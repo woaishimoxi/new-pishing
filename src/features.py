@@ -1,14 +1,14 @@
 """
-多维度特征工程模块 - 增强版
-特征工程是机器学习项目的灵魂。本模块负责将 parse_email 函数输出的原始信息，
-转化为一个数值化的特征向量。
+Multi-dimensional Feature Engineering Module - Enhanced Version
+Feature engineering is the soul of machine learning projects. This module is responsible for converting
+raw information from parse_email function into a numerical feature vector.
 
-增强特征体系设计（共 35+ 维）：
-- 邮件头特征（8 维）：新增 SPF/DKIM 验证、发件人欺骗检测
-- URL 特征（15 维）：新增 IP 地址检测、端口检测、可疑参数、URL 长度等
-- 文本特征（7 维）：保持原有特征
-- 附件特征（5 维）：附件数量、可疑类型、大小等
-- 沙箱分析特征（3 维）：沙箱检测结果、检测率、分析状态
+Enhanced feature system design (35+ dimensions):
+- Email header features (8 dimensions): SPF/DKIM verification, sender spoofing detection
+- URL features (15 dimensions): IP address detection, port detection, suspicious parameters, URL length, etc.
+- Text features (7 dimensions): original features maintained
+- Attachment features (5 dimensions): attachment count, suspicious types, size, etc.
+- Sandbox analysis features (3 dimensions): sandbox detection results, detection rate, analysis status
 """
 import time
 import re
@@ -190,31 +190,28 @@ def extract_header_features(parsed_email: Dict) -> Dict:
     else:
         top_level_domain = from_domain
 
-    # 检查域名是否在可疑关键词列表中（精确匹配或包含）
-    current_suspicious_keywords = load_whitelist_config().get("suspicious_domain_keywords", SUSPICIOUS_DOMAIN_KEYWORDS)
-    for keyword in current_suspicious_keywords:
-        if keyword in top_level_domain:
-            features['is_suspicious_from_domain'] = 1
-            break
+    # 检查发件人是否在可信列表中（优先检查）
+    trusted_senders = get_trusted_senders()
+    trusted_domains = get_trusted_domains()
     
-    # 增强检测：检查域名是否包含可疑关键词
-    suspicious_domain_patterns = ['suspicious', 'bank', 'security', 'verify', 'login', 'secure', 'account', 'auth']
-    for pattern in suspicious_domain_patterns:
-        if pattern in top_level_domain.lower():
-            features['is_suspicious_from_domain'] = 1
-            break
+    is_trusted = from_email.lower() in trusted_senders or top_level_domain in trusted_domains
     
-    # 增强检测：检查显示名是否包含可疑关键词
-    from_display_name = parsed_email.get('from_display_name', '').lower()
-    suspicious_display_name_patterns = ['bank', 'security', 'paypal', 'google', 'microsoft', 'amazon', 'verification']
-    for pattern in suspicious_display_name_patterns:
-        if pattern in from_display_name:
-            features['is_suspicious_from_domain'] = 1
-            break
-    
-    # 检查发件人是否在可信列表中
-    if from_email.lower() in get_trusted_senders():
-        features['is_suspicious_from_domain'] = 0  # 可信发件人覆盖可疑标记
+    if is_trusted:
+        features['is_suspicious_from_domain'] = 0
+    else:
+        # 非可信域名才进行可疑检测
+        current_suspicious_keywords = load_whitelist_config().get("suspicious_domain_keywords", SUSPICIOUS_DOMAIN_KEYWORDS)
+        for keyword in current_suspicious_keywords:
+            if keyword in top_level_domain:
+                features['is_suspicious_from_domain'] = 1
+                break
+        
+        # 高风险域名模式（仅针对非可信域名）
+        high_risk_patterns = ['suspicious', 'phish', 'scam', 'fraud', 'hack']
+        for pattern in high_risk_patterns:
+            if pattern in top_level_domain.lower():
+                features['is_suspicious_from_domain'] = 1
+                break
 
     # Received 链长度
     received_chain = parsed_email.get('received_chain', [])
