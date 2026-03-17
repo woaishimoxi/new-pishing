@@ -1,0 +1,23 @@
+# Web 框架
+flask>=2.3.0
+
+# 邮件解析（Python 内置，无需额外安装）
+
+# 机器学习
+lightgbm>=4.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# URL 和域名分析
+requests>=2.31.0
+whois>=0.8.0
+urllib3>=2.0.0
+
+# 文本处理
+textblob>=0.17.0
+
+# WSGI 服务器（生产环境）
+waitress>=2.1.0
+
+# 工具库
+python-dateutil>=2.8.0

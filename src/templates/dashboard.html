@@ -1,0 +1,2746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钓鱼邮件检测与溯源系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --neutral-bg: #f9fafb;
+        }
+
+        body {
+            background-color: var(--neutral-bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border-radius: 12px;
+        }
+
+        .detection-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .detection-card .card-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 16px 16px 0 0;
+        }
+
+        .upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: var(--secondary-color);
+            background-color: #f0f9ff;
+        }
+
+        .form-control {
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .stat-card {
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        /* 渐变背景 */
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .bg-gradient-danger {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+        }
+
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #059669, #10b981);
+        }
+
+        .bg-gradient-info {
+            background: linear-gradient(135deg, #0284c7, #3b82f6);
+        }
+
+        /* 脉冲动画 */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        /* 悬浮按钮脉冲动画 */
+        @keyframes pulse-fab {
+            0% {
+                box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(52, 152, 219, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+            }
+        }
+
+        .pulse-fab {
+            animation: pulse-fab 2s infinite;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .stats-banner .row {
+                flex-direction: column;
+            }
+
+            .stats-banner .col-md-3 {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+
+            .row.g-6 {
+                flex-direction: column;
+            }
+
+            .col-md-7,
+            .col-md-5 {
+                width: 100%;
+            }
+
+            .fixed.bottom-6.right-6 {
+                bottom: 2rem;
+                right: 2rem;
+            }
+
+            .btn.btn-primary.rounded-full.w-16.h-16 {
+                width: 4rem;
+                height: 4rem;
+            }
+        }
+
+        /* 辅助类 */
+        .flex {
+            display: flex;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-content-between {
+            justify-content: space-between;
+        }
+
+        .mt-1 {
+            margin-top: 0.25rem;
+        }
+
+        .mt-2 {
+            margin-top: 0.5rem;
+        }
+
+        .mr-1 {
+            margin-right: 0.25rem;
+        }
+
+        .space-x-2 > * + * {
+            margin-left: 0.5rem;
+        }
+
+        .text-xs {
+            font-size: 0.75rem;
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+        }
+
+        .text-xl {
+            font-size: 1.25rem;
+        }
+
+        .font-medium {
+            font-weight: 500;
+        }
+
+        .font-semibold {
+            font-weight: 600;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .text-gray-400 {
+            color: #9ca3af;
+        }
+
+        .text-gray-500 {
+            color: #6b7280;
+        }
+
+        .text-gray-700 {
+            color: #374151;
+        }
+
+        .text-gray-900 {
+            color: #111827;
+        }
+
+        .text-primary {
+            color: var(--secondary-color);
+        }
+
+        .text-success {
+            color: var(--success-color);
+        }
+
+        .text-danger {
+            color: var(--danger-color);
+        }
+
+        .bg-white {
+            background-color: #ffffff;
+        }
+
+        .border-bottom {
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .rounded-full {
+            border-radius: 9999px;
+        }
+
+        .rounded-xl {
+            border-radius: 0.75rem;
+        }
+
+        .shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .shadow-xl {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .overflow-hidden {
+            overflow: hidden;
+        }
+
+        .p-4 {
+            padding: 1rem;
+        }
+
+        .p-5 {
+            padding: 1.25rem;
+        }
+
+        .p-6 {
+            padding: 1.5rem;
+        }
+
+        .mt-3 {
+            margin-top: 0.75rem;
+        }
+
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .mt-6 {
+            margin-top: 1.5rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+
+        .g-4 {
+            gap: 1rem;
+        }
+
+        .g-6 {
+            gap: 1.5rem;
+        }
+
+        .space-y-6 > * + * {
+            margin-top: 1.5rem;
+        }
+
+        .list-group-flush {
+            border-radius: 0;
+        }
+
+        .list-group-item {
+            border: none;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .list-group-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            opacity: 0.8;
+        }
+
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .status-phishing {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .status-normal {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .progress-threshold {
+            position: relative;
+        }
+
+        .threshold-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: var(--warning-color);
+            z-index: 1;
+        }
+
+        .confidence-bar {
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-content {
+            text-align: center;
+            max-width: 400px;
+            padding: 30px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .loading-spinner {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+        }
+
+        .loading-progress {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .loading-text {
+            font-size: 16px;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+
+        .loading-subtext {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .risk-indicator {
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+        }
+
+        .risk-high {
+            background-color: #fce4e4;
+            border-color: var(--danger-color);
+        }
+
+        .risk-medium {
+            background-color: #fff3cd;
+            border-color: var(--warning-color);
+        }
+
+        .risk-low {
+            background-color: #d4edda;
+            border-color: var(--success-color);
+        }
+
+        .result-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .feature-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin: 2px;
+        }
+
+        .feature-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .feature-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .feature-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .attachment-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+
+        .attachment-icon {
+            font-size: 2rem;
+            margin-right: 10px;
+        }
+
+        .url-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #fff;
+        }
+
+        .detail-table th {
+            width: 180px;
+            background-color: #f8f9fa;
+        }
+
+        /* 邮件列表表格样式 */
+        .table-hover tbody tr:hover {
+            background-color: #f8f9ff !important;
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
+        }
+
+        .table th {
+            font-weight: 600;
+            color: #495057;
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .table td {
+            vertical-align: middle;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* 调整邮件列表卡片高度 */
+        .card {
+            margin-bottom: 1rem;
+        }
+
+        /* 调整统计卡片高度 */
+        .stats-banner .card {
+            margin-bottom: 1rem;
+        }
+
+        /* 调整主内容区域间距 */
+        .row.g-6 {
+            gap: 1rem;
+        }
+
+        /* 响应式调整 */
+        @media (min-height: 768px) {
+            .table-responsive {
+                max-height: 700px;
+            }
+        }
+
+        @media (min-height: 1080px) {
+            .table-responsive {
+                max-height: 800px;
+            }
+        }
+
+        /* 滚动条样式 */
+        .table-responsive::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* 响应式表格 */
+        @media (max-width: 1200px) {
+            .table th:nth-child(5),
+            .table td:nth-child(5) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .table th:nth-child(4),
+            .table td:nth-child(4) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .table th:nth-child(6),
+            .table td:nth-child(6) {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-shield-check"></i>
+                钓鱼邮件检测与溯源系统
+            </a>
+            <div class="d-flex ms-auto">
+                <button class="btn btn-sm btn-outline-light me-2" type="button" onclick="showApiConfig()">
+                    <i class="bi bi-gear"></i> API 配置
+                </button>
+                <button class="btn btn-sm btn-outline-light" type="button" onclick="shutdownSystem()">
+                    <i class="bi bi-power"></i> 关闭系统
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <!-- 顶部统计区域 - 采用网格布局 -->
+        <div class="grid-container" style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-bottom: 1rem;">
+            <!-- 主要统计卡片 -->
+            <div class="grid-item" style="grid-column: span 3;">
+                <div class="stat-card bg-gradient-primary text-white rounded-xl shadow-lg">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-sm font-medium opacity-80">总检测数</p>
+                                <h3 class="text-2xl font-bold mt-1" id="total-count">0</h3>
+                                <div class="flex items-center mt-2 text-xs">
+                                    <span class="text-success mr-1"><i class="bi bi-arrow-up"></i> 12%</span>
+                                    <span class="opacity-70">较昨日</span>
+                                </div>
+                            </div>
+                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                                <i class="bi bi-box-seen stat-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-item" style="grid-column: span 3;">
+                <div class="stat-card bg-gradient-danger text-white rounded-xl shadow-lg pulse-animation">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-sm font-medium opacity-80">钓鱼邮件</p>
+                                <h3 class="text-2xl font-bold mt-1" id="phishing-count">0</h3>
+                                <div class="flex items-center mt-2 text-xs">
+                                    <span class="text-danger mr-1"><i class="bi bi-arrow-up"></i> 5%</span>
+                                    <span class="opacity-70">较昨日</span>
+                                </div>
+                            </div>
+                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                                <i class="bi bi-exclamation-triangle stat-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-item" style="grid-column: span 3;">
+                <div class="stat-card bg-gradient-success text-white rounded-xl shadow-lg">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-sm font-medium opacity-80">正常邮件</p>
+                                <h3 class="text-2xl font-bold mt-1" id="normal-count">0</h3>
+                                <div class="flex items-center mt-2 text-xs">
+                                    <span class="text-success mr-1"><i class="bi bi-arrow-up"></i> 15%</span>
+                                    <span class="opacity-70">较昨日</span>
+                                </div>
+                            </div>
+                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                                <i class="bi bi-check-circle stat-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-item" style="grid-column: span 3;">
+                <div class="stat-card bg-gradient-info text-white rounded-xl shadow-lg">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-sm font-medium opacity-80">今日新增</p>
+                                <h3 class="text-2xl font-bold mt-1" id="today-count">0</h3>
+                                <div class="flex items-center mt-2 text-xs">
+                                    <span class="text-success mr-1"><i class="bi bi-arrow-up"></i> 8%</span>
+                                    <span class="opacity-70">较昨日</span>
+                                </div>
+                            </div>
+                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
+                                <i class="bi bi-calendar-day stat-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 平台监测资源统计 -->
+            <div class="grid-item" style="grid-column: span 12;">
+                <div class="card rounded-xl shadow-lg overflow-hidden">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-server text-primary mr-2"></i>平台监测资源</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                            <div class="text-center">
+                                <div class="display-4 font-bold text-primary">0</div>
+                                <div class="text-sm text-gray-500">API 调用</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="display-4 font-bold text-success">1</div>
+                                <div class="text-sm text-gray-500">活跃检测</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="display-4 font-bold text-warning">1</div>
+                                <div class="text-sm text-gray-500">队列任务</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="display-4 font-bold text-danger">3</div>
+                                <div class="text-sm text-gray-500">威胁情报</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="display-4 font-bold text-info">0</div>
+                                <div class="text-sm text-gray-500">异常事件</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="display-4 font-bold text-secondary">100%</div>
+                                <div class="text-sm text-gray-500">系统状态</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区域 - 采用网格布局 -->
+        <div class="grid-container" style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-bottom: 1rem;">
+            <!-- 左侧邮件列表（主要内容） - 占用8列 -->
+            <div class="grid-item" style="grid-column: span 8;">
+                <!-- 邮件列表 -->
+                <div class="card rounded-xl shadow-lg overflow-hidden">
+                    <div class="card-header bg-white border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-inbox text-primary mr-2"></i>邮件列表</h5>
+                            <div class="d-flex align-items-center space-x-3">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showEmailSourceModal('fetch')">
+                                        <i class="bi bi-cloud-download"></i> 第三方获取
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showEmailSourceModal('manual')">
+                                        <i class="bi bi-pencil"></i> 手动输入
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showEmailSourceModal('upload')">
+                                        <i class="bi bi-upload"></i> 上传邮件
+                                    </button>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="auto-monitor-toggle" onchange="toggleAutoMonitor(this.checked)">
+                                    <label class="form-check-label" for="auto-monitor-toggle">自动监控</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th style="width: 40px;">
+                                            <input type="checkbox" class="form-check-input" id="select-all-checkbox" onchange="toggleSelectAll(this)">
+                                        </th>
+                                        <th class="ps-4">邮件标题</th>
+                                        <th>发件人</th>
+                                        <th>判定结果</th>
+                                        <th>判定评分</th>
+                                        <th>获取来源</th>
+                                        <th>检测时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="email-list-body">
+                                    <!-- 动态加载邮件列表 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="email-list-empty" class="text-center py-5" style="display: none;">
+                            <i class="bi bi-inbox" style="font-size: 3rem; color: #dee2e6;"></i>
+                            <p class="text-muted mt-3">暂无邮件数据</p>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center">
+                        <div>
+                            <button class="btn btn-sm btn-outline-danger" id="batch-delete-btn" onclick="batchDeleteEmails()" style="display: none;">
+                                <i class="bi bi-trash"></i> 批量删除 (<span id="selected-count">0</span>)
+                            </button>
+                        </div>
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center mb-0" id="email-pagination">
+                                <!-- 动态生成分页 -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧统计信息 - 占用4列 -->
+            <div class="grid-item" style="grid-column: span 4;">
+                <div class="space-y-3">
+                    <!-- 检测结果分布 -->
+                    <div class="card rounded-xl shadow-lg overflow-hidden">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-pie-chart text-primary mr-2"></i>检测结果分布</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <canvas id="distributionChart" height="160"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 近 7 天检测趋势 -->
+                    <div class="card rounded-xl shadow-lg overflow-hidden">
+                        <div class="card-header bg-white border-bottom">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-graph-up text-primary mr-2"></i>检测趋势</h5>
+                                <div class="flex space-x-1">
+                                    <button class="btn btn-sm btn-outline-primary rounded-full">日</button>
+                                    <button class="btn btn-sm btn-primary rounded-full">周</button>
+                                    <button class="btn btn-sm btn-outline-primary rounded-full">月</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <canvas id="trendChart" height="180"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 系统状态 -->
+                    <div class="card rounded-xl shadow-lg overflow-hidden">
+                        <div class="card-header bg-white border-bottom">
+                            <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-shield-check text-primary mr-2"></i>系统状态</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="space-y-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-sm font-medium">API 连接</span>
+                                    <span class="status-badge status-normal">正常</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-sm font-medium">数据库</span>
+                                    <span class="status-badge status-normal">正常</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-sm font-medium">自动监控</span>
+                                    <span id="auto-monitor-status" class="status-badge status-warning">未开启</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-sm font-medium">系统负载</span>
+                                    <span class="text-sm text-gray-700">低</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- 悬浮操作按钮 -->
+    <div class="fixed bottom-6 right-6">
+        <button class="btn btn-primary rounded-full w-16 h-16 shadow-lg flex items-center justify-center pulse-fab" onclick="openDetectionModal()">
+            <i class="bi bi-plus text-xl"></i>
+        </button>
+    </div>
+
+    <!-- 检测表单模态框 -->
+    <div class="modal fade" id="detectionModal" tabindex="-1" aria-labelledby="detectionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content rounded-xl shadow-xl">
+                <div class="modal-header bg-gradient-primary text-white">
+                    <h5 class="modal-title" id="detectionModalLabel">邮件检测</h5>
+                    <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-5">
+                    <!-- 选项卡切换 -->
+                    <ul class="nav nav-tabs mb-4" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#paste-tab" type="button">
+                                <i class="bi bi-clipboard"></i> 粘贴邮件内容
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#upload-tab" type="button">
+                                <i class="bi bi-file-earmark-arrow-up"></i> 上传邮件文件
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- 粘贴邮件内容 -->
+                        <div class="tab-pane fade show active" id="paste-tab">
+                            <form id="emailForm">
+                                <div class="mb-4">
+                                    <label for="emailContent" class="form-label fw-medium">粘贴原始邮件内容:</label>
+                                    <textarea class="form-control" id="emailContent" rows="10"
+                                        placeholder="粘贴邮件原文或上传 .eml 文件...
+
+示例：
+From: sender@example.com
+To: recipient@example.com
+Subject: 重要通知
+Date: Wed, 1 Jan 2025 12:00:00 +0000
+
+请点击以下链接查看您的账户信息：
+https://example.com/account"></textarea>
+                                    <small class="text-muted d-block mt-2">支持格式：RFC822 邮件原文、.eml 文件、纯 URL</small>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary me-md-2">
+                                        <i class="bi bi-search"></i> 开始检测
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- 上传邮件文件 -->
+                        <div class="tab-pane fade" id="upload-tab">
+                            <form id="uploadForm" enctype="multipart/form-data">
+                                <div class="mb-4">
+                                    <label for="emailFile" class="form-label fw-medium">上传邮件文件:</label>
+                                    <div class="upload-area p-6 text-center" id="uploadArea"
+                                         onclick="document.getElementById('emailFile').click()">
+                                        <i class="bi bi-cloud-upload" style="font-size: 4rem; color: #9ca3af;"></i>
+                                        <p class="mt-3 mb-2">点击选择文件或拖拽文件到此处</p>
+                                        <small class="text-muted">支持 .eml 和 .msg 格式，最大 50MB</small>
+                                        <input type="file" id="emailFile" name="file" accept=".eml,.msg" style="display: none;" onchange="handleFileSelect(this)">
+                                    </div>
+                                    <div id="fileInfo" class="mt-3" style="display: none;">
+                                        <div class="alert alert-info d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-file-earmark-check"></i> 已选择：<strong id="fileName"></strong></span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
+                                                <i class="bi bi-x-lg"></i> 清除
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary me-md-2" id="uploadBtn" disabled>
+                                        <i class="bi bi-search"></i> 开始检测
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner-border text-primary loading-spinner" role="status"></div>
+            <h4 class="loading-text" id="loadingText">正在分析邮件...</h4>
+            <p class="loading-subtext" id="loadingSubtext">正在解析邮件头...</p>
+            <div class="loading-progress">
+                <div class="loading-progress-bar" id="loadingProgressBar"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trendChart = null;
+        let distributionChart = null;
+        let currentResult = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+        });
+
+        // 数字滚动动画
+        function animateNumber(elementId, targetValue, duration = 2000) {
+            const element = document.getElementById(elementId);
+            const startValue = 0;
+            const increment = targetValue / (duration / 16);
+            let currentValue = startValue;
+
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= targetValue) {
+                    clearInterval(timer);
+                    currentValue = targetValue;
+                }
+                element.textContent = Math.floor(currentValue);
+            }, 16);
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats/overview');
+                const data = await response.json();
+
+                // 使用数字滚动动画
+                animateNumber('total-count', data.total);
+                animateNumber('phishing-count', data.phishing);
+                animateNumber('normal-count', data.normal);
+                animateNumber('today-count', data.today);
+
+                updateCharts(data);
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+            }
+        }
+
+        function updateCharts(data) {
+            const trendCtx = document.getElementById('trendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+
+            trendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: data.trend.map(d => d.day),
+                    datasets: [{
+                        label: '钓鱼邮件',
+                        data: data.trend.map(d => d.phish_count),
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#ef4444',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }, {
+                        label: '正常邮件',
+                        data: data.trend.map(d => d.count - d.phish_count),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 12
+                                },
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8,
+                            titleFont: {
+                                size: 14
+                            },
+                            bodyFont: {
+                                size: 13
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                }
+            });
+
+            const distCtx = document.getElementById('distributionChart').getContext('2d');
+            if (distributionChart) distributionChart.destroy();
+
+            distributionChart = new Chart(distCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['钓鱼邮件', '正常邮件'],
+                    datasets: [{
+                        data: [data.phishing || 0, data.normal || 0],
+                        backgroundColor: ['#ef4444', '#10b981'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 12
+                                },
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 8,
+                            bodyFont: {
+                                size: 13
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // 打开检测模态框
+        function openDetectionModal() {
+            const modal = new bootstrap.Modal(document.getElementById('detectionModal'));
+            modal.show();
+        }
+
+        // 切换自动监控状态
+        function toggleAutoMonitor(enabled) {
+            const statusElement = document.getElementById('auto-monitor-status');
+            if (enabled) {
+                statusElement.className = 'status-badge status-normal';
+                statusElement.textContent = '运行中';
+            } else {
+                statusElement.className = 'status-badge status-warning';
+                statusElement.textContent = '未开启';
+            }
+        }
+
+        // 文件上传相关函数
+        let selectedFile = null;
+
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (file) {
+                selectedFile = file;
+                document.getElementById('fileName').textContent = `${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                document.getElementById('fileInfo').style.display = 'block';
+                document.getElementById('uploadBtn').disabled = false;
+
+                // 添加高亮效果
+                document.getElementById('uploadArea').style.borderColor = '#28a745';
+                document.getElementById('uploadArea').style.backgroundColor = '#d4edda';
+            }
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('emailFile').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
+
+            // 恢复样式
+            document.getElementById('uploadArea').style.borderColor = '#dee2e6';
+            document.getElementById('uploadArea').style.backgroundColor = 'transparent';
+        }
+
+        // 拖拽上传支持
+        const uploadArea = document.getElementById('uploadArea');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#007bff';
+            uploadArea.style.backgroundColor = '#e7f1ff';
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#dee2e6';
+            uploadArea.style.backgroundColor = 'transparent';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#dee2e6';
+            uploadArea.style.backgroundColor = 'transparent';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                const validExt = file.name.toLowerCase().endsWith('.eml') || file.name.toLowerCase().endsWith('.msg');
+                if (!validExt) {
+                    alert('不支持的文件格式，请上传.eml 或.msg 文件');
+                    return;
+                }
+                selectedFile = file;
+                document.getElementById('fileName').textContent = `${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                document.getElementById('fileInfo').style.display = 'block';
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        });
+
+        // 更新加载动画状态
+        function updateLoadingStatus(text, subtext, progress) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingSubtext').textContent = subtext;
+            document.getElementById('loadingProgressBar').style.width = progress + '%';
+        }
+
+        // 显示加载动画
+        function showLoading(text, subtext, progress = 0) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingSubtext').textContent = subtext || '';
+            document.getElementById('loadingProgressBar').style.width = progress + '%';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        // 隐藏加载动画
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // 更新加载进度
+        function updateLoading(text, subtext, progress) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingSubtext').textContent = subtext;
+            document.getElementById('loadingProgressBar').style.width = progress + '%';
+        }
+
+        // 生成会话ID
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 上传表单提交
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!selectedFile) {
+                alert('请选择要上传的邮件文件');
+                return;
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            updateLoadingStatus('正在分析邮件...', '正在解析邮件头...', 0);
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                // 模拟进度更新
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 10;
+                    if (progress <= 90) {
+                        updateLoadingStatus('正在分析邮件...', '正在分析特征...', progress);
+                    }
+                }, 200);
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                updateLoadingStatus('正在分析邮件...', '正在生成报告...', 100);
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // 生成会话ID并存储结果
+                    const sessionId = generateSessionId();
+                    localStorage.setItem(`phishing_report_${sessionId}`, JSON.stringify(result));
+                    
+                    // 跳转到报告页面
+                    window.location.href = `/report.html?session=${sessionId}`;
+                } else {
+                    alert('分析失败：' + result.error);
+                }
+            } catch (error) {
+                alert('请求错误：' + error.message);
+            } finally {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        });
+
+        // 原有的邮件内容表单提交
+        document.getElementById('emailForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const emailContent = document.getElementById('emailContent').value.trim();
+            if (!emailContent) {
+                alert('请输入邮件内容');
+                return;
+            }
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            updateLoadingStatus('正在分析邮件...', '正在解析邮件头...', 0);
+
+            try {
+                // 模拟进度更新
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 10;
+                    if (progress <= 30) {
+                        updateLoadingStatus('正在分析邮件...', '正在解析邮件头...', progress);
+                    } else if (progress <= 60) {
+                        updateLoadingStatus('正在分析邮件...', '正在提取特征...', progress);
+                    } else if (progress <= 90) {
+                        updateLoadingStatus('正在分析邮件...', '正在比对威胁情报...', progress);
+                    }
+                }, 200);
+
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: emailContent })
+                });
+
+                clearInterval(progressInterval);
+                updateLoadingStatus('正在分析邮件...', '正在生成报告...', 100);
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // 生成会话ID并存储结果
+                    const sessionId = generateSessionId();
+                    localStorage.setItem(`phishing_report_${sessionId}`, JSON.stringify(result));
+                    
+                    // 跳转到报告页面
+                    window.location.href = `/report.html?session=${sessionId}`;
+                } else {
+                    alert('分析失败：' + result.error);
+                }
+            } catch (error) {
+                alert('请求错误：' + error.message);
+            } finally {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        });
+
+        function displayResults(result) {
+            const section = document.getElementById('resultSection');
+            const alertDiv = document.getElementById('resultAlert');
+            const isPhishing = result.is_phish;
+
+            document.getElementById('resultTitle').innerHTML = isPhishing
+                ? '<i class="bi bi-exclamation-triangle-fill"></i> 检测到钓鱼邮件!'
+                : '<i class="bi bi-check-circle-fill"></i> 这是一封正常的邮件';
+
+            document.getElementById('resultTitle').className = isPhishing ? 'text-danger fw-bold' : 'text-success fw-bold';
+
+            const confidence = result.confidence * 100;
+            document.getElementById('confidenceValue').textContent = confidence.toFixed(2) + '%';
+
+            const bar = document.getElementById('confidenceBar');
+            bar.style.width = confidence + '%';
+            document.getElementById('confidenceText').textContent = confidence.toFixed(0) + '%';
+            bar.className = `progress-bar ${isPhishing ? 'bg-danger' : 'bg-success'}`;
+
+            // 更新邮件信息
+            document.getElementById('resultFromName').textContent = result.parsed.from_display_name || '-';
+            document.getElementById('resultFromEmail').textContent = result.parsed.from_email || '-';
+            document.getElementById('resultTo').textContent = result.parsed.to || '-';
+            document.getElementById('resultSubject').textContent = result.parsed.subject || '-';
+            document.getElementById('resultUrlCount').textContent = result.parsed.url_count || 0;
+            document.getElementById('resultAttachmentCount').innerHTML =
+                result.parsed.attachment_count > 0
+                    ? `<span class="badge bg-warning">${result.parsed.attachment_count}</span>`
+                    : '0';
+
+            // 显示认证状态
+            displayAuthStatus(result.headers);
+
+            // 显示风险指标
+            displayRiskIndicators(result.traceback?.risk_indicators || [], result.features);
+
+            // 显示附件分析
+            displayAttachments(result.attachments || []);
+
+            // 显示 URL 分析
+            displayURLAnalysis(result.traceback?.url_analysis || [], result.html_links || []);
+
+            // 显示特征分析
+            displayFeatureAnalysis(result.features);
+
+            // 显示溯源信息
+            displayTracebackInfo(result.traceback);
+
+            section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function displayAuthStatus(headers) {
+            const container = document.getElementById('authStatus');
+            if (!headers) {
+                container.innerHTML = '<span class="text-muted">无认证信息</span>';
+                return;
+            }
+
+            const spf = headers.spf_result || 'unknown';
+            const dkim = headers.dkim_result || 'unknown';
+            const dmarc = headers.dmarc_result || 'unknown';
+
+            const getStatusBadge = (status) => {
+                if (status === 'pass') return '<span class="feature-badge feature-success">通过</span>';
+                if (status === 'fail') return '<span class="feature-badge feature-danger">失败</span>';
+                if (status === 'none') return '<span class="feature-badge feature-warning">未设置</span>';
+                return '<span class="feature-badge feature-warning">未知</span>';
+            };
+
+            container.innerHTML = `
+                <div class="mb-2">
+                    <strong>SPF:</strong> ${getStatusBadge(spf)}
+                    <small class="text-muted ms-2">验证发件人 IP 是否被授权</small>
+                </div>
+                <div class="mb-2">
+                    <strong>DKIM:</strong> ${getStatusBadge(dkim)}
+                    <small class="text-muted ms-2">验证邮件内容是否被篡改</small>
+                </div>
+                <div class="mb-2">
+                    <strong>DMARC:</strong> ${getStatusBadge(dmarc)}
+                    <small class="text-muted ms-2">综合认证策略</small>
+                </div>
+            `;
+        }
+
+        function displayRiskIndicators(indicators, features) {
+            const container = document.getElementById('riskIndicators');
+
+            // 根据特征生成额外风险指标
+            let dynamicIndicators = [...indicators];
+
+            // 检查附件风险
+            if (features?.has_executable_attachment) {
+                dynamicIndicators.push({
+                    type: 'EXECUTABLE_ATTACHMENT',
+                    description: '邮件包含可执行文件附件（.exe, .bat, .scr 等）',
+                    severity: 'high'
+                });
+            }
+            if (features?.has_double_extension) {
+                dynamicIndicators.push({
+                    type: 'DOUBLE_EXTENSION',
+                    description: '发现双重扩展名文件（如.pdf.exe），高度可疑',
+                    severity: 'high'
+                });
+            }
+
+            // 检查 URL 风险
+            if (features?.ip_address_count > 0) {
+                dynamicIndicators.push({
+                    type: 'IP_ADDRESS_URL',
+                    description: `发现 ${features.ip_address_count} 个使用 IP 地址的 URL`,
+                    severity: 'high'
+                });
+            }
+            if (features?.short_url_count > 0) {
+                dynamicIndicators.push({
+                    type: 'SHORT_URL',
+                    description: `发现 ${features.short_url_count} 个短链接`,
+                    severity: 'medium'
+                });
+            }
+            if (features?.has_hidden_links) {
+                dynamicIndicators.push({
+                    type: 'HIDDEN_LINKS',
+                    description: 'HTML 邮件中包含隐藏链接',
+                    severity: 'high'
+                });
+            }
+            if (features?.has_form) {
+                dynamicIndicators.push({
+                    type: 'FORM_IN_EMAIL',
+                    description: '邮件中包含表单（可能用于窃取凭证）',
+                    severity: 'high'
+                });
+            }
+
+            if (dynamicIndicators.length === 0) {
+                container.innerHTML = '<div class="alert alert-success"><i class="bi bi-shield-check"></i> 未发现明显风险指标</div>';
+                return;
+            }
+
+            // 去重
+            const seen = new Set();
+            const uniqueIndicators = dynamicIndicators.filter(ind => {
+                if (seen.has(ind.description)) return false;
+                seen.add(ind.description);
+                return true;
+            });
+
+            let html = '<h6 class="mb-3"><i class="bi bi-bug"></i>风险指标</h6>';
+            uniqueIndicators.forEach(ind => {
+                const severityClass = ind.severity === 'high' ? 'risk-high' :
+                                     ind.severity === 'medium' ? 'risk-medium' : 'risk-low';
+                html += `<div class="risk-indicator ${severityClass}">
+                    <strong>[${(ind.severity || '').toUpperCase()}]</strong> ${ind.description}
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function displayAttachments(attachments) {
+            const container = document.getElementById('attachmentsSection');
+
+            if (!attachments || attachments.length === 0) {
+                container.innerHTML = '<div class="alert alert-secondary"><i class="bi bi-file-earmark"></i> 未发现附件</div>';
+                return;
+            }
+
+            let html = '<h6 class="mb-3"><i class="bi bi-paperclip"></i>附件分析</h6>';
+
+            attachments.forEach((att, idx) => {
+                const isSuspicious = att.is_suspicious_type;
+                const ext = att.filename.split('.').pop()?.toLowerCase() || '';
+
+                // 根据文件类型选择图标
+                let icon = 'bi-file-earmark';
+                if (['exe', 'bat', 'cmd', 'scr', 'msi'].includes(ext)) icon = 'bi-file-earmark-lock';
+                else if (['doc', 'docm', 'xls', 'xlsm'].includes(ext)) icon = 'bi-file-earmark-word';
+                else if (['pdf'].includes(ext)) icon = 'bi-file-earmark-pdf';
+                else if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) icon = 'bi-file-earmark-image';
+                else if (['zip', 'rar', '7z'].includes(ext)) icon = 'bi-file-earmark-zip';
+
+                html += `<div class="attachment-card ${isSuspicious ? 'border-danger' : ''}">
+                    <div class="d-flex align-items-start">
+                        <i class="bi ${icon} attachment-icon ${isSuspicious ? 'text-danger' : 'text-secondary'}"></i>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>${att.filename}</strong>
+                                ${isSuspicious ? '<span class="badge bg-danger">可疑</span>' : '<span class="badge bg-success">安全</span>'}
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-3"><small><strong>类型:</strong> ${att.content_type}</small></div>
+                                <div class="col-md-2"><small><strong>大小:</strong> ${(att.size / 1024).toFixed(2)} KB</small></div>
+                                <div class="col-md-7"><small><strong>MD5:</strong> <code>${att.md5 || 'N/A'}</code></small></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function displayURLAnalysis(urlAnalysis, htmlLinks) {
+            const container = document.getElementById('urlAnalysisSection');
+
+            const allUrls = [...(urlAnalysis || [])];
+
+            if (allUrls.length === 0) {
+                container.innerHTML = '<div class="alert alert-secondary"><i class="bi bi-link-45deg"></i> 未发现 URL</div>';
+                return;
+            }
+
+            let html = '<h6 class="mb-3"><i class="bi bi-link-45deg"></i>URL 分析</h6>';
+
+            allUrls.forEach((urlInfo, idx) => {
+                const url = urlInfo.url || urlInfo;
+                const risks = urlInfo.risks || [];
+                const domainInfo = urlInfo.domain_info || {};
+
+                // 判断风险等级
+                let riskClass = 'border-success';
+                let riskBadge = '<span class="badge bg-success">安全</span>';
+                if (risks.length > 0) {
+                    const hasHighRisk = risks.some(r => r.severity === 'high');
+                    riskClass = hasHighRisk ? 'border-danger' : 'border-warning';
+                    riskBadge = hasHighRisk ? '<span class="badge bg-danger">高风险</span>' : '<span class="badge bg-warning text-dark">中等风险</span>';
+                }
+
+                html += `<div class="url-card ${riskClass}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <code>${url}</code>
+                        ${riskBadge}
+                    </div>`;
+
+                // 域名信息
+                if (domainInfo && domainInfo.domain) {
+                    html += `<div class="row">
+                        <div class="col-md-3"><small><strong>域名:</strong> ${domainInfo.domain}</small></div>
+                        <div class="col-md-3"><small><strong>域名年龄:</strong> ${domainInfo.age_days || 0} 天</small></div>
+                        <div class="col-md-3"><small><strong>注册商:</strong> ${domainInfo.registrar || '未知'}</small></div>
+                        <div class="col-md-3"><small><strong>HTTPS:</strong> ${urlInfo.url?.startsWith('https') ? '是' : '否'}</small></div>
+                    </div>`;
+                }
+
+                // 跳转链
+                if (urlInfo.redirect_chain && urlInfo.redirect_chain.length > 1) {
+                    html += `<div class="mt-2"><small><strong>跳转路径:</strong> ${urlInfo.redirect_chain.join(' → ')}</small></div>`;
+                }
+
+                // 风险提示
+                if (risks.length > 0) {
+                    html += '<div class="mt-2">';
+                    risks.forEach(risk => {
+                        const badgeClass = risk.severity === 'high' ? 'bg-danger' : 'bg-warning';
+                        html += `<span class="badge ${badgeClass} me-1">${risk.description}</span>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            });
+
+            // 显示 HTML 中的表单
+            if (htmlLinks && htmlLinks.length > 0) {
+                const forms = htmlLinks.filter(l => l.type === 'form' || (l.action && l.method));
+                if (forms.length > 0) {
+                    html += '<div class="alert alert-warning mt-3"><i class="bi bi-exclamation-triangle"></i> <strong>警告:</strong> 邮件中包含表单，可能用于窃取敏感信息</div>';
+                }
+            }
+
+            container.innerHTML = html;
+        }
+
+        function displayFeatureAnalysis(features) {
+            const container = document.getElementById('featureAnalysisSection');
+            if (!features) return;
+
+            let html = '<h6 class="mb-3"><i class="bi bi-bar-chart"></i>特征分析</h6>';
+            html += '<div class="row">';
+
+            // 邮件头特征
+            html += '<div class="col-md-4"><div class="card"><div class="card-header bg-light"><strong>邮件头特征</strong></div><div class="card-body">';
+            html += `<div class="d-flex justify-content-between"><span>可疑发件人域名:</span> ${features.is_suspicious_from_domain ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>Received 跳数:</span> <span>${features.received_hops_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>SPF 失败:</span> ${features.spf_fail ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>显示名不匹配:</span> ${features.from_display_name_mismatch ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
+            html += '</div></div></div>';
+
+            // URL 特征
+            html += '<div class="col-md-4"><div class="card"><div class="card-header bg-light"><strong>URL 特征</strong></div><div class="card-body">';
+            html += `<div class="d-flex justify-content-between"><span>URL 总数:</span> <span>${features.url_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>短链接:</span> ${features.short_url_count > 0 ? `<span class="badge bg-warning">${features.short_url_count}</span>` : '<span class="badge bg-success">0</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>IP 地址 URL:</span> ${features.ip_address_count > 0 ? `<span class="badge bg-danger">${features.ip_address_count}</span>` : '<span class="badge bg-success">0</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>平均域名年龄:</span> <span>${(features.avg_domain_age_days / 365).toFixed(1)} 年</span></div>`;
+            html += '</div></div></div>';
+
+            // 文本特征
+            html += '<div class="col-md-4"><div class="card"><div class="card-header bg-light"><strong>文本特征</strong></div><div class="card-body">';
+            html += `<div class="d-flex justify-content-between"><span>紧急关键词:</span> <span>${features.urgent_keywords_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>金融关键词:</span> <span>${features.financial_keywords_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>感叹号:</span> <span>${features.exclamation_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>紧迫感评分:</span> <span>${((features.urgency_score || 0) * 100).toFixed(0)}%</span></div>`;
+            html += '</div></div></div>';
+
+            // 附件特征
+            html += '</div><div class="row mt-3"><div class="col-md-6"><div class="card"><div class="card-header bg-light"><strong>附件特征</strong></div><div class="card-body">';
+            html += `<div class="d-flex justify-content-between"><span>附件数量:</span> <span>${features.attachment_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>可疑附件:</span> ${features.has_suspicious_attachment ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>可执行文件:</span> ${features.has_executable_attachment ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>双重扩展名:</span> ${features.has_double_extension ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
+            html += '</div></div></div>';
+
+            // HTML 特征
+            html += '<div class="col-md-6"><div class="card"><div class="card-header bg-light"><strong>HTML 特征</strong></div><div class="card-body">';
+            html += `<div class="d-flex justify-content-between"><span>HTML 正文:</span> ${features.has_html_body ? '<span class="badge bg-info">有</span>' : '<span class="badge bg-secondary">无</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>HTML 链接数:</span> <span>${features.html_link_count || 0}</span></div>`;
+            html += `<div class="d-flex justify-content-between"><span>隐藏链接:</span> ${features.has_hidden_links ? '<span class="badge bg-danger">有</span>' : '<span class="badge bg-success">无</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>表单:</span> ${features.has_form ? '<span class="badge bg-warning">有</span>' : '<span class="badge bg-success">无</span>'}</div>`;
+            html += `<div class="d-flex justify-content-between"><span>IFrame:</span> ${features.has_iframe ? '<span class="badge bg-warning">有</span>' : '<span class="badge bg-success">无</span>'}</div>`;
+            html += '</div></div></div></div>';
+
+            container.innerHTML = html;
+        }
+
+        function displayTracebackInfo(traceback) {
+            const container = document.getElementById('tracebackInfo');
+            const emailSource = traceback?.email_source || {};
+
+            let html = '<hr><h6 class="mb-3"><i class="bi bi-map"></i>溯源信息</h6>';
+
+            if (emailSource.source_ip || emailSource.hops?.length > 0) {
+                html += '<div class="card mb-3"><div class="card-body">';
+                html += '<h6 class="card-title">邮件来源</h6>';
+                html += `<p class="mb-1"><strong>源 IP:</strong> ${emailSource.source_ip || '未知'}</p>`;
+
+                if (emailSource.full_path) {
+                    html += `<p class="mb-1"><strong>传输路径:</strong> <code>${emailSource.full_path}</code></p>`;
+                }
+
+                const geo = emailSource.geolocation || {};
+                if (geo.country && geo.country !== 'Unknown') {
+                    html += `<p class="mb-1"><strong>地理位置:</strong> ${geo.country} ${geo.regionName || ''} ${geo.city || ''}</p>`;
+                    html += `<p class="mb-0"><strong>ISP:</strong> ${geo.isp || '未知'}</p>`;
+                }
+
+                const blacklist = emailSource.blacklist_check || {};
+                if (blacklist.is_blacklisted) {
+                    html += `<p class="text-danger mb-0"><i class="bi bi-exclamation-triangle"></i> <strong>黑名单:</strong> 被标记于 ${blacklist.blacklists?.join(', ') || '未知'}</p>`;
+                } else {
+                    html += `<p class="text-success mb-0"><i class="bi bi-check-circle"></i> <strong>黑名单:</strong> 未被标记</p>`;
+                }
+                html += '</div></div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function exportReport() {
+            if (!currentResult) return;
+
+            const report = {
+                detection_time: new Date().toISOString(),
+                result: currentResult
+            };
+
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `phishing_report_${new Date().getTime()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function shutdownSystem() {
+            if (!confirm('确定要关闭系统吗？关闭后需要重新启动服务才能再次访问。')) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/shutdown', { method: 'POST' });
+                const result = await response.json();
+                if (response.ok) {
+                    alert('系统正在关闭，当前页面很快将无法访问。');
+                } else {
+                    alert('关闭失败：' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('请求错误：' + error.message);
+            }
+        }
+
+        // ========== 邮件详情相关函数 ==========
+
+        // 打开邮件详情面板
+        function toggleRawEmail() {
+            const section = document.getElementById('rawEmailSection');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                renderRawEmailContent();
+                // 平滑滚动到详情区域
+                setTimeout(() => {
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        // 关闭邮件详情面板
+        function closeRawEmail() {
+            document.getElementById('rawEmailSection').style.display = 'none';
+        }
+
+        // 复制邮件头信息
+        function copyHeaders() {
+            const headers = currentResult?.headers || {};
+            let text = '';
+            for (const [key, value] of Object.entries(headers)) {
+                if (value && value !== '') {
+                    text += `${key}: ${value}\n`;
+                }
+            }
+            navigator.clipboard.writeText(text).then(() => {
+                alert('邮件头已复制到剪贴板！');
+            }).catch(() => alert('复制失败'));
+        }
+
+        // 复制完整原始邮件
+        function copyFullEmail() {
+            const email = currentResult?.raw_email || '';
+            navigator.clipboard.writeText(email).then(() => {
+                alert('原始邮件已复制到剪贴板！');
+            }).catch(() => alert('复制失败'));
+        }
+
+        // 渲染邮件详情内容
+        function renderRawEmailContent() {
+            if (!currentResult) {
+                alert('暂无检测结果');
+                return;
+            }
+
+            const result = currentResult;
+
+            // 1. 邮件正文
+            const body = result.parsed?.body || '(无纯文本正文)';
+            document.getElementById('textContent').textContent = body;
+
+            // 2. URL 列表
+            const urls = result.parsed?.urls || [];
+            document.getElementById('urlCountBadge').textContent = urls.length;
+            let urlHtml = '<ul class="list-group">';
+            if (urls.length > 0) {
+                urls.forEach((url, idx) => {
+                    const isHttps = url.startsWith('https://');
+                    const bgClass = isHttps ? 'bg-success' : 'bg-danger';
+                    const icon = isHttps ? 'bi-shield-check' : 'bi-exclamation-triangle';
+                    urlHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div><i class="bi ${icon} me-2"></i>${escapeHtml(url)}</div>
+                        <span class="badge ${bgClass}">${isHttps ? 'HTTPS' : 'HTTP'}</span>
+                    </li>`;
+                });
+            } else {
+                urlHtml += '<li class="list-group-item text-muted">(未发现 URL)</li>';
+            }
+            urlHtml += '</ul>';
+            document.getElementById('urlList').innerHTML = urlHtml;
+
+            // 3. 附件列表
+            const attachments = result.attachments || [];
+            document.getElementById('attCountBadge').textContent = attachments.length;
+            let attHtml = '<ul class="list-group">';
+            if (attachments.length > 0) {
+                attachments.forEach(att => {
+                    const suspicious = att.is_suspicious_type;
+                    attHtml += `<li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${escapeHtml(att.filename || '未命名')}</strong>
+                                <small class="text-muted d-block">${att.content_type || '未知类型'} · ${(att.size / 1024).toFixed(1)} KB</small>
+                            </div>
+                            <span class="badge ${suspicious ? 'bg-danger' : 'bg-secondary'}">${suspicious ? '可疑' : '普通'}</span>
+                        </div>
+                    </li>`;
+                });
+            } else {
+                attHtml += '<li class="list-group-item text-muted">(无附件)</li>';
+            }
+            attHtml += '</ul>';
+            document.getElementById('attachmentList').innerHTML = attHtml;
+
+            // 4. 邮件头信息（JSON 格式）
+            const headers = result.headers || {};
+            document.getElementById('headersContent').textContent = JSON.stringify(headers, null, 2);
+
+            // 5. 原始完整邮件
+            const fullEmail = result.raw_email || '(无法获取原始邮件)';
+            document.getElementById('fullRawEmail').value = fullEmail;
+        }
+
+        // HTML 转义函数（防止 XSS）
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ========== API 配置管理相关函数 ==========
+
+        // 显示 API 配置模态框
+        function showApiConfig() {
+            const modal = new bootstrap.Modal(document.getElementById('apiConfigModal'));
+            loadApiConfig();
+            modal.show();
+        }
+
+        // 加载 API 配置
+        async function loadApiConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                // 填充表单
+                document.getElementById('vt-api-key').value = config.virustotal?.api_key || '';
+                document.getElementById('vt-api-url').value = config.virustotal?.api_url || 'https://www.virustotal.com/vtapi/v2/url/report';
+                document.getElementById('ip-api-url').value = config.ipapi?.api_url || 'http://ip-api.com/json/';
+                
+                // 填充邮箱配置
+                document.getElementById('email-address').value = config.email?.email || '';
+                document.getElementById('email-password').value = config.email?.password || '';
+                document.getElementById('email-server').value = config.email?.server || '';
+                document.getElementById('email-protocol').value = config.email?.protocol || 'imap';
+                document.getElementById('email-port').value = config.email?.port || '';
+                document.getElementById('email-enabled').checked = config.email?.enabled || false;
+            } catch (error) {
+                console.error('加载 API 配置失败:', error);
+                alert('加载配置失败');
+            }
+        }
+
+        // 测试 API 连接
+        async function testApiConnection() {
+            const testBtn = document.getElementById('test-api-btn');
+            const resultDiv = document.getElementById('api-test-result');
+            
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="bi bi-spinner bi-spin"></i> 测试中...';
+            resultDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/config/test');
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success') {
+                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + result.message + '</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (result.message || '测试失败') + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 测试失败: ' + error.message + '</div>';
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="bi bi-play-fill"></i> 测试连接';
+            }
+        }
+
+        // 测试邮箱连接
+        async function testEmailConnection() {
+            const testBtn = document.getElementById('test-email-btn');
+            const resultDiv = document.getElementById('email-test-result');
+            
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="bi bi-spinner bi-spin"></i> 测试中...';
+            resultDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/config/test-email');
+                
+                // 检查响应状态
+                if (!response.ok) {
+                    // 尝试解析错误响应
+                    try {
+                        const errorResult = await response.json();
+                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (errorResult.message || '测试失败') + '</div>';
+                    } catch {
+                        // 如果无法解析JSON，显示通用错误
+                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 测试失败: 服务器响应错误</div>';
+                    }
+                    return;
+                }
+                
+                // 解析成功响应
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + result.message + '</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (result.message || '测试失败') + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 测试失败: ' + error.message + '</div>';
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="bi bi-play-fill"></i> 测试邮箱连接';
+            }
+        }
+
+        // 保存 API 配置
+        async function saveApiConfig() {
+            const saveBtn = document.getElementById('save-api-btn');
+            const resultDiv = document.getElementById('api-save-result');
+            
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="bi bi-spinner bi-spin"></i> 保存中...';
+            resultDiv.innerHTML = '';
+            
+            const config = {
+                virustotal: {
+                    api_key: document.getElementById('vt-api-key').value,
+                    api_url: document.getElementById('vt-api-url').value
+                },
+                ipapi: {
+                    api_url: document.getElementById('ip-api-url').value
+                },
+                email: {
+                    email: document.getElementById('email-address').value,
+                    password: document.getElementById('email-password').value,
+                    server: document.getElementById('email-server').value,
+                    protocol: document.getElementById('email-protocol').value,
+                    port: document.getElementById('email-port').value ? parseInt(document.getElementById('email-port').value) : null,
+                    enabled: document.getElementById('email-enabled').checked
+                }
+            };
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success') {
+                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + result.message + '</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (result.message || '保存失败') + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 保存失败: ' + error.message + '</div>';
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-save"></i> 保存配置';
+            }
+        }
+
+        // 当前页码
+        let currentPage = 1;
+        const emailsPerPage = 10;
+        let selectedIds = new Set();  // 存储选中的报告ID
+
+        // 显示邮件来源选择模态框
+        function showEmailSourceModal(sourceType) {
+            if (sourceType === 'fetch') {
+                // 第三方获取 - 从配置的邮箱获取
+                fetchEmailsFromServer();
+            } else if (sourceType === 'manual') {
+                // 手动输入 - 打开检测模态框
+                openDetectionModal();
+            } else if (sourceType === 'upload') {
+                // 上传邮件 - 切换到上传选项卡
+                openDetectionModal();
+                setTimeout(() => {
+                    const uploadTab = document.querySelector('button[data-bs-target="#upload-tab"]');
+                    if (uploadTab) uploadTab.click();
+                }, 300);
+            }
+        }
+
+        // 从服务器获取邮件
+        async function fetchEmailsFromServer() {
+            showLoading('正在获取邮件...', '连接邮件服务器中...');
+            
+            try {
+                const response = await fetch('/api/fetch-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success') {
+                    hideLoading();
+                    showLoading('获取成功', `成功获取 ${result.emails.length} 封邮件`, '正在分析...');
+                    
+                    // 逐个分析邮件
+                    for (let i = 0; i < result.emails.length; i++) {
+                        const email = result.emails[i];
+                        updateLoading(`正在分析邮件 ${i + 1}/${result.emails.length}`, `处理：${email.subject || '无标题'}`, ((i + 1) / result.emails.length) * 100);
+                        
+                        const analyzeResponse = await fetch('/api/analyze', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                email: email.raw, 
+                                source: 'fetch',
+                                email_uid: email.uid
+                            })
+                        });
+                        
+                        if (!analyzeResponse.ok) {
+                            console.error('分析邮件失败:', email.subject);
+                        }
+                    }
+                    
+                    hideLoading();
+                    // 刷新邮件列表
+                    loadEmailList();
+                    showAlert('success', `成功获取并分析 ${result.emails.length} 封邮件`);
+                } else {
+                    hideLoading();
+                    showAlert('danger', result.message || '获取邮件失败');
+                }
+            } catch (error) {
+                hideLoading();
+                showAlert('danger', '获取邮件失败：' + error.message);
+            }
+        }
+
+        // 加载邮件列表
+        async function loadEmailList(page = 1) {
+            try {
+                const response = await fetch(`/api/alerts?page=${page}&per_page=${emailsPerPage}`);
+                const data = await response.json();
+                
+                renderEmailList(data.alerts);
+                renderPagination(data.page, data.total_pages, data.total);
+                
+                currentPage = page;
+            } catch (error) {
+                console.error('加载邮件列表失败:', error);
+            }
+        }
+
+        // 渲染邮件列表
+        function renderEmailList(alerts) {
+            const tbody = document.getElementById('email-list-body');
+            const emptyDiv = document.getElementById('email-list-empty');
+            
+            if (!alerts || alerts.length === 0) {
+                tbody.innerHTML = '';
+                emptyDiv.style.display = 'block';
+                return;
+            }
+            
+            emptyDiv.style.display = 'none';
+            
+            let html = '';
+            alerts.forEach(alert => {
+                const labelClass = getLabelClass(alert.label);
+                const labelText = getLabelText(alert.label);
+                const scoreClass = getScoreClass(alert.confidence);
+                const source = alert.source || '手动上传';
+                const subject = alert.subject || '无标题';
+                const fromEmail = alert.from_email || alert.from_addr || '未知';
+                const detectionTime = formatDetectionTime(alert.detection_time);
+                const isSelected = selectedIds.has(alert.id);
+                
+                html += `
+                    <tr class="align-middle" data-id="${alert.id}">
+                        <td onclick="event.stopPropagation();">
+                            <input type="checkbox" class="form-check-input email-checkbox" 
+                                   value="${alert.id}" 
+                                   ${isSelected ? 'checked' : ''} 
+                                   onchange="toggleSelectEmail(${alert.id}, this.checked)">
+                        </td>
+                        <td class="ps-4" onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <div class="fw-semibold text-truncate" style="max-width: 250px;" title="${escapeHtml(subject)}">${escapeHtml(subject)}</div>
+                        </td>
+                        <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <div class="text-truncate" style="max-width: 150px;" title="${escapeHtml(fromEmail)}">${escapeHtml(fromEmail)}</div>
+                        </td>
+                        <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <span class="badge ${labelClass}">${labelText}</span>
+                        </td>
+                        <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <div class="progress" style="width: 100px; height: 20px;">
+                                <div class="progress-bar ${scoreClass}" role="progressbar" style="width: ${alert.confidence * 100}%">
+                                    ${(alert.confidence * 100).toFixed(0)}%
+                                </div>
+                            </div>
+                        </td>
+                        <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <span class="badge bg-secondary">${escapeHtml(source)}</span>
+                        </td>
+                        <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <small class="text-muted">${detectionTime}</small>
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewEmailDetail(${alert.id})">
+                                    <i class="bi bi-eye"></i> 查看
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteEmail(${alert.id})">
+                                    <i class="bi bi-trash"></i> 删除
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        // 渲染分页
+        function renderPagination(current, total, totalItems) {
+            const pagination = document.getElementById('email-pagination');
+            
+            if (total <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            // 上一页
+            if (current > 1) {
+                html += `<li class="page-item">
+                    <a class="page-link" href="#" onclick="loadEmailList(${current - 1}); return false;">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>`;
+            }
+            
+            // 页码
+            for (let i = 1; i <= total; i++) {
+                if (i === 1 || i === total || (i >= current - 2 && i <= current + 2)) {
+                    html += `<li class="page-item ${i === current ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="loadEmailList(${i}); return false;">${i}</a>
+                    </li>`;
+                } else if (i === current - 3 || i === current + 3) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+            
+            // 下一页
+            if (current < total) {
+                html += `<li class="page-item">
+                    <a class="page-link" href="#" onclick="loadEmailList(${current + 1}); return false;">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>`;
+            }
+            
+            pagination.innerHTML = html;
+        }
+
+        // 获取标签样式
+        function getLabelClass(label) {
+            if (label === 'PHISHING') return 'bg-danger';
+            if (label === 'SUSPICIOUS') return 'bg-warning';
+            return 'bg-success';
+        }
+
+        // 获取标签文本
+        function getLabelText(label) {
+            if (label === 'PHISHING') return '钓鱼';
+            if (label === 'SUSPICIOUS') return '可疑';
+            return '正常';
+        }
+
+        // 获取评分样式
+        function getScoreClass(score) {
+            if (score >= 0.7) return 'bg-danger';
+            if (score >= 0.4) return 'bg-warning';
+            return 'bg-success';
+        }
+
+        // 格式化检测时间
+        function formatDetectionTime(isoString) {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            const now = new Date();
+            const diff = now - date;
+            
+            // 小于 1 小时
+            if (diff < 3600000) {
+                const minutes = Math.floor(diff / 60000);
+                return `${minutes}分钟前`;
+            }
+            // 小于 24 小时
+            if (diff < 86400000) {
+                const hours = Math.floor(diff / 3600000);
+                return `${hours}小时前`;
+            }
+            // 小于 7 天
+            if (diff < 604800000) {
+                const days = Math.floor(diff / 86400000);
+                return `${days}天前`;
+            }
+            // 其他显示具体日期
+            return date.toLocaleDateString('zh-CN');
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 查看邮件详情
+        async function viewEmailDetail(alertId) {
+            showLoading('加载邮件详情...', '正在获取报告数据...');
+            
+            try {
+                // 从服务器获取完整的报告数据
+                const response = await fetch(`/api/alerts/${alertId}`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // 存储完整的报告数据
+                    const sessionId = 'alert_' + alertId;
+                    localStorage.setItem('phishing_report_' + sessionId, JSON.stringify(result));
+                    window.location.href = `/report.html?session=${sessionId}`;
+                } else {
+                    showAlert('danger', '获取邮件详情失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                showAlert('danger', '加载失败：' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 删除邮件报告
+        async function deleteEmail(alertId) {
+            if (!confirm('确定要删除这份报告吗？此操作不可恢复。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/alerts/${alertId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success') {
+                    showAlert('success', '报告已删除');
+                    // 刷新列表
+                    loadEmailList(currentPage);
+                    // 刷新统计数据
+                    loadStats();
+                } else {
+                    showAlert('danger', '删除失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                showAlert('danger', '删除失败：' + error.message);
+            }
+        }
+
+        // 切换单个邮件选择状态
+        function toggleSelectEmail(id, checked) {
+            if (checked) {
+                selectedIds.add(id);
+            } else {
+                selectedIds.delete(id);
+            }
+            updateBatchDeleteButton();
+        }
+
+        // 切换全选状态
+        function toggleSelectAll(checkbox) {
+            const checkboxes = document.querySelectorAll('.email-checkbox');
+            checkboxes.forEach(cb => {
+                const id = parseInt(cb.value);
+                cb.checked = checkbox.checked;
+                if (checkbox.checked) {
+                    selectedIds.add(id);
+                } else {
+                    selectedIds.delete(id);
+                }
+            });
+            updateBatchDeleteButton();
+        }
+
+        // 更新批量删除按钮显示状态
+        function updateBatchDeleteButton() {
+            const btn = document.getElementById('batch-delete-btn');
+            const countSpan = document.getElementById('selected-count');
+            
+            if (selectedIds.size > 0) {
+                btn.style.display = 'inline-block';
+                countSpan.textContent = selectedIds.size;
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        // 批量删除邮件报告
+        async function batchDeleteEmails() {
+            if (selectedIds.size === 0) {
+                showAlert('warning', '请先选择要删除的报告');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${selectedIds.size} 份报告吗？此操作不可恢复。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/alerts/batch', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: Array.from(selectedIds) })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success') {
+                    showAlert('success', `成功删除 ${result.deleted_count} 份报告`);
+                    // 清空选中状态
+                    selectedIds.clear();
+                    document.getElementById('select-all-checkbox').checked = false;
+                    updateBatchDeleteButton();
+                    // 刷新列表
+                    loadEmailList(currentPage);
+                    // 刷新统计数据
+                    loadStats();
+                } else {
+                    showAlert('danger', '批量删除失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                showAlert('danger', '批量删除失败：' + error.message);
+            }
+        }
+
+        // 显示提示框
+        function showAlert(type, message) {
+            const alertHtml = `
+                <div class="position-fixed top-0 end-0 p-3" style="z-index: 1100">
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                </div>
+            `;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = alertHtml;
+            document.body.appendChild(tempDiv.firstChild);
+            
+            // 3 秒后自动移除
+            setTimeout(() => {
+                const alert = document.querySelector('.alert-dismissible');
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                    setTimeout(() => alert.remove(), 150);
+                }
+            }, 3000);
+        }
+
+        // 自动监控相关变量
+        let autoMonitorInterval = null;
+        let isProcessingEmails = false;  // 防重复处理标志
+        const AUTO_MONITOR_INTERVAL = 30000; // 30秒
+        const processedEmailHashes = new Set();  // 内存中去重缓存
+
+        // 切换自动监控
+        function toggleAutoMonitor(enabled) {
+            if (enabled) {
+                startAutoMonitor();
+                localStorage.setItem('autoMonitorEnabled', 'true');
+                showAlert('success', '邮件自动监控已开启，每30秒检查一次新邮件');
+            } else {
+                stopAutoMonitor();
+                localStorage.setItem('autoMonitorEnabled', 'false');
+                showAlert('info', '邮件自动监控已关闭');
+            }
+        }
+
+        // 启动自动监控
+        function startAutoMonitor() {
+            // 清除之前的定时器
+            if (autoMonitorInterval) {
+                clearInterval(autoMonitorInterval);
+            }
+            
+            // 立即执行一次
+            autoFetchEmails();
+            
+            // 设置定时器
+            autoMonitorInterval = setInterval(autoFetchEmails, AUTO_MONITOR_INTERVAL);
+        }
+
+        // 停止自动监控
+        function stopAutoMonitor() {
+            if (autoMonitorInterval) {
+                clearInterval(autoMonitorInterval);
+                autoMonitorInterval = null;
+            }
+        }
+
+        // 自动获取邮件
+        async function autoFetchEmails() {
+            // 如果正在处理中，跳过本次执行
+            if (isProcessingEmails) {
+                console.log('邮件处理中，跳过本次自动获取');
+                return;
+            }
+            
+            try {
+                isProcessingEmails = true;
+                
+                const response = await fetch('/api/fetch-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success' && result.emails && result.emails.length > 0) {
+                    // 再次检查是否已处理（双重保险）
+                    const uniqueEmails = result.emails.filter(email => {
+                        const hash = email.hash || email.id;
+                        if (processedEmailHashes.has(hash)) {
+                            return false;
+                        }
+                        processedEmailHashes.add(hash);
+                        // 限制缓存大小
+                        if (processedEmailHashes.size > 1000) {
+                            const first = processedEmailHashes.values().next().value;
+                            processedEmailHashes.delete(first);
+                        }
+                        return true;
+                    });
+                    
+                    if (uniqueEmails.length === 0) {
+                        console.log('所有邮件已在处理中或已处理');
+                        return;
+                    }
+                    
+                    // 分析新邮件
+                    for (let email of uniqueEmails) {
+                        try {
+                            await fetch('/api/analyze', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    email: email.raw, 
+                                    source: '自动监控',
+                                    email_uid: email.uid
+                                })
+                            });
+                        } catch (e) {
+                            console.error('分析邮件失败:', e);
+                        }
+                    }
+                    
+                    // 刷新邮件列表
+                    loadEmailList();
+                    loadStats();
+                    
+                    // 显示通知
+                    showAlert('success', `自动监控：发现并分析了 ${uniqueEmails.length} 封新邮件`);
+                }
+            } catch (error) {
+                console.error('自动获取邮件失败:', error);
+            } finally {
+                isProcessingEmails = false;
+            }
+        }
+
+        // 页面加载时加载邮件列表
+        document.addEventListener('DOMContentLoaded', function() {
+            loadEmailList(1);
+            
+            // 恢复自动监控状态
+            const autoMonitorEnabled = localStorage.getItem('autoMonitorEnabled') === 'true';
+            const autoMonitorToggle = document.getElementById('auto-monitor-toggle');
+            if (autoMonitorToggle) {
+                autoMonitorToggle.checked = autoMonitorEnabled;
+                if (autoMonitorEnabled) {
+                    startAutoMonitor();
+                }
+            }
+        });
+    </script>
+
+    <!-- API 配置模态框 -->
+    <div class="modal fade" id="apiConfigModal" tabindex="-1" aria-labelledby="apiConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="apiConfigModalLabel">API 连接配置管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <h6><i class="bi bi-virus"></i> VirusTotal API 配置</h6>
+                        <div class="form-group mb-3">
+                            <label for="vt-api-key" class="form-label">API Key</label>
+                            <input type="password" class="form-control" id="vt-api-key" placeholder="输入 VirusTotal API Key">
+                            <small class="text-muted">用于增强 URL 威胁检测能力，提升钓鱼邮件识别准确率</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="vt-api-url" class="form-label">API URL</label>
+                            <input type="url" class="form-control" id="vt-api-url" placeholder="VirusTotal API URL">
+                            <small class="text-muted">默认：https://www.virustotal.com/vtapi/v2/url/report</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6><i class="bi bi-globe"></i> IP-API 配置</h6>
+                        <div class="form-group mb-3">
+                            <label for="ip-api-url" class="form-label">API URL</label>
+                            <input type="url" class="form-control" id="ip-api-url" placeholder="IP 地理位置 API URL">
+                            <small class="text-muted">提供 IP 地理位置信息，辅助邮件来源分析</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6><i class="bi bi-link-45deg"></i> URL 跳转追踪</h6>
+                        <div class="form-group mb-3">
+                            <label for="url-tracking-api" class="form-label">API 状态</label>
+                            <input type="text" class="form-control" value="内置功能" disabled>
+                            <small class="text-muted">追踪 URL 跳转链路，揭示隐藏的恶意目标</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6><i class="bi bi-exclamation-triangle"></i> DNSBL 黑名单检查</h6>
+                        <div class="form-group mb-3">
+                            <label for="dnsbl-api" class="form-label">API 状态</label>
+                            <input type="text" class="form-control" value="内置功能" disabled>
+                            <small class="text-muted">检查 IP 是否在黑名单中，快速识别恶意来源</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6><i class="bi bi-envelope"></i> 邮箱配置</h6>
+                        <div class="form-group mb-3">
+                            <label for="email-address" class="form-label">邮箱地址</label>
+                            <input type="email" class="form-control" id="email-address" placeholder="输入邮箱地址">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="email-password" class="form-label">密码/授权码</label>
+                            <input type="password" class="form-control" id="email-password" placeholder="输入邮箱密码或授权码">
+                            <small class="text-muted">对于 QQ 邮箱、Gmail 等，需要使用授权码而不是密码</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="email-server" class="form-label">邮件服务器</label>
+                            <input type="text" class="form-control" id="email-server" placeholder="输入邮件服务器地址">
+                            <small class="text-muted">例如：imap.qq.com、imap.gmail.com</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="email-protocol" class="form-label">协议</label>
+                            <select class="form-control" id="email-protocol">
+                                <option value="imap">IMAP</option>
+                                <option value="pop3">POP3</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="email-port" class="form-label">端口</label>
+                            <input type="number" class="form-control" id="email-port" placeholder="输入端口号，留空使用默认端口">
+                            <small class="text-muted">IMAP 默认 993，POP3 默认 995</small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email-enabled">
+                                <label class="form-check-label" for="email-enabled">启用邮箱监控</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6><i class="bi bi-info-circle"></i> WHOIS 查询</h6>
+                        <div class="form-group mb-3">
+                            <label for="whois-api" class="form-label">API 状态</label>
+                            <input type="text" class="form-control" value="内置功能" disabled>
+                            <small class="text-muted">查询域名注册信息，评估域名可信度</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6><i class="bi bi-info-circle"></i> API 状态</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>API 名称</th>
+                                        <th>状态</th>
+                                        <th>说明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>VirusTotal API</td>
+                                        <td><span class="badge bg-warning" id="vt-status">未配置</span></td>
+                                        <td>用于 URL 威胁检测</td>
+                                    </tr>
+                                    <tr>
+                                        <td>IP-API.com</td>
+                                        <td><span class="badge bg-success">可用</span></td>
+                                        <td>免费 IP 地理位置查询</td>
+                                    </tr>
+                                    <tr>
+                                        <td>URL 跳转追踪</td>
+                                        <td><span class="badge bg-success">可用</span></td>
+                                        <td>追踪 URL 跳转链路</td>
+                                    </tr>
+                                    <tr>
+                                        <td>DNSBL 黑名单检查</td>
+                                        <td><span class="badge bg-success">可用</span></td>
+                                        <td>检查 IP 是否在黑名单中</td>
+                                    </tr>
+                                    <tr>
+                                        <td>WHOIS 查询</td>
+                                        <td><span class="badge bg-success">可用</span></td>
+                                        <td>域名信息查询</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="api-test-result" class="mb-3"></div>
+                    <div id="email-test-result" class="mb-3"></div>
+                    <div id="api-save-result" class="mb-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-info me-2" id="test-api-btn" onclick="testApiConnection()">
+                        <i class="bi bi-play-fill"></i> 测试 API 连接
+                    </button>
+                    <button type="button" class="btn btn-info me-2" id="test-email-btn" onclick="testEmailConnection()">
+                        <i class="bi bi-play-fill"></i> 测试邮箱连接
+                    </button>
+                    <button type="button" class="btn btn-primary" id="save-api-btn" onclick="saveApiConfig()">
+                        <i class="bi bi-save"></i> 保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

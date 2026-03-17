@@ -1,0 +1,57 @@
+{
+  "trusted_domains": [
+    "qq.com",
+    "qlogo.cn",
+    "mail.qq.com",
+    "weixin.qq.com",
+    "steampowered.com",
+    "steamcommunity.com",
+    "steamstatic.com",
+    "valvesoftware.com",
+    "google.com",
+    "microsoft.com",
+    "facebook.com",
+    "baidu.com",
+    "taobao.com",
+    "jd.com",
+    "aliyun.com",
+    "alipay.com",
+    "wechat.com",
+    "163.com",
+    "126.com",
+    "sina.com",
+    "sohu.com"
+  ],
+  "trusted_senders": [
+    "noreply@deepphish.cn",
+    "info@deepphish.cn",
+    "support@deepphish.cn",
+    "service@deepphish.cn"
+  ],
+  "verification_email_indicators": [
+    "验证码",
+    "verification",
+    "verify",
+    "code",
+    "confirm",
+    "激活码",
+    "校验码",
+    "动态密码",
+    "verification code"
+  ],
+  "suspicious_domain_keywords": [
+    "paypa1.com",
+    "g0ogle.com",
+    "micros0ft.com",
+    "amaz0n.com",
+    "secure-login.net",
+    "account-verify.com",
+    "bank-security.net"
+  ],
+  "notes": {
+    "trusted_domains": "可信域名列表，这些域名不会被标记为可疑",
+    "trusted_senders": "可信发件人列表，这些发件人的邮件风险评分会降低",
+    "verification_email_indicators": "验证码邮件关键词，用于识别正常的验证码邮件",
+    "suspicious_domain_keywords": "已知恶意域名关键词（精确匹配）"
+  }
+}

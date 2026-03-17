@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试报告页面</title>
+    <script>
+        // 测试数据
+        const testData = {
+            label: "SUSPICIOUS",
+            confidence: 0.4898,
+            reason: "邮件包含URL链接，需要进一步验证",
+            module_scores: {
+                header: 0.0,
+                url: 0.0,
+                text: 0.0,
+                attachment: 0.0,
+                html: 0.0
+            },
+            parsed: {
+                from: "sender@example.com",
+                from_display_name: "Sender",
+                from_email: "sender@example.com",
+                to: "recipient@example.com",
+                subject: "测试邮件",
+                body: "这是一封测试邮件。\nhttps://example.com",
+                html_body: "",
+                urls: ["https://example.com"],
+                url_count: 1,
+                attachment_count: 0,
+                has_html_body: 0
+            },
+            features: {
+                at_symbol_count: 0,
+                attachment_count: 0,
+                avg_domain_age_days: 3650.0,
+                avg_path_depth: 0.0,
+                avg_url_length: 19.0,
+                caps_ratio: 0.0,
+                dkim_fail: 0,
+                dmarc_fail: 0,
+                exclamation_count: 0,
+                financial_keywords_count: 0,
+                has_executable_attachment: 0,
+                has_form: 0,
+                has_hidden_links: 0,
+                has_iframe: 0,
+                has_sandbox_analysis: 0,
+                has_short_url: 0,
+                ip_address_count: 0,
+                port_count: 0,
+                spf_fail: 0,
+                subdomain_count: 0,
+                suspicious_param_count: 0,
+                urgent_keywords_count: 0,
+                urgency_score: 0.0
+            },
+            attachments: [],
+            html_links: [],
+            html_forms: [],
+            headers: {},
+            traceback: {
+                email_source: {
+                    source_ip: "192.168.1.1",
+                    hops: [
+                        {
+                            ip: "192.168.1.1",
+                            hostname: "mail.example.com",
+                            timestamp: "2025-01-01 12:00:00"
+                        }
+                    ]
+                },
+                risk_indicators: []
+            },
+            sandbox_analysis: {
+                enabled: false,
+                has_sandbox_analysis: false,
+                sandbox_detected: false,
+                max_detection_ratio: 0.0
+            }
+        };
+
+        // 生成会话ID
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 存储测试数据
+        const sessionId = generateSessionId();
+        localStorage.setItem(`phishing_report_${sessionId}`, JSON.stringify(testData));
+        localStorage.setItem('last_session_id', sessionId);
+
+        console.log('测试数据已存储到localStorage');
+        console.log('会话ID:', sessionId);
+
+        // 重定向到报告页面
+        window.location.href = 'http://localhost:5000/report.html?session=' + sessionId;
+    </script>
+</head>
+<body>
+    <h1>测试报告页面</h1>
+    <p>正在准备测试数据...</p>
+</body>
+</html>
