@@ -1,6 +1,6 @@
 {
   "virustotal": {
-    "api_key": "f70b679ce193c9177b79a7b240433b165a539e88471f54f3200d635a97d34b71",
+    "api_key": "test_key",
     "api_url": "https://www.virustotal.com/vtapi/v2/url/report"
   },
   "ipapi": {
@@ -12,6 +12,6 @@
     "server": "imap.qq.com",
     "protocol": "imap",
     "port": 993,
-    "enabled": true
+    "enabled": false
   }
 }

@@ -45,3 +45,13 @@ models/*.pkl
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Sensitive config
+config/api_config.json
+
+# Test files
+test_api.py
