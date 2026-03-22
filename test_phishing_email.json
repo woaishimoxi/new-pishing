@@ -1,3 +1,0 @@
-{
-  "email": "From: \"PayPal Security\" <security@paypal-secure.com>\nTo: user@example.com\nSubject: 【紧急】您的PayPal账户已被限制\n\n尊敬的PayPal用户，\n\n我们检测到您的账户存在异常活动，已暂时限制您的账户访问权限。\n\n请立即点击以下链接验证您的身份：\nhttp://paypal-secure-verify.com/login\n\n如果在24小时内未完成验证，您的账户将被永久冻结。\n\n此致\nPayPal安全团队"
-}

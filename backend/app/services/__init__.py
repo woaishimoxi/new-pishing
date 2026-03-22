@@ -8,6 +8,8 @@ from .email_fetcher import EmailFetcherService
 from .url_analyzer import URLAnalyzerService
 from .sandbox_analyzer import SandboxAnalyzerService
 from .feature_extractor import FeatureExtractionService
+from .auto_tuner import AutoTuner, auto_tuner
+from .performance_monitor import PerformanceMonitor, monitor, record_execution_time
 
 __all__ = [
     'EmailParserService',
@@ -16,5 +18,10 @@ __all__ = [
     'EmailFetcherService',
     'URLAnalyzerService',
     'SandboxAnalyzerService',
-    'FeatureExtractionService'
+    'FeatureExtractionService',
+    'AutoTuner',
+    'auto_tuner',
+    'PerformanceMonitor',
+    'monitor',
+    'record_execution_time'
 ]

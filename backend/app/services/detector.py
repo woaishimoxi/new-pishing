@@ -1,8 +1,9 @@
 """
 Detection Service
-Core phishing detection logic
+Core phishing detection logic with new trained model
 """
 import os
+import re
 import json
 import pickle
 import numpy as np
@@ -13,7 +14,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from app.core import get_logger, get_config, DetectionError
 
 
-FEATURE_COLUMNS = [
+NEW_FEATURE_COLUMNS = [
+    'text_length', 'word_count', 'uppercase_ratio', 'exclamation_count',
+    'question_count', 'digit_ratio', 'special_char_ratio', 'url_count',
+    'ip_url_count', 'shortened_url_count', 'urgent_word_count',
+    'financial_word_count', 'phishing_pattern_count', 'email_count',
+    'html_tag_count', 'link_count', 'form_count'
+]
+
+LEGACY_FEATURE_COLUMNS = [
     'is_suspicious_from_domain', 'received_hops_count',
     'first_external_ip_is_blacklisted',
     'spf_fail', 'dkim_fail', 'dmarc_fail',
@@ -34,6 +43,31 @@ FEATURE_COLUMNS = [
     'has_form', 'has_iframe',
 ]
 
+URGENT_WORDS = [
+    'urgent', 'immediately', 'important', 'attention', 'alert',
+    'warning', 'critical', 'verify', 'confirm', 'suspend',
+    '紧急', '立即', '重要', '注意', '警告', '验证', '确认', '暂停'
+]
+
+FINANCIAL_WORDS = [
+    'bank', 'account', 'password', 'credit', 'debit', 'pin',
+    'ssn', 'security', 'login', 'verify', 'update',
+    '银行', '账户', '密码', '信用卡', '安全', '登录', '验证', '更新'
+]
+
+PHISHING_PATTERNS = [
+    r'click\s+here',
+    r'verify\s+your\s+account',
+    r'your\s+account\s+has\s+been',
+    r'suspended',
+    r'limited',
+    r'unusual\s+activity',
+    r'confirm\s+your\s+identity',
+    r'update\s+your\s+information',
+    r'click\s+below',
+    r'act\s+now',
+]
+
 
 class DetectionService:
     """
@@ -45,6 +79,8 @@ class DetectionService:
         self.logger = get_logger(__name__)
         self.config = get_config()
         self.model = None
+        self.model_type = None
+        self.feature_names = None
         self.demo_weights = self._get_demo_weights()
         
         self._load_model()
@@ -101,34 +137,147 @@ class DetectionService:
         """Load pre-trained model"""
         model_path = self.config.detection.model_path
         
-        if not os.path.exists(model_path):
-            self.logger.warning(f"Model file not found: {model_path}, using demo mode")
-            return False
+        current_file = os.path.abspath(__file__)
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+        base_dir = os.path.dirname(backend_dir)
         
-        try:
-            import lightgbm as lgb
-            self.model = lgb.Booster(model_file=model_path)
-            self.logger.info(f"Loaded LightGBM model: {model_path}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to load model: {e}")
-            return False
+        pkl_path = os.path.join(base_dir, 'models', 'phish_detector.pkl')
+        txt_path = os.path.join(base_dir, 'models', 'phish_detector.txt')
+        feature_info_path = os.path.join(base_dir, 'models', 'feature_info.json')
+        
+        self.logger.info(f"Looking for model files in: {os.path.join(base_dir, 'models')}")
+        self.logger.info(f"PKL path exists: {os.path.exists(pkl_path)}")
+        self.logger.info(f"TXT path exists: {os.path.exists(txt_path)}")
+        
+        if os.path.exists(pkl_path):
+            try:
+                with open(pkl_path, 'rb') as f:
+                    self.model = pickle.load(f)
+                self.model_type = 'new'
+                self.logger.info(f"Loaded new LightGBM model from pickle: {pkl_path}")
+                
+                if os.path.exists(feature_info_path):
+                    with open(feature_info_path, 'r', encoding='utf-8') as f:
+                        feature_info = json.load(f)
+                        self.feature_names = feature_info.get('feature_names', NEW_FEATURE_COLUMNS)
+                        self.logger.info(f"Model metrics: {feature_info.get('metrics', {})}")
+                else:
+                    self.feature_names = NEW_FEATURE_COLUMNS
+                
+                return True
+            except Exception as e:
+                self.logger.error(f"Failed to load pickle model: {e}")
+        
+        if os.path.exists(txt_path):
+            try:
+                import lightgbm as lgb
+                self.model = lgb.Booster(model_file=txt_path)
+                self.model_type = 'legacy'
+                self.feature_names = LEGACY_FEATURE_COLUMNS
+                self.logger.info(f"Loaded legacy LightGBM model: {txt_path}")
+                return True
+            except Exception as e:
+                self.logger.error(f"Failed to load legacy model: {e}")
+        
+        if os.path.exists(model_path):
+            try:
+                import lightgbm as lgb
+                self.model = lgb.Booster(model_file=model_path)
+                self.model_type = 'legacy'
+                self.feature_names = LEGACY_FEATURE_COLUMNS
+                self.logger.info(f"Loaded LightGBM model: {model_path}")
+                return True
+            except Exception as e:
+                self.logger.error(f"Failed to load model: {e}")
+        
+        self.logger.warning(f"No model file found, using demo mode")
+        return False
+    
+    def _extract_new_features(self, email_data: Dict, features: Dict) -> Dict[str, float]:
+        """Extract features for new model"""
+        text = ""
+        if email_data:
+            text = str(email_data.get('body', '')) + ' ' + str(email_data.get('html_body', ''))
+            text += ' ' + str(email_data.get('subject', ''))
+        
+        text_lower = text.lower()
+        
+        if not text:
+            return {name: 0.0 for name in NEW_FEATURE_COLUMNS}
+        
+        extracted = {}
+        
+        extracted['text_length'] = float(len(text))
+        
+        words = text.split()
+        extracted['word_count'] = float(len(words))
+        
+        alpha_chars = [c for c in text if c.isalpha()]
+        if alpha_chars:
+            extracted['uppercase_ratio'] = float(sum(1 for c in alpha_chars if c.isupper()) / len(alpha_chars))
+        else:
+            extracted['uppercase_ratio'] = 0.0
+        
+        extracted['exclamation_count'] = float(text.count('!'))
+        extracted['question_count'] = float(text.count('?'))
+        
+        if text:
+            extracted['digit_ratio'] = float(sum(1 for c in text if c.isdigit()) / len(text))
+            special_chars = sum(1 for c in text if not c.isalnum() and not c.isspace())
+            extracted['special_char_ratio'] = float(special_chars / len(text))
+        else:
+            extracted['digit_ratio'] = 0.0
+            extracted['special_char_ratio'] = 0.0
+        
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+        urls = re.findall(url_pattern, text, re.IGNORECASE)
+        extracted['url_count'] = float(len(urls))
+        
+        ip_urls = len(re.findall(r'https?://\d+\.\d+\.\d+\.\d+', text, re.IGNORECASE))
+        extracted['ip_url_count'] = float(ip_urls)
+        
+        shorteners = ['bit.ly', 'tinyurl', 'goo.gl', 't.co', 'ow.ly', 'is.gd', 'buff.ly', 'dlvr.it']
+        shortened = sum(1 for url in urls for s in shorteners if s in url.lower())
+        extracted['shortened_url_count'] = float(shortened)
+        
+        extracted['urgent_word_count'] = float(sum(1 for word in URGENT_WORDS if word in text_lower))
+        extracted['financial_word_count'] = float(sum(1 for word in FINANCIAL_WORDS if word in text_lower))
+        
+        extracted['phishing_pattern_count'] = float(sum(
+            1 for pattern in PHISHING_PATTERNS if re.search(pattern, text_lower)
+        ))
+        
+        emails = re.findall(r'[\w\.-]+@[\w\.-]+\.\w+', text)
+        extracted['email_count'] = float(len(emails))
+        
+        html_tags = len(re.findall(r'<[^>]+>', text))
+        extracted['html_tag_count'] = float(html_tags)
+        
+        links = len(re.findall(r'<a\s', text_lower))
+        extracted['link_count'] = float(links)
+        
+        forms = len(re.findall(r'<form', text_lower))
+        extracted['form_count'] = float(forms)
+        
+        return extracted
     
     def analyze(
         self,
         email_data: Dict,
         features: Dict,
         url_risk_level: str = 'UNKNOWN',
-        url_risk_score: int = 0
+        url_risk_score: int = 0,
+        url_analysis: Dict = None
     ) -> Tuple[str, float, str]:
         """
-        Analyze email for phishing detection
+        Analyze email for phishing detection - improved version
         
         Args:
             email_data: Parsed email data
             features: Feature vector
             url_risk_level: URL risk level from URL analyzer
             url_risk_score: URL risk score from URL analyzer
+            url_analysis: URL analysis results with whitelist info
             
         Returns:
             Tuple of (label, confidence, reason)
@@ -143,8 +292,13 @@ class DetectionService:
         base_confidence = 0.65 if sandbox_risk == "HIGH_RISK_FILE_NO_RESULT" else 0.0
         
         if self.model:
-            input_data = [[float(features.get(col, 0)) for col in FEATURE_COLUMNS]]
-            prediction = self.model.predict(np.array(input_data))
+            if self.model_type == 'new':
+                new_features = self._extract_new_features(email_data, features)
+                input_data = [[float(new_features.get(col, 0)) for col in self.feature_names]]
+                prediction = self.model.predict(np.array(input_data))
+            else:
+                input_data = [[float(features.get(col, 0)) for col in self.feature_names]]
+                prediction = self.model.predict(np.array(input_data))
             
             if isinstance(prediction, (list, np.ndarray)):
                 model_prob = float(prediction[0]) if len(prediction) > 0 else 0.0
@@ -166,6 +320,57 @@ class DetectionService:
         
         if features.get('first_external_ip_is_blacklisted'):
             final_confidence = min(1.0, final_confidence + 0.2)
+        
+        # 改进1: 白名单URL降低风险
+        if url_analysis:
+            summary = url_analysis.get('summary', {})
+            total_urls = summary.get('total_urls', 0)
+            whitelisted = summary.get('whitelisted', 0)
+            high_risk = summary.get('high_risk', 0)
+            
+            # 如果所有URL都在白名单中，大幅降低风险
+            if total_urls > 0 and whitelisted == total_urls:
+                final_confidence = max(0.0, final_confidence - 0.5)
+            # 如果大部分URL在白名单中，适当降低风险
+            elif total_urls > 0 and whitelisted / total_urls > 0.8:
+                final_confidence = max(0.0, final_confidence - 0.3)
+            # 如果没有高风险URL，降低风险
+            if high_risk == 0 and url_risk_level == 'LOW':
+                final_confidence = max(0.0, final_confidence - 0.2)
+        
+        # 改进2: 邮件认证全部通过降低风险
+        spf_pass = features.get('spf_fail', 0) == 0
+        dkim_pass = features.get('dkim_fail', 0) == 0
+        dmarc_pass = features.get('dmarc_fail', 0) == 0
+        
+        if spf_pass and dkim_pass and dmarc_pass:
+            # 三重认证全部通过，降低风险
+            final_confidence = max(0.0, final_confidence - 0.3)
+        elif spf_pass and dkim_pass:
+            # 双重认证通过，适当降低风险
+            final_confidence = max(0.0, final_confidence - 0.15)
+        
+        # 改进3: 发件人域名与链接域名一致降低风险
+        from_email = email_data.get('from_email', '') if email_data else ''
+        from_domain = from_email.split('@')[-1].lower() if '@' in from_email else ''
+        
+        if from_domain:
+            # 检查邮件中的链接是否来自同一域名
+            urls = email_data.get('urls', []) if email_data else []
+            same_domain_count = 0
+            for url in urls:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url if url.startswith(('http://', 'https://')) else 'http://' + url)
+                    link_domain = parsed.netloc.lower()
+                    if from_domain in link_domain or link_domain.endswith('.' + from_domain):
+                        same_domain_count += 1
+                except:
+                    pass
+            
+            # 如果大部分链接来自同一域名，降低风险
+            if len(urls) > 0 and same_domain_count / len(urls) > 0.5:
+                final_confidence = max(0.0, final_confidence - 0.2)
         
         return self._determine_label(final_confidence, features, url_reasons)
     
@@ -220,12 +425,13 @@ class DetectionService:
         url_reasons: List[str],
         confidence: float
     ) -> Tuple[str, float, str]:
-        """Build phishing detection result"""
+        """Build phishing detection result - improved version"""
         reasons = []
         
         if url_reasons:
             reasons.append(f"URL风险: {'; '.join(url_reasons[:3])}")
         
+        # 邮件头风险（高权重）
         if features.get('is_suspicious_from_domain'):
             reasons.append("可疑的发件人域名")
         if features.get('spf_fail') and features.get('dkim_fail') and features.get('dmarc_fail'):
@@ -239,6 +445,7 @@ class DetectionService:
         if features.get('from_display_name_mismatch'):
             reasons.append("发件人显示名称与邮箱不匹配")
         
+        # 附件风险（高权重）
         if features.get('has_executable_attachment'):
             reasons.append("包含可执行文件附件")
         if features.get('has_suspicious_attachment'):
@@ -248,10 +455,9 @@ class DetectionService:
         if features.get('sandbox_detected'):
             reasons.append("沙箱检测到恶意代码")
         
-        if features.get('has_html_body'):
-            reasons.append("包含HTML正文")
-        if features.get('html_link_count', 0) > 5:
-            reasons.append("HTML链接数量异常")
+        # HTML风险（移除低风险特征）
+        # has_html_body 和 html_link_count 不再作为钓鱼理由
+        # 因为这些是合法营销邮件的正常特征
         if features.get('has_hidden_links'):
             reasons.append("包含隐藏链接")
         if features.get('has_form'):
@@ -259,10 +465,13 @@ class DetectionService:
         if features.get('has_iframe'):
             reasons.append("包含iframe（可能用于恶意重定向）")
         
-        if features.get('urgent_keywords_count', 0) > 3:
+        # 文本风险（提高阈值）
+        if features.get('urgent_keywords_count', 0) > 5:
             reasons.append("包含过多紧急关键词")
-        if features.get('financial_keywords_count', 0) > 2:
+        if features.get('financial_keywords_count', 0) > 3:
             reasons.append("包含金融相关关键词")
+        if features.get('exclamation_count', 0) > 20:
+            reasons.append("感叹号使用异常")
         
         reason = "；".join(reasons) if reasons else "检测到高置信度钓鱼邮件特征"
         

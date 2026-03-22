@@ -303,7 +303,7 @@ class FeatureExtractionService:
         vt_api_url: str
     ) -> float:
         """Query VirusTotal for URL detection ratio"""
-        if not vt_api_key:
+        if not vt_api_key or vt_api_key in ['test_key', 'test', 'your_api_key', '']:
             return 0.0
         
         try:
@@ -317,7 +317,7 @@ class FeatureExtractionService:
                     total = result.get('total', 1)
                     return positives / total if total > 0 else 0.0
         except Exception as e:
-            self.logger.error(f"VirusTotal query error for {url}: {e}")
+            self.logger.debug(f"VirusTotal query skipped for {url[:50]}: {type(e).__name__}")
         
         return 0.0
     
@@ -360,7 +360,7 @@ class FeatureExtractionService:
         }
     
     def _extract_text_features(self, body: str, subject: str = "") -> Dict:
-        """Extract text features"""
+        """Extract text features - improved version"""
         features = {
             'urgent_keywords_count': 0,
             'financial_keywords_count': 0,
@@ -374,7 +374,17 @@ class FeatureExtractionService:
         if not body:
             return features
         
-        text = body + " " + subject
+        # 移除HTML标签和CSS样式，只保留纯文本
+        clean_text = re.sub(r'<style[^>]*>.*?</style>', '', body, flags=re.DOTALL | re.IGNORECASE)
+        clean_text = re.sub(r'<script[^>]*>.*?</script>', '', clean_text, flags=re.DOTALL | re.IGNORECASE)
+        clean_text = re.sub(r'<[^>]+>', ' ', clean_text)
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+        
+        # 移除CSS中的 !important 和注释
+        text_for_analysis = re.sub(r'!important', '', clean_text, flags=re.IGNORECASE)
+        text_for_analysis = re.sub(r'/\*.*?\*/', '', text_for_analysis, flags=re.DOTALL)
+        
+        text = text_for_analysis + " " + subject
         
         urgent_count = sum(1 for kw in URGENT_KEYWORDS if kw.lower() in text.lower())
         features['urgent_keywords_count'] = urgent_count
@@ -383,6 +393,7 @@ class FeatureExtractionService:
         features['financial_keywords_count'] = financial_count
         
         features['text_length'] = len(text)
+        # 只计算纯文本中的感叹号，排除CSS !important
         features['exclamation_count'] = text.count('!')
         
         letters = ''.join(c for c in text if c.isalpha())

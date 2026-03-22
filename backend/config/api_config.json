@@ -1,0 +1,15 @@
+{
+  "detection": {
+    "phishing_threshold": 0.7,
+    "suspicious_threshold": 0.4,
+    "url_risk_weight": 0.4,
+    "text_risk_weight": 0.3,
+    "header_risk_weight": 0.3
+  },
+  "monitor": {
+    "interval": 600,
+    "max_attachment_size": 10485760,
+    "enable_sandbox": false
+  },
+  "last_tuned": "2026-03-22T20:23:41.452468"
+}

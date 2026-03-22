@@ -1,3 +1,0 @@
-{
-  "email": "From: \"Microsoft Security\" <security@microsoft-secure.com>\nTo: user@example.com\nSubject: 【紧急】您的Microsoft账户需要立即验证\n\n尊敬的Microsoft用户，\n\n我们检测到您的账户存在异常登录活动。为了保护您的账户安全，请立即点击以下链接验证您的身份：\nhttp://microsoft-secure-verify.com/login?user=test&token=123456\n\n如果您在24小时内未完成验证，您的账户将被永久冻结！\n\n附件包含详细的安全指南，请务必查看。\n\n此致\nMicrosoft安全团队"
-}

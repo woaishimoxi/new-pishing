@@ -1,10 +1,13 @@
 """
 URL Analyzer Service
-Analyze URL security risks
+Analyze URL security risks with VirusTotal integration
 """
 import re
 import time
 import whois
+import requests
+import hashlib
+import json
 from urllib.parse import urlparse
 from typing import Dict, List, Tuple, Optional, Set
 from datetime import datetime
@@ -15,38 +18,140 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from app.core import get_logger, get_config
 
 
-TRUSTED_DOMAINS = {
-    'qq.com', 'qlogo.cn', 'mail.qq.com', 'weixin.qq.com',
-    'steampowered.com', 'steamcommunity.com', 'steamstatic.com',
-    'valvesoftware.com', 'google.com', 'microsoft.com',
-    'facebook.com', 'baidu.com', 'taobao.com', 'jd.com',
-    'aliyun.com', 'alipay.com', 'wechat.com', '163.com', '126.com',
-    'sina.com', 'sohu.com'
-}
-
-SUSPICIOUS_DOMAIN_KEYWORDS = [
-    'phish', 'phishing', 'fake', 'scam', 'fraud', 'hack', 'steal',
-    'login', 'verify', 'secure', 'account', 'update', 'confirm',
-    'paypa1', 'g00gle', 'micr0soft', 'amaz0n', 'faceb00k',
-    'security', 'service', 'support', 'team', 'admin'
-]
-BRAND_NAMES = [
-    'paypal', 'google', 'microsoft', 'amazon', 'facebook', 'apple',
-    'linkedin', 'twitter', 'instagram', 'netflix', 'dropbox',
-    'alipay', 'wechat', 'taobao', 'jd', 'icbc', 'ccb', 'bank'
-]
+# 全局缓存
+TRUSTED_DOMAINS: Set[str] = set()
+SUSPICIOUS_DOMAIN_KEYWORDS: List[str] = []
+BRAND_NAMES: List[str] = []
 DOMAIN_AGE_CACHE: Dict = {}
+_IOC_CACHE: Dict = {}
+_CONFIG_LOADED = False
+
+
+def _load_config():
+    """Load whitelist and IOC config"""
+    global TRUSTED_DOMAINS, SUSPICIOUS_DOMAIN_KEYWORDS, BRAND_NAMES, _CONFIG_LOADED, _IOC_CACHE
+    
+    if _CONFIG_LOADED:
+        return
+    
+    # 加载白名单
+    whitelist_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        'config', 'whitelist.json'
+    )
+    
+    if os.path.exists(whitelist_file):
+        try:
+            with open(whitelist_file, 'r', encoding='utf-8') as f:
+                whitelist = json.load(f)
+                TRUSTED_DOMAINS = set(whitelist.get('trusted_domains', []))
+                SUSPICIOUS_DOMAIN_KEYWORDS = whitelist.get('suspicious_domain_keywords', [])
+        except Exception as e:
+            print(f"Failed to load whitelist: {e}")
+    
+    # 加载品牌名称
+    BRAND_NAMES = [
+        'paypal', 'google', 'microsoft', 'amazon', 'facebook', 'apple',
+        'linkedin', 'twitter', 'instagram', 'netflix', 'dropbox',
+        'alipay', 'wechat', 'taobao', 'jd', 'icbc', 'ccb', 'bank',
+        'steam', 'epic', 'playstation', 'xbox', 'nintendo',
+        'hsbc', 'citibank', 'jpmorgan', 'goldmansachs',
+        'visa', 'mastercard', 'unionpay',
+        'baidu', 'tencent', 'alibaba', 'bytedance', 'douyin', 'tiktok'
+    ]
+    
+    # 加载IOC数据库
+    ioc_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        'config', 'ioc_database.json'
+    )
+    
+    if os.path.exists(ioc_file):
+        try:
+            with open(ioc_file, 'r', encoding='utf-8') as f:
+                _IOC_CACHE = json.load(f)
+        except Exception as e:
+            print(f"Failed to load IOC database: {e}")
+    
+    _CONFIG_LOADED = True
 
 
 class URLAnalyzerService:
     """
     URL Analyzer Service
-    Analyze URL security risks
+    Analyze URL security risks with VirusTotal integration
     """
     
     def __init__(self):
         self.logger = get_logger(__name__)
         self.config = get_config()
+        self.vt_api_key = self.config.api.virustotal_api_key
+        self.vt_api_url = self.config.api.virustotal_api_url
+        self.vt_cache: Dict[str, Dict] = {}
+        
+        # 加载配置
+        _load_config()
+    
+    def check_virustotal(self, url: str) -> Dict:
+        """
+        Check URL against VirusTotal API
+        
+        Args:
+            url: URL to check
+            
+        Returns:
+            Dict with VT results
+        """
+        result = {
+            'checked': False,
+            'positives': 0,
+            'total': 0,
+            'detection_ratio': 0.0,
+            'permalink': '',
+            'error': None
+        }
+        
+        if not self.vt_api_key:
+            return result
+        
+        # 使用URL的MD5作为缓存键
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        if url_hash in self.vt_cache:
+            return self.vt_cache[url_hash]
+        
+        try:
+            params = {
+                'apikey': self.vt_api_key,
+                'resource': url
+            }
+            
+            response = requests.get(self.vt_api_url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                response_code = data.get('response_code', 0)
+                
+                if response_code == 1:
+                    result['checked'] = True
+                    result['positives'] = data.get('positives', 0)
+                    result['total'] = data.get('total', 0)
+                    result['permalink'] = data.get('permalink', '')
+                    
+                    if result['total'] > 0:
+                        result['detection_ratio'] = result['positives'] / result['total']
+                else:
+                    result['error'] = 'URL not found in VT database'
+            else:
+                result['error'] = f'VT API error: {response.status_code}'
+                
+        except requests.exceptions.Timeout:
+            result['error'] = 'VT API timeout'
+        except Exception as e:
+            result['error'] = f'VT API error: {str(e)}'
+        
+        # 缓存结果
+        self.vt_cache[url_hash] = result
+        return result
     
     def is_valid_http_url(self, url: str) -> bool:
         """Check if URL is valid HTTP/HTTPS URL"""
@@ -139,6 +244,53 @@ class URLAnalyzerService:
         
         return abused_brands
     
+    def check_ioc_patterns(self, domain: str, url: str = "") -> List[str]:
+        """
+        Check domain/URL against IOC patterns
+        
+        Returns:
+            List of matched IOC patterns
+        """
+        matches = []
+        
+        # 检查域名模式
+        domain_patterns = _IOC_CACHE.get('malicious_domain_patterns', [])
+        for pattern in domain_patterns:
+            try:
+                if re.match(pattern, domain, re.IGNORECASE):
+                    matches.append(f'域名匹配恶意模式: {pattern}')
+            except re.error:
+                pass
+        
+        # 检查URL模式
+        if url:
+            url_patterns = _IOC_CACHE.get('malicious_url_patterns', [])
+            for pattern in url_patterns:
+                try:
+                    if re.match(pattern, url, re.IGNORECASE):
+                        matches.append(f'URL匹配恶意模式: {pattern}')
+                except re.error:
+                    pass
+        
+        return matches
+    
+    def check_phishing_keywords(self, text: str) -> List[str]:
+        """
+        Check text for phishing keywords
+        
+        Returns:
+            List of matched phishing keywords
+        """
+        matches = []
+        text_lower = text.lower()
+        
+        keywords = _IOC_CACHE.get('known_phishing_keywords', [])
+        for keyword in keywords:
+            if keyword.lower() in text_lower:
+                matches.append(keyword)
+        
+        return matches
+    
     def get_domain_age(self, domain: str) -> Optional[float]:
         """Get domain age in days"""
         if domain in DOMAIN_AGE_CACHE:
@@ -175,8 +327,15 @@ class URLAnalyzerService:
             DOMAIN_AGE_CACHE[domain] = None
             return None
     
-    def analyze_single_url(self, url: str, check_whitelist: bool = True) -> Dict:
-        """Analyze single URL for security risks"""
+    def analyze_single_url(self, url: str, check_whitelist: bool = True, use_vt: bool = True) -> Dict:
+        """
+        Analyze single URL for security risks
+        
+        Args:
+            url: URL to analyze
+            check_whitelist: Whether to check whitelist
+            use_vt: Whether to use VirusTotal API
+        """
         result = {
             'url': url,
             'is_valid': False,
@@ -190,7 +349,8 @@ class URLAnalyzerService:
             'is_ip_address': False,
             'suspicious_keywords': [],
             'brand_abuse': [],
-            'reasons': []
+            'reasons': [],
+            'virustotal': None  # 新增VirusTotal结果
         }
         
         if not self.is_valid_http_url(url):
@@ -260,6 +420,12 @@ class URLAnalyzerService:
             risk_score += 45
             reasons.append(f'疑似品牌滥用: {", ".join(brand_abuse)}')
         
+        # IOC模式匹配检查
+        ioc_matches = self.check_ioc_patterns(domain, url)
+        if ioc_matches:
+            risk_score += 40
+            reasons.extend(ioc_matches[:3])  # 最多显示3个匹配
+        
         if not result['has_https']:
             risk_score += 10
             reasons.append('未使用HTTPS加密')
@@ -267,6 +433,24 @@ class URLAnalyzerService:
         if len(url) > 200:
             risk_score += 5
             reasons.append('URL过长')
+        
+        # VirusTotal检查
+        if use_vt and self.vt_api_key:
+            vt_result = self.check_virustotal(url)
+            result['virustotal'] = vt_result
+            
+            if vt_result['checked'] and vt_result['positives'] > 0:
+                # 根据VT检测结果增加风险分数
+                vt_ratio = vt_result['detection_ratio']
+                if vt_ratio > 0.5:
+                    risk_score += 50
+                    reasons.append(f'VirusTotal检测到高风险（{vt_result["positives"]}/{vt_result["total"]}）')
+                elif vt_ratio > 0.2:
+                    risk_score += 30
+                    reasons.append(f'VirusTotal检测到中风险（{vt_result["positives"]}/{vt_result["total"]}）')
+                elif vt_ratio > 0:
+                    risk_score += 15
+                    reasons.append(f'VirusTotal检测到低风险（{vt_result["positives"]}/{vt_result["total"]}）')
         
         result['risk_score'] = min(risk_score, 100)
         
@@ -283,8 +467,15 @@ class URLAnalyzerService:
         
         return result
     
-    def analyze_urls(self, urls: List[str], check_whitelist: bool = True) -> Dict:
-        """Batch analyze URLs"""
+    def analyze_urls(self, urls: List[str], check_whitelist: bool = True, use_vt: bool = False) -> Dict:
+        """
+        Batch analyze URLs
+        
+        Args:
+            urls: List of URLs to analyze
+            check_whitelist: Whether to check whitelist
+            use_vt: Whether to use VirusTotal API (default False for performance)
+        """
         valid_urls, skipped_urls = self.filter_urls(urls)
         
         analysis_results = []
@@ -294,7 +485,7 @@ class URLAnalyzerService:
         safe_count = 0
         
         for url in valid_urls:
-            result = self.analyze_single_url(url, check_whitelist)
+            result = self.analyze_single_url(url, check_whitelist, use_vt=use_vt)
             analysis_results.append(result)
             
             if result['risk_level'] == 'HIGH':

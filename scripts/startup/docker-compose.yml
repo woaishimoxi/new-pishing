@@ -1,0 +1,45 @@
+# 面向中小型企业的轻量化钓鱼邮件检测与溯源系统
+# Docker 部署配置文件
+# 使用方式: cd scripts/startup && docker-compose up -d
+
+version: '3.8'
+
+services:
+  phish-detector:
+    build:
+      context: ../..
+      dockerfile: scripts/startup/Dockerfile
+    container_name: phish-detector-system
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../../data:/app/data
+      - ../../logs:/app/logs
+      - ../../uploads:/app/uploads
+      - ../../config:/app/config
+      - ../../models:/app/models
+    environment:
+      - VT_API_KEY=${VT_API_KEY:-}
+      - FLASK_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/detection/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - phish-net
+    # 资源限制（适配2核4G环境）
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  phish-net:
+    driver: bridge

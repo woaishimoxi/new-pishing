@@ -6,6 +6,7 @@ from .alerts import alerts_bp
 from .config import config_bp
 from .stats import stats_bp
 from .email import email_bp
+from .system import system_bp
 from .docs import api_docs, api
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     'config_bp',
     'stats_bp',
     'email_bp',
+    'system_bp',
     'api_docs',
     'api'
 ]

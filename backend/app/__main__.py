@@ -18,6 +18,7 @@ from app.api.alerts import alerts_bp
 from app.api.config import config_bp
 from app.api.stats import stats_bp
 from app.api.email import email_bp
+from app.api.system import system_bp
 from app.api.docs import api_docs
 
 
@@ -62,6 +63,7 @@ def create_app(config_name: str = 'development') -> Flask:
     app.register_blueprint(config_bp, url_prefix='/api/config')
     app.register_blueprint(stats_bp, url_prefix='/api/stats')
     app.register_blueprint(email_bp, url_prefix='/api/email')
+    app.register_blueprint(system_bp)
     app.register_blueprint(api_docs)
     
     register_error_handlers(app)

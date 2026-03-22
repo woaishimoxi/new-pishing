@@ -115,7 +115,17 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
         config.api.virustotal_api_url
     )
     
-    label, confidence, reason = detector.analyze(parsed, features)
+    # 先进行URL分析，然后传入检测器
+    url_analysis = url_analyzer.analyze_urls(parsed.get('urls', []))
+    url_risk_level = url_analysis.get('max_risk_level', 'UNKNOWN')
+    url_risk_score = url_analysis.get('max_risk_score', 0)
+    
+    label, confidence, reason = detector.analyze(
+        parsed, features, 
+        url_risk_level=url_risk_level,
+        url_risk_score=url_risk_score,
+        url_analysis=url_analysis
+    )
     
     traceback_report = traceback.generate_report(
         parsed, 
@@ -140,8 +150,6 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
             safe_features[key] = str(value)
         else:
             safe_features[key] = value
-    
-    url_analysis = url_analyzer.analyze_urls(parsed.get('urls', []))
     
     module_scores = calculate_module_scores(features)
     

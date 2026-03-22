@@ -1,0 +1,152 @@
+{
+  "description": "Known malicious Indicators of Compromise (IOC) database",
+  "version": "2.0",
+  "last_updated": "2026-03-21",
+  
+  "malicious_ip_patterns": [
+    "^185\\.",
+    "^194\\.",
+    "^45\\.",
+    "^103\\.",
+    "^91\\."
+  ],
+  
+  "malicious_ips": [],
+  
+  "malicious_domain_patterns": [
+    ".*-secure\\..*",
+    ".*-verify\\..*",
+    ".*-login\\..*",
+    ".*-account\\..*",
+    ".*phish.*",
+    ".*scam.*",
+    ".*fake.*",
+    ".*fraud.*",
+    ".*-bank\\..*",
+    ".*bank-.*",
+    "secure-.*",
+    "verify-.*",
+    "login-.*",
+    "account-.*"
+  ],
+  
+  "malicious_domains": [],
+  
+  "malicious_url_patterns": [
+    ".*\\?token=.*",
+    ".*\\?session=.*",
+    ".*\\?auth=.*",
+    ".*/login\\?.*redirect.*",
+    ".*/verify\\?.*token.*",
+    ".*/account\\?.*confirm.*",
+    ".*/secure\\?.*update.*"
+  ],
+  
+  "malicious_urls": [],
+  
+  "malicious_hashes": [],
+  
+  "phishing_subject_patterns": [
+    ".*[Uu]rgent.*",
+    ".*[Ii]mmediate.*[Aa]ction.*",
+    ".*[Aa]ccount.*[Ss]uspended.*",
+    ".*[Ss]ecurity.*[Aa]lert.*",
+    ".*[Vv]erify.*[Yy]our.*[Aa]ccount.*",
+    ".*[Cc]onfirm.*[Yy]our.*[Ii]dentity.*",
+    ".*[Uu]pdate.*[Yy]our.*[Ii]nformation.*",
+    ".*[Pp]assword.*[Ee]xpir.*",
+    ".*[Ll]imited.*[Aa]ccess.*",
+    ".*[Uu]nusual.*[Aa]ctivity.*",
+    ".*紧急.*",
+    ".*立即.*处理.*",
+    ".*账户.*异常.*",
+    ".*安全.*警告.*",
+    ".*验证.*身份.*",
+    ".*密码.*过期.*",
+    ".*账号.*冻结.*"
+  ],
+  
+  "suspicious_attachment_extensions": [
+    ".exe", ".scr", ".bat", ".cmd", ".com", ".pif", ".vbs", ".vbe",
+    ".js", ".jse", ".wsf", ".wsh", ".ps1", ".psm1", ".psc1",
+    ".msi", ".msp", ".mst", ".inf", ".reg",
+    ".hta", ".cpl", ".scf", ".lnk", ".inf",
+    ".dll", ".sys", ".drv",
+    ".docm", ".xlsm", ".pptm", ".dotm", ".xltm", ".potm",
+    ".doc", ".xls", ".ppt",  // Older Office formats with macros
+    ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2",  // Archives (may contain malware)
+    ".iso", ".img", ".vhd", ".vhdx"  // Disk images
+  ],
+  
+  "suspicious_attachment_names": [
+    "invoice", "receipt", "order", "shipping", "delivery",
+    "statement", "report", "document", "file", "attachment",
+    "photo", "image", "picture", "scan", "copy",
+    "发票", "订单", "收据", "账单", "报告", "文件", "照片"
+  ],
+  
+  "known_phishing_keywords": [
+    "verify your account",
+    "confirm your identity",
+    "update your information",
+    "your account has been suspended",
+    "unusual activity detected",
+    "security alert",
+    "immediate action required",
+    "your password will expire",
+    "limited access to your account",
+    "click here to verify",
+    "login to continue",
+    "your account needs attention",
+    "紧急通知",
+    "账户异常",
+    "安全警告",
+    "请立即验证",
+    "账户冻结",
+    "密码过期",
+    "身份确认",
+    "登录验证"
+  ],
+  
+  "brand_impersonation_targets": [
+    {"brand": "PayPal", "keywords": ["paypal", "pay-pal"]},
+    {"brand": "Microsoft", "keywords": ["microsoft", "office365", "outlook", "onedrive"]},
+    {"brand": "Google", "keywords": ["google", "gmail", "google drive"]},
+    {"brand": "Apple", "keywords": ["apple", "icloud", "apple id"]},
+    {"brand": "Amazon", "keywords": ["amazon", "aws", "prime"]},
+    {"brand": "Netflix", "keywords": ["netflix"]},
+    {"brand": "Facebook", "keywords": ["facebook", "fb"]},
+    {"brand": "Instagram", "keywords": ["instagram"]},
+    {"brand": "Twitter", "keywords": ["twitter", "x.com"]},
+    {"brand": "LinkedIn", "keywords": ["linkedin"]},
+    {"brand": "银行", "keywords": ["bank", "icbc", "ccb", "boc", "abc", "bankcomm"]},
+    {"brand": "支付宝", "keywords": ["alipay", "zhifubao"]},
+    {"brand": "微信", "keywords": ["wechat", "weixin"]},
+    {"brand": "淘宝", "keywords": ["taobao"]},
+    {"brand": "京东", "keywords": ["jd.com", "jingdong"]},
+    {"brand": "Steam", "keywords": ["steam", "valve"]},
+    {"brand": "Epic Games", "keywords": ["epic", "epicgames"]}
+  ],
+  
+  "sources": [
+    "PhishTank",
+    "OpenPhish",
+    "Abuse.ch",
+    "Spamhaus",
+    "Local threat intelligence",
+    "Manual IOC entries",
+    "Pattern-based detection"
+  ],
+  
+  "notes": {
+    "description": "IOC数据库包含已知恶意指标和检测模式",
+    "update_frequency": "建议每周更新",
+    "external_sources": [
+      "https://phishtank.org/",
+      "https://openphish.com/",
+      "https://www.spamhaus.org/",
+      "https://urlhaus.abuse.ch/",
+      "https://threatfeeds.io/"
+    ]
+  }
+}
