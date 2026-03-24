@@ -1,0 +1,13 @@
+{
+  "domains": [
+    "malicious-example.com",
+    "phishing-site.com",
+    "fake-bank.com"
+  ],
+  "ips": [
+    "192.168.1.100",
+    "10.0.0.1"
+  ],
+  "last_updated": "2026-03-22T20:00:00",
+  "notes": "本地黑名单配置，可在Web界面管理"
+}

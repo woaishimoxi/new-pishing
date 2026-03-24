@@ -19,6 +19,7 @@ from app.api.config import config_bp
 from app.api.stats import stats_bp
 from app.api.email import email_bp
 from app.api.system import system_bp
+from app.api.domains import domains_bp
 from app.api.docs import api_docs
 
 
@@ -64,6 +65,7 @@ def create_app(config_name: str = 'development') -> Flask:
     app.register_blueprint(stats_bp, url_prefix='/api/stats')
     app.register_blueprint(email_bp, url_prefix='/api/email')
     app.register_blueprint(system_bp)
+    app.register_blueprint(domains_bp)
     app.register_blueprint(api_docs)
     
     register_error_handlers(app)
@@ -123,6 +125,10 @@ def register_template_routes(app: Flask) -> None:
     @app.route('/history')
     def history():
         return render_template('history.html')
+    
+    @app.route('/domains')
+    def domains_page():
+        return render_template('domains.html')
     
     @app.route('/report.html')
     def report():
