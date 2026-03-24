@@ -626,15 +626,12 @@
                 钓鱼邮件检测与溯源系统
             </a>
             <div class="d-flex ms-auto gap-2">
-                <a href="/settings" class="btn btn-sm btn-outline-light" title="配置管理中心">
-                    <i class="bi bi-sliders"></i> 配置管理
+                <a href="/settings" class="btn btn-sm btn-outline-light" title="系统配置">
+                    <i class="bi bi-sliders"></i> 系统配置
                 </a>
                 <a href="/domains" class="btn btn-sm btn-outline-light" title="域名管理">
                     <i class="bi bi-globe"></i> 域名管理
                 </a>
-                <button class="btn btn-sm btn-outline-light" type="button" onclick="showApiConfig()" title="API配置">
-                    <i class="bi bi-key"></i> API配置
-                </button>
                 <button class="btn btn-sm btn-outline-light" type="button" onclick="shutdownSystem()" title="关闭系统">
                     <i class="bi bi-power"></i> 关闭
                 </button>
@@ -2579,163 +2576,6 @@ https://example.com/account"></textarea>
             }
         });
     </script>
-
-    <!-- API 配置模态框 -->
-    <div class="modal fade" id="apiConfigModal" tabindex="-1" aria-labelledby="apiConfigModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="apiConfigModalLabel">API 连接配置管理</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-4">
-                        <h6><i class="bi bi-virus"></i> VirusTotal API 配置</h6>
-                        <div class="form-group mb-3">
-                            <label for="vt-api-key" class="form-label">API Key</label>
-                            <input type="password" class="form-control" id="vt-api-key" placeholder="输入 VirusTotal API Key">
-                            <small class="text-muted">用于增强 URL 威胁检测能力，提升钓鱼邮件识别准确率</small>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="vt-api-url" class="form-label">API URL</label>
-                            <input type="url" class="form-control" id="vt-api-url" placeholder="VirusTotal API URL">
-                            <small class="text-muted">默认：https://www.virustotal.com/vtapi/v2/url/report</small>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h6><i class="bi bi-globe"></i> IP-API 配置</h6>
-                        <div class="form-group mb-3">
-                            <label for="ip-api-url" class="form-label">API URL</label>
-                            <input type="url" class="form-control" id="ip-api-url" placeholder="IP 地理位置 API URL">
-                            <small class="text-muted">提供 IP 地理位置信息，辅助邮件来源分析</small>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h6><i class="bi bi-link-45deg"></i> URL 跳转追踪</h6>
-                        <div class="form-group mb-3">
-                            <label for="url-tracking-api" class="form-label">API 状态</label>
-                            <input type="text" class="form-control" value="内置功能" disabled>
-                            <small class="text-muted">追踪 URL 跳转链路，揭示隐藏的恶意目标</small>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h6><i class="bi bi-exclamation-triangle"></i> DNSBL 黑名单检查</h6>
-                        <div class="form-group mb-3">
-                            <label for="dnsbl-api" class="form-label">API 状态</label>
-                            <input type="text" class="form-control" value="内置功能" disabled>
-                            <small class="text-muted">检查 IP 是否在黑名单中，快速识别恶意来源</small>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h6><i class="bi bi-envelope"></i> 邮箱配置</h6>
-                        <div class="form-group mb-3">
-                            <label for="email-address" class="form-label">邮箱地址</label>
-                            <input type="email" class="form-control" id="email-address" placeholder="输入邮箱地址">
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="email-password" class="form-label">密码/授权码</label>
-                            <input type="password" class="form-control" id="email-password" placeholder="输入邮箱密码或授权码">
-                            <small class="text-muted">对于 QQ 邮箱、Gmail 等，需要使用授权码而不是密码</small>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="email-server" class="form-label">邮件服务器</label>
-                            <input type="text" class="form-control" id="email-server" placeholder="输入邮件服务器地址">
-                            <small class="text-muted">例如：imap.qq.com、imap.gmail.com</small>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="email-protocol" class="form-label">协议</label>
-                            <select class="form-control" id="email-protocol">
-                                <option value="imap">IMAP</option>
-                                <option value="pop3">POP3</option>
-                            </select>
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="email-port" class="form-label">端口</label>
-                            <input type="number" class="form-control" id="email-port" placeholder="输入端口号，留空使用默认端口">
-                            <small class="text-muted">IMAP 默认 993，POP3 默认 995</small>
-                        </div>
-                        <div class="form-group mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="email-enabled">
-                                <label class="form-check-label" for="email-enabled">启用邮箱监控</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h6><i class="bi bi-info-circle"></i> WHOIS 查询</h6>
-                        <div class="form-group mb-3">
-                            <label for="whois-api" class="form-label">API 状态</label>
-                            <input type="text" class="form-control" value="内置功能" disabled>
-                            <small class="text-muted">查询域名注册信息，评估域名可信度</small>
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <h6><i class="bi bi-info-circle"></i> API 状态</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>API 名称</th>
-                                        <th>状态</th>
-                                        <th>说明</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>VirusTotal API</td>
-                                        <td><span class="badge bg-warning" id="vt-status">未配置</span></td>
-                                        <td>用于 URL 威胁检测</td>
-                                    </tr>
-                                    <tr>
-                                        <td>IP-API.com</td>
-                                        <td><span class="badge bg-success">可用</span></td>
-                                        <td>免费 IP 地理位置查询</td>
-                                    </tr>
-                                    <tr>
-                                        <td>URL 跳转追踪</td>
-                                        <td><span class="badge bg-success">可用</span></td>
-                                        <td>追踪 URL 跳转链路</td>
-                                    </tr>
-                                    <tr>
-                                        <td>DNSBL 黑名单检查</td>
-                                        <td><span class="badge bg-success">可用</span></td>
-                                        <td>检查 IP 是否在黑名单中</td>
-                                    </tr>
-                                    <tr>
-                                        <td>WHOIS 查询</td>
-                                        <td><span class="badge bg-success">可用</span></td>
-                                        <td>域名信息查询</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div id="api-test-result" class="mb-3"></div>
-                    <div id="email-test-result" class="mb-3"></div>
-                    <div id="api-save-result" class="mb-3"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                    <button type="button" class="btn btn-info me-2" id="test-api-btn" onclick="testApiConnection()">
-                        <i class="bi bi-play-fill"></i> 测试 API 连接
-                    </button>
-                    <button type="button" class="btn btn-info me-2" id="test-email-btn" onclick="testEmailConnection()">
-                        <i class="bi bi-play-fill"></i> 测试邮箱连接
-                    </button>
-                    <button type="button" class="btn btn-primary" id="save-api-btn" onclick="saveApiConfig()">
-                        <i class="bi bi-save"></i> 保存配置
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 </body>

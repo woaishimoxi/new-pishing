@@ -107,13 +107,60 @@
                 <!-- API配置 -->
                 <div class="card-custom">
                     <div class="card-header-custom">
-                        <h5 class="card-title"><i class="bi bi-key"></i>API配置</h5>
-                        <button class="btn btn-outline-custom btn-custom" onclick="editConfig('api_config.json')">
-                            <i class="bi bi-pencil me-1"></i>编辑
-                        </button>
+                        <h5 class="card-title"><i class="bi bi-key"></i>系统配置</h5>
                     </div>
-                    <div class="card-body-custom" id="api-config-preview">
-                        <div class="text-center text-muted py-3">加载中...</div>
+                    <div class="card-body-custom">
+                        <!-- VirusTotal API -->
+                        <div class="mb-4">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                <i class="bi bi-shield-check me-1" style="color: var(--blue);"></i>VirusTotal API
+                            </label>
+                            <input type="text" class="form-control form-control-custom" id="vt-api-key" placeholder="输入VirusTotal API Key">
+                            <div class="form-text" style="font-size: 0.7rem;">用于URL威胁检测增强</div>
+                        </div>
+                        
+                        <!-- 邮箱配置 -->
+                        <div class="mb-4">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                <i class="bi bi-envelope me-1" style="color: var(--green);"></i>邮箱配置
+                            </label>
+                            <div class="row g-2 mb-2">
+                                <div class="col-8">
+                                    <input type="email" class="form-control form-control-custom" id="email-address" placeholder="邮箱地址">
+                                </div>
+                                <div class="col-4">
+                                    <select class="form-select form-control-custom" id="email-protocol">
+                                        <option value="imap">IMAP</option>
+                                        <option value="pop3">POP3</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-8">
+                                    <input type="text" class="form-control form-control-custom" id="email-server" placeholder="服务器地址，如 imap.qq.com">
+                                </div>
+                                <div class="col-4">
+                                    <input type="number" class="form-control form-control-custom" id="email-port" placeholder="端口" value="993">
+                                </div>
+                            </div>
+                            <input type="password" class="form-control form-control-custom" id="email-password" placeholder="密码/授权码">
+                            <div class="form-text" style="font-size: 0.7rem;">QQ邮箱需使用授权码</div>
+                        </div>
+                        
+                        <!-- 保存按钮 -->
+                        <button class="btn btn-primary-custom btn-custom w-100" onclick="saveApiConfig()">
+                            <i class="bi bi-check-lg me-1"></i>保存配置
+                        </button>
+                        
+                        <!-- 测试连接 -->
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-outline-custom btn-custom flex-fill" onclick="testVirusTotal()">
+                                <i class="bi bi-plug me-1"></i>测试VT
+                            </button>
+                            <button class="btn btn-outline-custom btn-custom flex-fill" onclick="testEmail()">
+                                <i class="bi bi-plug me-1"></i>测试邮箱
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -299,23 +346,83 @@
             }
         }
 
-        // 渲染API配置预览
+        // 填充API配置表单
         function renderAPIPreview(config) {
-            const container = document.getElementById('api-config-preview');
-            container.innerHTML = `
-                <div class="mb-2">
-                    <span style="font-size: 0.75rem; color: var(--text-secondary);">VirusTotal API:</span>
-                    <span style="font-size: 0.8rem; font-family: monospace;">${config.virustotal?.api_key ? '已配置' : '未配置'}</span>
-                </div>
-                <div class="mb-2">
-                    <span style="font-size: 0.75rem; color: var(--text-secondary);">邮箱服务器:</span>
-                    <span style="font-size: 0.8rem; font-family: monospace;">${config.email?.server || '未配置'}</span>
-                </div>
-                <div>
-                    <span style="font-size: 0.75rem; color: var(--text-secondary);">邮箱地址:</span>
-                    <span style="font-size: 0.8rem; font-family: monospace;">${config.email?.email || '未配置'}</span>
-                </div>
-            `;
+            document.getElementById('vt-api-key').value = config.virustotal?.api_key || '';
+            document.getElementById('email-address').value = config.email?.email || '';
+            document.getElementById('email-password').value = config.email?.password || '';
+            document.getElementById('email-server').value = config.email?.server || '';
+            document.getElementById('email-protocol').value = config.email?.protocol || 'imap';
+            document.getElementById('email-port').value = config.email?.port || 993;
+        }
+
+        // 保存API配置
+        async function saveApiConfig() {
+            const config = {
+                virustotal: {
+                    api_key: document.getElementById('vt-api-key').value,
+                    api_url: 'https://www.virustotal.com/vtapi/v2/url/report'
+                },
+                ipapi: {
+                    api_url: 'http://ip-api.com/json/'
+                },
+                email: {
+                    email: document.getElementById('email-address').value,
+                    password: document.getElementById('email-password').value,
+                    server: document.getElementById('email-server').value,
+                    protocol: document.getElementById('email-protocol').value,
+                    port: parseInt(document.getElementById('email-port').value) || 993,
+                    enabled: !!document.getElementById('email-address').value
+                }
+            };
+            
+            try {
+                const resp = await fetch('/api/settings/file/api_config.json', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: config })
+                });
+                
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('配置已保存');
+                    currentData.api = config;
+                } else {
+                    showToast(data.error || '保存失败', 'error');
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        // 测试VirusTotal连接
+        async function testVirusTotal() {
+            try {
+                const resp = await fetch('/api/config/test');
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    showToast('VirusTotal连接成功');
+                } else {
+                    showToast(data.message || '连接失败', 'error');
+                }
+            } catch (e) {
+                showToast('测试失败', 'error');
+            }
+        }
+
+        // 测试邮箱连接
+        async function testEmail() {
+            try {
+                const resp = await fetch('/api/config/test-email');
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    showToast('邮箱连接成功');
+                } else {
+                    showToast(data.message || '连接失败', 'error');
+                }
+            } catch (e) {
+                showToast('测试失败', 'error');
+            }
         }
 
         // 渲染白名单
