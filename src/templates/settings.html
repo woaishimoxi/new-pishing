@@ -395,9 +395,42 @@
             }
         }
 
-        // 测试VirusTotal连接
+        // 测试VirusTotal连接（先保存配置再测试）
         async function testVirusTotal() {
             try {
+                // 先从表单读取配置
+                const config = {
+                    virustotal: {
+                        api_key: document.getElementById('vt-api-key').value,
+                        api_url: 'https://www.virustotal.com/vtapi/v2/url/report'
+                    },
+                    ipapi: {
+                        api_url: 'http://ip-api.com/json/'
+                    },
+                    email: {
+                        email: document.getElementById('email-address').value,
+                        password: document.getElementById('email-password').value,
+                        server: document.getElementById('email-server').value,
+                        protocol: document.getElementById('email-protocol').value,
+                        port: parseInt(document.getElementById('email-port').value) || 993,
+                        enabled: !!document.getElementById('email-address').value
+                    }
+                };
+                
+                // 检查配置是否完整
+                if (!config.virustotal.api_key) {
+                    showToast('请先填写VirusTotal API Key', 'error');
+                    return;
+                }
+                
+                // 先保存配置
+                await fetch('/api/settings/file/api_config.json', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: config })
+                });
+                
+                // 再测试连接
                 const resp = await fetch('/api/config/test');
                 const data = await resp.json();
                 if (data.status === 'success') {
@@ -406,13 +439,46 @@
                     showToast(data.message || '连接失败', 'error');
                 }
             } catch (e) {
-                showToast('测试失败', 'error');
+                showToast('测试失败: ' + e.message, 'error');
             }
         }
 
-        // 测试邮箱连接
+        // 测试邮箱连接（先保存配置再测试）
         async function testEmail() {
             try {
+                // 先从表单读取配置
+                const config = {
+                    virustotal: {
+                        api_key: document.getElementById('vt-api-key').value,
+                        api_url: 'https://www.virustotal.com/vtapi/v2/url/report'
+                    },
+                    ipapi: {
+                        api_url: 'http://ip-api.com/json/'
+                    },
+                    email: {
+                        email: document.getElementById('email-address').value,
+                        password: document.getElementById('email-password').value,
+                        server: document.getElementById('email-server').value,
+                        protocol: document.getElementById('email-protocol').value,
+                        port: parseInt(document.getElementById('email-port').value) || 993,
+                        enabled: !!document.getElementById('email-address').value
+                    }
+                };
+                
+                // 检查配置是否完整
+                if (!config.email.email || !config.email.password || !config.email.server) {
+                    showToast('请先填写邮箱配置（邮箱地址、密码、服务器）', 'error');
+                    return;
+                }
+                
+                // 先保存配置
+                await fetch('/api/settings/file/api_config.json', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: config })
+                });
+                
+                // 再测试连接
                 const resp = await fetch('/api/config/test-email');
                 const data = await resp.json();
                 if (data.status === 'success') {
@@ -421,7 +487,7 @@
                     showToast(data.message || '连接失败', 'error');
                 }
             } catch (e) {
-                showToast('测试失败', 'error');
+                showToast('测试失败: ' + e.message, 'error');
             }
         }
 
