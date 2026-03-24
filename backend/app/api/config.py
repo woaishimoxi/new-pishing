@@ -102,17 +102,36 @@ def test_api_connection():
 def test_email_connection():
     """Test email server connection"""
     try:
-        if not config.email.address or not config.email.password or not config.email.server:
+        # 从文件读取最新配置
+        import json
+        from pathlib import Path
+        
+        config_file = Path(__file__).resolve().parent.parent.parent / 'config' / 'api_config.json'
+        email_config = {}
+        
+        if config_file.exists():
+            with open(config_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                email_config = data.get('email', {})
+        
+        # 使用文件配置或内存配置
+        email_address = email_config.get('email') or config.email.address
+        email_password = email_config.get('password') or config.email.password
+        email_server = email_config.get('server') or config.email.server
+        email_protocol = email_config.get('protocol') or config.email.protocol
+        email_port = email_config.get('port') or config.email.port
+        
+        if not email_address or not email_password or not email_server:
             return jsonify({'status': 'error', 'message': '邮箱配置不完整'}), 400
         
         fetcher = EmailFetcherService()
         
         if fetcher.connect(
-            config.email.address,
-            config.email.password,
-            config.email.server,
-            config.email.protocol,
-            config.email.port
+            email_address,
+            email_password,
+            email_server,
+            email_protocol,
+            email_port
         ):
             fetcher.disconnect()
             return jsonify({'status': 'success', 'message': '邮箱连接成功'})
