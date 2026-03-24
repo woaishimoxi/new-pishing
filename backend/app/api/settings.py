@@ -114,6 +114,10 @@ def update_config_file(filename):
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(content, f, indent=2, ensure_ascii=False)
         
+        # 如果是API配置文件，同步到系统配置
+        if filename == 'api_config.json':
+            _sync_api_config(content)
+        
         return jsonify({
             'success': True,
             'message': f'{filename} 已更新'
@@ -121,6 +125,41 @@ def update_config_file(filename):
     except Exception as e:
         logger.error(f"Update config file error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+def _sync_api_config(content: Dict):
+    """同步API配置到系统配置"""
+    try:
+        from app.core.config import get_config
+        config = get_config()
+        
+        # 更新VirusTotal配置
+        if 'virustotal' in content:
+            vt = content['virustotal']
+            if 'api_key' in vt:
+                config.api.virustotal_api_key = vt['api_key']
+            if 'api_url' in vt:
+                config.api.virustotal_api_url = vt['api_url']
+        
+        # 更新邮箱配置
+        if 'email' in content:
+            email = content['email']
+            if 'email' in email:
+                config.email.address = email['email']
+            if 'password' in email:
+                config.email.password = email['password']
+            if 'server' in email:
+                config.email.server = email['server']
+            if 'protocol' in email:
+                config.email.protocol = email['protocol']
+            if 'port' in email:
+                config.email.port = email['port']
+            if 'enabled' in email:
+                config.email.enabled = email['enabled']
+        
+        logger.info("API config synced to system")
+    except Exception as e:
+        logger.error(f"Failed to sync API config: {e}")
 
 
 @settings_bp.route('/api/settings/file/<filename>/backup', methods=['POST'])
