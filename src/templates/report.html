@@ -245,6 +245,12 @@
                 <button class="btn btn-sm btn-outline-light me-2" type="button" onclick="window.location.href='/';">
                     <i class="bi bi-house"></i> 返回首页
                 </button>
+                <button class="btn btn-sm btn-outline-light me-2" type="button" onclick="exportRawEmail()">
+                    <i class="bi bi-file-earmark-text"></i> 导出原邮件
+                </button>
+                <button class="btn btn-sm btn-outline-light me-2" type="button" onclick="aiAnalyze()">
+                    <i class="bi bi-robot"></i> AI分析
+                </button>
                 <button class="btn btn-sm btn-outline-light" type="button" onclick="exportReport()">
                     <i class="bi bi-download"></i> 导出报告
                 </button>
@@ -1393,6 +1399,73 @@
             }
 
             container.innerHTML = html;
+        }
+
+        // 导出原邮件
+        function exportRawEmail() {
+            if (!currentResult || !currentResult.id) {
+                alert('无法获取邮件ID');
+                return;
+            }
+            
+            const alertId = currentResult.id;
+            window.location.href = `/api/alerts/${alertId}/export`;
+        }
+
+        // AI分析（预留功能）
+        async function aiAnalyze() {
+            if (!currentResult || !currentResult.id) {
+                alert('无法获取邮件ID');
+                return;
+            }
+            
+            const alertId = currentResult.id;
+            
+            try {
+                const response = await fetch(`/api/alerts/${alertId}/ai-analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'gpt-4',
+                        prompt: '请分析这封邮件是否为钓鱼邮件，并说明原因。'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'placeholder') {
+                    alert(`AI分析功能预留接口\n\n${data.ai_suggestion}\n\n集成步骤：\n${data.integration_guide.step1}\n${data.integration_guide.step2}\n${data.integration_guide.step3}\n${data.integration_guide.step4}`);
+                } else if (data.ai_result) {
+                    // 未来接入AI后显示分析结果
+                    showAIResult(data);
+                } else {
+                    alert('AI分析响应异常');
+                }
+            } catch (e) {
+                alert('AI分析请求失败: ' + e.message);
+            }
+        }
+
+        // 显示AI分析结果（预留）
+        function showAIResult(data) {
+            const modal = document.createElement('div');
+            modal.innerHTML = `
+                <div class="modal fade" id="aiResultModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-robot"></i> AI分析结果</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            new bootstrap.Modal(document.getElementById('aiResultModal')).show();
         }
 
         function exportReport() {
