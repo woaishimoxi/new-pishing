@@ -1409,18 +1409,7 @@
             }
             
             const alertId = currentResult.id;
-            // 使用隐藏的iframe触发下载，而不是跳转页面
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = `/api/alerts/${alertId}/export`;
-            document.body.appendChild(iframe);
-            
-            // 3秒后移除iframe
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 3000);
-            
-            // 同时创建一个下载链接作为备用
+            // 使用隐藏链接触发下载
             const link = document.createElement('a');
             link.href = `/api/alerts/${alertId}/export`;
             link.download = `email_${alertId}.eml`;
