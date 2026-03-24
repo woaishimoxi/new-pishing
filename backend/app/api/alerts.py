@@ -79,18 +79,26 @@ def export_raw_email(alert_id):
     if not raw_email:
         return jsonify({'error': '原始邮件未保存'}), 404
     
-    # 生成文件名
-    subject = alert.get('subject', 'email')
-    # 清理文件名中的特殊字符
-    safe_subject = ''.join(c for c in subject if c.isalnum() or c in ' _-')[:50]
-    filename = f"{safe_subject}.eml"
+    # 生成文件名（只使用ASCII字符，避免HTTP头编码问题）
+    filename = f"email_{alert_id}.eml"
     
     from flask import Response
+    from urllib.parse import quote
+    
+    # 获取原始主题用于中文文件名
+    subject = alert.get('subject', '')
+    if subject:
+        # URL编码中文文件名
+        encoded_subject = quote(subject[:30], safe='')
+        content_disposition = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_subject}.eml'
+    else:
+        content_disposition = f'attachment; filename="{filename}"'
+    
     return Response(
         raw_email,
         mimetype='message/rfc822',
         headers={
-            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Disposition': content_disposition,
             'Content-Type': 'message/rfc822; charset=utf-8'
         }
     )
