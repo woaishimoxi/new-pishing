@@ -8,6 +8,7 @@ from .stats import stats_bp
 from .email import email_bp
 from .system import system_bp
 from .domains import domains_bp
+from .settings import settings_bp
 from .docs import api_docs, api
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     'email_bp',
     'system_bp',
     'domains_bp',
+    'settings_bp',
     'api_docs',
     'api'
 ]

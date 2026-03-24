@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置管理中心 - 钓鱼邮件检测系统</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-white: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --blue: #3b82f6;
+            --red: #ef4444;
+            --green: #10b981;
+            --amber: #f59e0b;
+            --purple: #8b5cf6;
+        }
+
+        body { background-color: var(--bg-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        
+        .navbar-custom { background: var(--bg-white); border-bottom: 1px solid var(--border-color); padding: 0.75rem 0; }
+        .main-container { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+        
+        .card-custom { background: var(--bg-white); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .card-header-custom { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+        .card-title i { color: var(--blue); }
+        .card-body-custom { padding: 1.25rem; }
+        
+        .config-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 0.75rem; transition: all 0.15s ease; }
+        .config-item:hover { border-color: var(--blue); background: rgba(59, 130, 246, 0.02); }
+        .config-item-left { display: flex; align-items: center; gap: 1rem; }
+        .config-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.125rem; }
+        .config-icon.blue { background: rgba(59, 130, 246, 0.1); color: var(--blue); }
+        .config-icon.green { background: rgba(16, 185, 129, 0.1); color: var(--green); }
+        .config-icon.red { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .config-icon.purple { background: rgba(139, 92, 246, 0.1); color: var(--purple); }
+        .config-icon.amber { background: rgba(245, 158, 11, 0.1); color: var(--amber); }
+        .config-info h6 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.25rem; }
+        .config-info p { font-size: 0.75rem; color: var(--text-secondary); margin: 0; }
+        .config-badge { font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 4px; }
+        
+        .btn-custom { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.8125rem; font-weight: 500; transition: all 0.15s ease; cursor: pointer; }
+        .btn-primary-custom { background: var(--blue); border: none; color: white; }
+        .btn-primary-custom:hover { background: #2563eb; }
+        .btn-outline-custom { border: 1px solid var(--border-color); background: var(--bg-white); color: var(--text-secondary); }
+        .btn-outline-custom:hover { border-color: var(--blue); color: var(--blue); }
+        .btn-danger-custom { background: var(--red); border: none; color: white; }
+        .btn-danger-custom:hover { background: #dc2626; }
+        
+        .form-control-custom { border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+        .form-control-custom:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        
+        .json-editor { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.8125rem; background: #1e293b; color: #e2e8f0; border: none; border-radius: 8px; padding: 1rem; min-height: 300px; resize: vertical; }
+        
+        .tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .tag { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; background: rgba(59, 130, 246, 0.1); color: var(--blue); border-radius: 4px; font-size: 0.75rem; font-family: monospace; }
+        .tag.danger { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .tag.success { background: rgba(16, 185, 129, 0.1); color: var(--green); }
+        .tag-remove { cursor: pointer; opacity: 0.7; }
+        .tag-remove:hover { opacity: 1; }
+        
+        .modal-custom .modal-content { border: 1px solid var(--border-color); border-radius: 12px; }
+        .modal-custom .modal-header { border-bottom: 1px solid var(--border-color); }
+        
+        .alert-toast { position: fixed; top: 1rem; right: 1rem; z-index: 9999; min-width: 300px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar-custom">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/" style="font-weight: 600; color: var(--text-primary); text-decoration: none;">
+                <i class="bi bi-shield-check" style="color: var(--blue);"></i>
+                钓鱼邮件检测系统
+            </a>
+            <div class="d-flex gap-2">
+                <a href="/domains" class="btn btn-outline-custom btn-custom">
+                    <i class="bi bi-globe me-1"></i>域名管理
+                </a>
+                <a href="/" class="btn btn-outline-custom btn-custom">
+                    <i class="bi bi-house me-1"></i>返回首页
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="row mb-4">
+            <div class="col">
+                <h5 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+                    <i class="bi bi-gear me-2" style="color: var(--blue);"></i>配置管理中心
+                </h5>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">管理所有系统配置文件，无需手动编辑项目文件</p>
+            </div>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <div class="row">
+            <!-- 左侧：配置项列表 -->
+            <div class="col-lg-5">
+                <!-- API配置 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-key"></i>API配置</h5>
+                        <button class="btn btn-outline-custom btn-custom" onclick="editConfig('api_config.json')">
+                            <i class="bi bi-pencil me-1"></i>编辑
+                        </button>
+                    </div>
+                    <div class="card-body-custom" id="api-config-preview">
+                        <div class="text-center text-muted py-3">加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 白名单 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-shield-check" style="color: var(--green);"></i>白名单管理</h5>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="mb-3">
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-custom" id="whitelist-input" placeholder="输入域名，如 example.com">
+                                <button class="btn btn-primary-custom btn-custom" onclick="addWhitelist()">添加</button>
+                            </div>
+                        </div>
+                        <div class="tag-list" id="whitelist-tags">
+                            <span class="text-muted">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 黑名单 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-shield-x" style="color: var(--red);"></i>黑名单管理</h5>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="mb-3">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control form-control-custom" id="blacklist-domain-input" placeholder="输入域名">
+                                <button class="btn btn-danger-custom btn-custom" onclick="addBlacklistDomain()">添加域名</button>
+                            </div>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-custom" id="blacklist-ip-input" placeholder="输入IP地址">
+                                <button class="btn btn-danger-custom btn-custom" onclick="addBlacklistIP()">添加IP</button>
+                            </div>
+                        </div>
+                        <div class="mb-2" style="font-size: 0.75rem; color: var(--text-secondary);">域名:</div>
+                        <div class="tag-list mb-3" id="blacklist-domain-tags">
+                            <span class="text-muted">加载中...</span>
+                        </div>
+                        <div class="mb-2" style="font-size: 0.75rem; color: var(--text-secondary);">IP地址:</div>
+                        <div class="tag-list" id="blacklist-ip-tags">
+                            <span class="text-muted">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：IOC数据库和高级编辑 -->
+            <div class="col-lg-7">
+                <!-- IOC数据库 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-database" style="color: var(--purple);"></i>IOC威胁情报库</h5>
+                        <button class="btn btn-outline-custom btn-custom" onclick="editConfig('ioc_database.json')">
+                            <i class="bi bi-pencil me-1"></i>高级编辑
+                        </button>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" style="font-size: 0.8rem; color: var(--text-secondary);">恶意IP</label>
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control form-control-custom" id="ioc-ip-input" placeholder="1.2.3.4">
+                                    <button class="btn btn-outline-custom btn-custom" onclick="addIOC('malicious_ips')">添加</button>
+                                </div>
+                                <div class="tag-list" id="ioc-ips" style="max-height: 100px; overflow-y: auto;">
+                                    <span class="text-muted">加载中...</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" style="font-size: 0.8rem; color: var(--text-secondary);">恶意域名</label>
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control form-control-custom" id="ioc-domain-input" placeholder="malicious.com">
+                                    <button class="btn btn-outline-custom btn-custom" onclick="addIOC('malicious_domains')">添加</button>
+                                </div>
+                                <div class="tag-list" id="ioc-domains" style="max-height: 100px; overflow-y: auto;">
+                                    <span class="text-muted">加载中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级JSON编辑 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-code-slash"></i>JSON编辑器</h5>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-control-custom" id="file-selector" style="width: auto;" onchange="loadFileContent()">
+                                <option value="api_config.json">API配置</option>
+                                <option value="whitelist.json">白名单</option>
+                                <option value="blacklist.json">黑名单</option>
+                                <option value="ioc_database.json">IOC数据库</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body-custom">
+                        <textarea class="json-editor w-100" id="json-editor" spellcheck="false"></textarea>
+                        <div class="d-flex justify-content-between mt-3">
+                            <button class="btn btn-outline-custom btn-custom" onclick="formatJSON()">
+                                <i class="bi bi-code me-1"></i>格式化
+                            </button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-custom btn-custom" onclick="restoreBackup()">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>恢复备份
+                                </button>
+                                <button class="btn btn-primary-custom btn-custom" onclick="saveJSON()">
+                                    <i class="bi bi-check-lg me-1"></i>保存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast提示 -->
+    <div class="alert-toast" id="toast-container"></div>
+
+    <script>
+        let currentData = {};
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAllConfigs();
+            loadFileContent();
+        });
+
+        // 显示Toast
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-warning';
+            container.innerHTML = `
+                <div class="toast show ${bgClass} text-white" role="alert">
+                    <div class="toast-body d-flex align-items-center">
+                        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                        ${message}
+                    </div>
+                </div>
+            `;
+            setTimeout(() => container.innerHTML = '', 3000);
+        }
+
+        // 加载所有配置
+        async function loadAllConfigs() {
+            try {
+                // 加载API配置
+                const apiResp = await fetch('/api/settings/file/api_config.json');
+                const apiData = await apiResp.json();
+                if (apiData.content) {
+                    currentData.api = apiData.content;
+                    renderAPIPreview(apiData.content);
+                }
+
+                // 加载白名单
+                const whiteResp = await fetch('/api/settings/file/whitelist.json');
+                const whiteData = await whiteResp.json();
+                if (whiteData.content) {
+                    currentData.whitelist = whiteData.content;
+                    renderWhitelist(whiteData.content.trusted_domains || []);
+                }
+
+                // 加载黑名单
+                const blackResp = await fetch('/api/settings/file/blacklist.json');
+                const blackData = await blackResp.json();
+                if (blackData.content) {
+                    currentData.blacklist = blackData.content;
+                    renderBlacklist(blackData.content);
+                }
+
+                // 加载IOC
+                const iocResp = await fetch('/api/settings/file/ioc_database.json');
+                const iocData = await iocResp.json();
+                if (iocData.content) {
+                    currentData.ioc = iocData.content;
+                    renderIOC(iocData.content);
+                }
+            } catch (e) {
+                showToast('加载配置失败: ' + e.message, 'error');
+            }
+        }
+
+        // 渲染API配置预览
+        function renderAPIPreview(config) {
+            const container = document.getElementById('api-config-preview');
+            container.innerHTML = `
+                <div class="mb-2">
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">VirusTotal API:</span>
+                    <span style="font-size: 0.8rem; font-family: monospace;">${config.virustotal?.api_key ? '已配置' : '未配置'}</span>
+                </div>
+                <div class="mb-2">
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">邮箱服务器:</span>
+                    <span style="font-size: 0.8rem; font-family: monospace;">${config.email?.server || '未配置'}</span>
+                </div>
+                <div>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">邮箱地址:</span>
+                    <span style="font-size: 0.8rem; font-family: monospace;">${config.email?.email || '未配置'}</span>
+                </div>
+            `;
+        }
+
+        // 渲染白名单
+        function renderWhitelist(domains) {
+            const container = document.getElementById('whitelist-tags');
+            if (domains.length === 0) {
+                container.innerHTML = '<span class="text-muted">暂无白名单</span>';
+                return;
+            }
+            container.innerHTML = domains.slice(0, 30).map(d => `
+                <span class="tag success">
+                    ${d}
+                    <span class="tag-remove" onclick="removeWhitelist('${d}')">&times;</span>
+                </span>
+            `).join('') + (domains.length > 30 ? `<span class="text-muted">...还有${domains.length - 30}个</span>` : '');
+        }
+
+        // 渲染黑名单
+        function renderBlacklist(data) {
+            const domainContainer = document.getElementById('blacklist-domain-tags');
+            const ipContainer = document.getElementById('blacklist-ip-tags');
+            
+            const domains = data.domains || [];
+            const ips = data.ips || [];
+            
+            domainContainer.innerHTML = domains.length > 0 
+                ? domains.slice(0, 20).map(d => `
+                    <span class="tag danger">
+                        ${d}
+                        <span class="tag-remove" onclick="removeBlacklistDomain('${d}')">&times;</span>
+                    </span>
+                `).join('') + (domains.length > 20 ? `<span class="text-muted">...还有${domains.length - 20}个</span>` : '')
+                : '<span class="text-muted">暂无域名</span>';
+            
+            ipContainer.innerHTML = ips.length > 0
+                ? ips.map(ip => `
+                    <span class="tag danger">
+                        ${ip}
+                        <span class="tag-remove" onclick="removeBlacklistIP('${ip}')">&times;</span>
+                    </span>
+                `).join('')
+                : '<span class="text-muted">暂无IP</span>';
+        }
+
+        // 渲染IOC
+        function renderIOC(data) {
+            const ipContainer = document.getElementById('ioc-ips');
+            const domainContainer = document.getElementById('ioc-domains');
+            
+            const ips = data.malicious_ips || [];
+            const domains = data.malicious_domains || [];
+            
+            ipContainer.innerHTML = ips.length > 0
+                ? ips.slice(0, 10).map(ip => `
+                    <span class="tag danger">
+                        ${ip}
+                        <span class="tag-remove" onclick="removeIOC('malicious_ips', '${ip}')">&times;</span>
+                    </span>
+                `).join('') + (ips.length > 10 ? `<span class="text-muted">+${ips.length - 10}</span>` : '')
+                : '<span class="text-muted">暂无</span>';
+            
+            domainContainer.innerHTML = domains.length > 0
+                ? domains.slice(0, 10).map(d => `
+                    <span class="tag danger">
+                        ${d}
+                        <span class="tag-remove" onclick="removeIOC('malicious_domains', '${d}')">&times;</span>
+                    </span>
+                `).join('') + (domains.length > 10 ? `<span class="text-muted">+${domains.length - 10}</span>` : '')
+                : '<span class="text-muted">暂无</span>';
+        }
+
+        // 加载文件内容到编辑器
+        async function loadFileContent() {
+            const filename = document.getElementById('file-selector').value;
+            try {
+                const resp = await fetch(`/api/settings/file/${filename}`);
+                const data = await resp.json();
+                if (data.content) {
+                    document.getElementById('json-editor').value = JSON.stringify(data.content, null, 2);
+                }
+            } catch (e) {
+                showToast('加载失败', 'error');
+            }
+        }
+
+        // 格式化JSON
+        function formatJSON() {
+            const editor = document.getElementById('json-editor');
+            try {
+                const obj = JSON.parse(editor.value);
+                editor.value = JSON.stringify(obj, null, 2);
+                showToast('格式化成功');
+            } catch (e) {
+                showToast('JSON格式错误', 'error');
+            }
+        }
+
+        // 保存JSON
+        async function saveJSON() {
+            const filename = document.getElementById('file-selector').value;
+            const editor = document.getElementById('json-editor');
+            
+            try {
+                const content = JSON.parse(editor.value);
+                
+                const resp = await fetch(`/api/settings/file/${filename}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('保存成功');
+                    loadAllConfigs();
+                } else {
+                    showToast(data.error || '保存失败', 'error');
+                }
+            } catch (e) {
+                showToast('JSON格式错误', 'error');
+            }
+        }
+
+        // 恢复备份
+        async function restoreBackup() {
+            const filename = document.getElementById('file-selector').value;
+            if (!confirm('确定恢复备份？当前更改将丢失。')) return;
+            
+            try {
+                const resp = await fetch(`/api/settings/file/${filename}/backup`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已恢复备份');
+                    loadFileContent();
+                    loadAllConfigs();
+                } else {
+                    showToast(data.error || '恢复失败', 'error');
+                }
+            } catch (e) {
+                showToast('恢复失败', 'error');
+            }
+        }
+
+        // 编辑配置文件
+        function editConfig(filename) {
+            document.getElementById('file-selector').value = filename;
+            loadFileContent();
+            document.getElementById('json-editor').focus();
+        }
+
+        // 白名单操作
+        async function addWhitelist() {
+            const input = document.getElementById('whitelist-input');
+            const domain = input.value.trim();
+            if (!domain) return;
+            
+            try {
+                const resp = await fetch('/api/settings/whitelist/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domains: [domain] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已添加到白名单');
+                    input.value = '';
+                    loadAllConfigs();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (e) {
+                showToast('添加失败', 'error');
+            }
+        }
+
+        async function removeWhitelist(domain) {
+            try {
+                const resp = await fetch('/api/settings/whitelist/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domains: [domain] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已删除');
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
+
+        // 黑名单操作
+        async function addBlacklistDomain() {
+            const input = document.getElementById('blacklist-domain-input');
+            const domain = input.value.trim();
+            if (!domain) return;
+            
+            try {
+                const resp = await fetch('/api/settings/blacklist/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domains: [domain] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已添加到黑名单');
+                    input.value = '';
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('添加失败', 'error');
+            }
+        }
+
+        async function addBlacklistIP() {
+            const input = document.getElementById('blacklist-ip-input');
+            const ip = input.value.trim();
+            if (!ip) return;
+            
+            try {
+                const resp = await fetch('/api/settings/blacklist/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ips: [ip] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已添加到黑名单');
+                    input.value = '';
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('添加失败', 'error');
+            }
+        }
+
+        async function removeBlacklistDomain(domain) {
+            try {
+                const resp = await fetch('/api/settings/blacklist/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domains: [domain] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已删除');
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
+
+        async function removeBlacklistIP(ip) {
+            try {
+                const resp = await fetch('/api/settings/blacklist/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ips: [ip] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已删除');
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
+
+        // IOC操作
+        async function addIOC(type) {
+            const inputId = type === 'malicious_ips' ? 'ioc-ip-input' : 'ioc-domain-input';
+            const input = document.getElementById(inputId);
+            const value = input.value.trim();
+            if (!value) return;
+            
+            try {
+                const resp = await fetch('/api/settings/ioc/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, items: [value] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已添加');
+                    input.value = '';
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('添加失败', 'error');
+            }
+        }
+
+        async function removeIOC(type, value) {
+            try {
+                const resp = await fetch('/api/settings/ioc/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, items: [value] })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('已删除');
+                    loadAllConfigs();
+                }
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
