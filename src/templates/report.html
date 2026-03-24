@@ -1409,7 +1409,25 @@
             }
             
             const alertId = currentResult.id;
-            window.location.href = `/api/alerts/${alertId}/export`;
+            // 使用隐藏的iframe触发下载，而不是跳转页面
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = `/api/alerts/${alertId}/export`;
+            document.body.appendChild(iframe);
+            
+            // 3秒后移除iframe
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 3000);
+            
+            // 同时创建一个下载链接作为备用
+            const link = document.createElement('a');
+            link.href = `/api/alerts/${alertId}/export`;
+            link.download = `email_${alertId}.eml`;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // AI分析（预留功能）
@@ -1471,21 +1489,33 @@
         function exportReport() {
             if (!currentResult) return;
 
-            // 生成报告ID
-            const reportId = generateReportId();
-            const report = {
-                report_id: reportId,
-                detection_time: new Date().toISOString(),
-                result: currentResult
-            };
+            if (!currentResult.id) {
+                // 本地生成的报告，没有保存到数据库
+                const reportId = generateReportId();
+                const report = {
+                    report_id: reportId,
+                    detection_time: new Date().toISOString(),
+                    result: currentResult
+                };
 
-            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `phishing_report_${report.report_id}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `phishing_report_${report.report_id}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } else {
+                // 从数据库获取的报告，调用API导出
+                const alertId = currentResult.id;
+                const link = document.createElement('a');
+                link.href = `/api/alerts/${alertId}/export/json`;
+                link.download = `report_${alertId}.json`;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
         }
     </script>
 
