@@ -1401,19 +1401,62 @@
             container.innerHTML = html;
         }
 
-        // 导出原邮件
-        function exportRawEmail() {
+        // 导出原邮件 - 支持选择保存位置
+        async function exportRawEmail() {
             if (!currentResult || !currentResult.id) {
                 alert('无法获取邮件ID');
                 return;
             }
             
             const alertId = currentResult.id;
-            // 使用window.open打开下载链接，让用户选择保存位置
-            window.open(`/api/alerts/${alertId}/export`, '_blank');
+            const filename = `email_${alertId}.eml`;
+            
+            try {
+                // 获取文件内容
+                const response = await fetch(`/api/alerts/${alertId}/export`);
+                if (!response.ok) {
+                    alert('下载失败');
+                    return;
+                }
+                
+                const blob = await response.blob();
+                
+                // 尝试使用 showSaveFilePicker API (现代浏览器支持)
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{
+                                description: '邮件文件',
+                                accept: { 'message/rfc822': ['.eml'] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    } catch (e) {
+                        // 用户取消了对话框，使用默认方式
+                        if (e.name === 'AbortError') return;
+                    }
+                }
+                
+                // 备用方案：创建下载链接
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+            } catch (e) {
+                alert('导出失败: ' + e.message);
+            }
         }
 
-        // AI分析（预留功能）
+        // AI分析功能
         async function aiAnalyze() {
             if (!currentResult || !currentResult.id) {
                 alert('无法获取邮件ID');
@@ -1422,54 +1465,185 @@
             
             const alertId = currentResult.id;
             
+            // 显示加载提示
+            const loadingToast = document.createElement('div');
+            loadingToast.innerHTML = `
+                <div class="position-fixed top-50 start-50 translate-middle" style="z-index: 9999;">
+                    <div class="bg-white p-4 rounded shadow-lg text-center">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <div>AI正在分析邮件...</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingToast);
+            
             try {
                 const response = await fetch(`/api/alerts/${alertId}/ai-analyze`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'gpt-4',
-                        prompt: '请分析这封邮件是否为钓鱼邮件，并说明原因。'
+                        model: 'default',
+                        prompt: '请分析这封邮件是否为钓鱼邮件，从发件人、内容、链接等方面进行分析，并给出风险评估和建议。'
                     })
                 });
                 
                 const data = await response.json();
+                document.body.removeChild(loadingToast);
                 
-                if (data.status === 'placeholder') {
-                    alert(`AI分析功能预留接口\n\n${data.ai_suggestion}\n\n集成步骤：\n${data.integration_guide.step1}\n${data.integration_guide.step2}\n${data.integration_guide.step3}\n${data.integration_guide.step4}`);
-                } else if (data.ai_result) {
-                    // 未来接入AI后显示分析结果
-                    showAIResult(data);
+                if (data.status === 'success' && data.ai_result) {
+                    // 显示AI分析结果
+                    showAIResult(data.ai_result);
+                } else if (data.status === 'placeholder') {
+                    // 未配置AI，显示配置提示
+                    showAIConfigGuide(data);
                 } else {
-                    alert('AI分析响应异常');
+                    alert(data.message || 'AI分析失败');
                 }
             } catch (e) {
+                document.body.removeChild(loadingToast);
                 alert('AI分析请求失败: ' + e.message);
             }
         }
 
-        // 显示AI分析结果（预留）
-        function showAIResult(data) {
+        // 显示AI分析结果
+        function showAIResult(result) {
             const modal = document.createElement('div');
             modal.innerHTML = `
                 <div class="modal fade" id="aiResultModal" tabindex="-1">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title"><i class="bi bi-robot"></i> AI分析结果</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title"><i class="bi bi-robot me-2"></i>AI深度分析报告</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                                <div class="mb-4">
+                                    <h6 class="text-primary"><i class="bi bi-check-circle me-1"></i>分析结论</h6>
+                                    <div class="alert alert-${result.is_phishing ? 'danger' : 'success'}">
+                                        <strong>${result.is_phishing ? '⚠️ 疑似钓鱼邮件' : '✅ 邮件安全'}</strong>
+                                        <p class="mb-0 mt-2">${result.conclusion || '无'}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6 class="text-primary"><i class="bi bi-graph-up me-1"></i>风险评分</h6>
+                                    <div class="progress" style="height: 25px;">
+                                        <div class="progress-bar ${result.risk_score > 70 ? 'bg-danger' : result.risk_score > 40 ? 'bg-warning' : 'bg-success'}" 
+                                             style="width: ${result.risk_score}%">${result.risk_score}%</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6 class="text-primary"><i class="bi bi-list-check me-1"></i>详细分析</h6>
+                                    <div class="bg-light p-3 rounded">
+                                        <pre style="white-space: pre-wrap; font-size: 0.85rem;">${result.analysis || '无详细分析'}</pre>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6 class="text-primary"><i class="bi bi-lightbulb me-1"></i>安全建议</h6>
+                                    <ul class="list-group">
+                                        ${(result.suggestions || []).map(s => `<li class="list-group-item">${s}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                <button type="button" class="btn btn-primary" onclick="copyAIResult()">
+                                    <i class="bi bi-clipboard me-1"></i>复制分析结果
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
-            new bootstrap.Modal(document.getElementById('aiResultModal')).show();
+            
+            const modalEl = document.getElementById('aiResultModal');
+            const bsModal = new bootstrap.Modal(modalEl);
+            bsModal.show();
+            
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                document.body.removeChild(modal);
+            });
+            
+            // 存储结果供复制
+            window._aiResult = result;
         }
 
-        function exportReport() {
+        // 显示AI配置引导
+        function showAIConfigGuide(data) {
+            const modal = document.createElement('div');
+            modal.innerHTML = `
+                <div class="modal fade" id="aiConfigGuideModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>AI分析未配置</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>AI分析功能需要先配置AI服务：</p>
+                                <ol>
+                                    <li>前往 <a href="/settings" target="_blank">系统配置</a></li>
+                                    <li>找到「AI模型配置」区域</li>
+                                    <li>选择AI服务提供商（OpenAI/文心一言等）</li>
+                                    <li>输入API Key并保存</li>
+                                </ol>
+                                <div class="alert alert-info">
+                                    <strong>支持的AI服务：</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li>OpenAI GPT-4</li>
+                                        <li>百度文心一言</li>
+                                        <li>阿里通义千问</li>
+                                        <li>智谱ChatGLM</li>
+                                        <li>月之暗面Kimi</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                <a href="/settings" class="btn btn-primary">
+                                    <i class="bi bi-gear me-1"></i>前往配置
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            const modalEl = document.getElementById('aiConfigGuideModal');
+            const bsModal = new bootstrap.Modal(modalEl);
+            bsModal.show();
+            
+            modalEl.addEventListener('hidden.bs.modal', () => {
+                document.body.removeChild(modal);
+            });
+        }
+
+        // 复制AI分析结果
+        function copyAIResult() {
+            if (!window._aiResult) return;
+            
+            const result = window._aiResult;
+            const text = `AI分析结果
+================
+结论: ${result.is_phishing ? '疑似钓鱼邮件' : '邮件安全'}
+风险评分: ${result.risk_score}%
+详细分析:
+${result.analysis || '无'}
+安全建议:
+${(result.suggestions || []).join('\n')}
+`;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板');
+            });
+        }
+
+        // 导出报告 - 支持选择保存位置
+        async function exportReport() {
             if (!currentResult) return;
 
             if (!currentResult.id) {
@@ -1482,16 +1656,79 @@
                 };
 
                 const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const filename = `phishing_report_${reportId}.json`;
+                
+                // 尝试使用 showSaveFilePicker API
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{
+                                description: 'JSON报告文件',
+                                accept: { 'application/json': ['.json'] }
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    } catch (e) {
+                        if (e.name === 'AbortError') return;
+                    }
+                }
+                
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `phishing_report_${report.report_id}.json`;
+                a.download = filename;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } else {
-                // 从数据库获取的报告，调用API导出
+                // 从数据库获取的报告
                 const alertId = currentResult.id;
-                window.open(`/api/alerts/${alertId}/export/json`, '_blank');
+                const filename = `report_${alertId}.json`;
+                
+                try {
+                    const response = await fetch(`/api/alerts/${alertId}/export/json`);
+                    if (!response.ok) {
+                        alert('下载失败');
+                        return;
+                    }
+                    
+                    const blob = await response.blob();
+                    
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const handle = await window.showSaveFilePicker({
+                                suggestedName: filename,
+                                types: [{
+                                    description: 'JSON报告文件',
+                                    accept: { 'application/json': ['.json'] }
+                                }]
+                            });
+                            const writable = await handle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                            return;
+                        } catch (e) {
+                            if (e.name === 'AbortError') return;
+                        }
+                    }
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                } catch (e) {
+                    alert('导出失败: ' + e.message);
+                }
             }
         }
     </script>

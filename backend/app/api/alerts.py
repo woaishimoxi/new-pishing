@@ -161,38 +161,58 @@ def ai_analyze(alert_id):
         'current_confidence': alert.get('confidence', 0)
     }
     
-    # TODO: 接入AI大模型API
-    # 这里预留接口，后续可以接入以下服务：
-    # - OpenAI GPT-4
-    # - 文心一言
-    # - 通义千问
-    # - Claude
+    # 读取AI配置
+    config_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        'config', 'api_config.json'
+    )
     
-    # 目前返回模拟响应
-    ai_response = {
-        'status': 'placeholder',
-        'message': 'AI分析功能预留接口',
-        'model': model,
-        'prompt': prompt,
-        'email_summary': {
-            'subject': email_data['subject'],
-            'from': email_data['from_email'],
-            'url_count': len(email_data['urls']),
-            'current_analysis': {
-                'label': email_data['current_label'],
-                'confidence': email_data['current_confidence']
+    ai_config = {}
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                all_config = json.load(f)
+                ai_config = all_config.get('ai', {})
+        except:
+            pass
+    
+    # 检查AI配置是否完整
+    if not ai_config.get('enabled') or not ai_config.get('api_key'):
+        return jsonify({
+            'status': 'placeholder',
+            'message': 'AI分析未配置',
+            'ai_suggestion': '请在系统配置中设置AI服务',
+            'integration_guide': {
+                'step1': '获取AI服务API Key',
+                'step2': '在系统配置中填写API配置',
+                'step3': '启用AI分析功能'
             }
-        },
-        'ai_suggestion': '此接口已预留，可接入OpenAI GPT-4、文心一言等大模型进行深度分析。',
-        'integration_guide': {
-            'step1': '获取AI服务API Key',
-            'step2': '在config/api_config.json中添加ai_api_key配置',
-            'step3': '实现AI服务调用逻辑',
-            'step4': '解析AI返回结果并更新邮件分析'
-        }
-    }
+        })
     
-    return jsonify(ai_response)
+    # 准备邮件信息
+    email_summary = f"""
+邮件主题: {email_data['subject']}
+发件人: {email_data['from_display_name']} <{email_data['from_email']}>
+收件人: {email_data['to']}
+URL数量: {len(email_data['urls'])}
+当前检测结果: {email_data['current_label']} (置信度: {email_data['current_confidence']:.2%})
+
+邮件内容摘要:
+{(alert.get('body') or '')[:500]}
+"""
+    
+    # 调用AI服务
+    try:
+        ai_result = call_ai_service(ai_config, email_summary, prompt)
+        return jsonify({
+            'status': 'success',
+            'ai_result': ai_result
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'AI分析失败: {str(e)}'
+        }), 500
 
 
 @alerts_bp.route('/<int:alert_id>/analyze-detail', methods=['GET'])
@@ -258,3 +278,177 @@ def get_analysis_detail(alert_id):
     }
     
     return jsonify(detail)
+
+
+def call_ai_service(ai_config: Dict, email_content: str, prompt: str) -> Dict:
+    """
+    调用AI服务进行邮件分析
+    
+    支持：OpenAI、文心一言、通义千问、智谱AI、月之暗面
+    """
+    provider = ai_config.get('provider', 'openai')
+    api_key = ai_config.get('api_key', '')
+    api_url = ai_config.get('api_url', '')
+    model = ai_config.get('model', 'gpt-4')
+    
+    # 构建系统提示
+    system_prompt = """你是一个专业的邮件安全分析师。请分析以下邮件是否为钓鱼邮件，并提供详细的分析报告。
+
+请按以下格式返回JSON：
+{
+    "is_phishing": true/false,
+    "risk_score": 0-100,
+    "conclusion": "简短结论",
+    "analysis": "详细分析（从发件人、内容、链接、语气等方面分析）",
+    "suggestions": ["建议1", "建议2", ...]
+}"""
+    
+    # 构建用户消息
+    user_message = f"""请分析以下邮件：
+
+{email_content}
+
+分析要求：{prompt}"""
+    
+    # 根据不同提供商调用API
+    if provider == 'openai' or provider == 'moonshot' or provider == 'custom':
+        # OpenAI兼容格式
+        if not api_url:
+            api_url = 'https://api.openai.com/v1/chat/completions'
+        
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'model': model,
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_message}
+            ],
+            'temperature': 0.3
+        }
+        
+        response = requests.post(api_url, headers=headers, json=data, timeout=60)
+        result = response.json()
+        
+        if 'choices' in result and len(result['choices']) > 0:
+            ai_text = result['choices'][0]['message']['content']
+        else:
+            raise Exception(f"AI返回异常: {result}")
+    
+    elif provider == 'baidu':
+        # 百度文心一言
+        url = f"{api_url}?access_token={api_key}"
+        
+        data = {
+            'messages': [
+                {'role': 'user', 'content': system_prompt + '\n\n' + user_message}
+            ]
+        }
+        
+        response = requests.post(url, json=data, timeout=60)
+        result = response.json()
+        
+        if 'result' in result:
+            ai_text = result['result']
+        else:
+            raise Exception(f"文心一言返回异常: {result}")
+    
+    elif provider == 'alibaba':
+        # 阿里通义千问
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'model': model,
+            'input': {
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_message}
+                ]
+            },
+            'parameters': {
+                'temperature': 0.3
+            }
+        }
+        
+        response = requests.post(api_url, headers=headers, json=data, timeout=60)
+        result = response.json()
+        
+        if 'output' in result and 'text' in result['output']:
+            ai_text = result['output']['text']
+        else:
+            raise Exception(f"通义千问返回异常: {result}")
+    
+    elif provider == 'zhipu':
+        # 智谱ChatGLM
+        import jwt
+        import time
+        
+        # 生成JWT token
+        api_key_parts = api_key.split('.')
+        if len(api_key_parts) != 2:
+            raise Exception("智谱API Key格式错误")
+        
+        id, secret = api_key_parts
+        payload = {
+            "api_key": id,
+            "exp": int(round(time.time() * 1000)) + 3600 * 1000,
+            "timestamp": int(round(time.time() * 1000))
+        }
+        token = jwt.encode(payload, secret, algorithm="HS256")
+        
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'model': model,
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_message}
+            ]
+        }
+        
+        response = requests.post(api_url, headers=headers, json=data, timeout=60)
+        result = response.json()
+        
+        if 'choices' in result and len(result['choices']) > 0:
+            ai_text = result['choices'][0]['message']['content']
+        else:
+            raise Exception(f"智谱AI返回异常: {result}")
+    
+    else:
+        raise Exception(f"不支持的AI提供商: {provider}")
+    
+    # 解析AI返回的JSON
+    try:
+        # 尝试从返回文本中提取JSON
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', ai_text)
+        if json_match:
+            ai_result = json.loads(json_match.group())
+        else:
+            # 如果没有JSON，构建一个基本结果
+            ai_result = {
+                'is_phishing': '钓鱼' in ai_text or 'phishing' in ai_text.lower(),
+                'risk_score': 50 if '风险' in ai_text else 20,
+                'conclusion': ai_text[:200],
+                'analysis': ai_text,
+                'suggestions': ['请仔细核实发件人身份', '不要点击可疑链接']
+            }
+    except json.JSONDecodeError:
+        ai_result = {
+            'is_phishing': False,
+            'risk_score': 30,
+            'conclusion': 'AI分析完成',
+            'analysis': ai_text,
+            'suggestions': ['请人工复核']
+        }
+    
+    return ai_result

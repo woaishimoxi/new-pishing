@@ -164,6 +164,73 @@
                     </div>
                 </div>
 
+                <!-- AI模型配置 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-robot" style="color: var(--purple);"></i>AI模型配置</h5>
+                    </div>
+                    <div class="card-body-custom">
+                        <!-- AI服务选择 -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                <i class="bi bi-cpu me-1" style="color: var(--purple);"></i>AI服务提供商
+                            </label>
+                            <select class="form-select form-control-custom" id="ai-provider" onchange="updateAIConfig()">
+                                <option value="openai">OpenAI (GPT-4)</option>
+                                <option value="baidu">百度文心一言</option>
+                                <option value="alibaba">阿里通义千问</option>
+                                <option value="zhipu">智谱AI (ChatGLM)</option>
+                                <option value="moonshot">月之暗面 (Kimi)</option>
+                                <option value="custom">自定义API</option>
+                            </select>
+                        </div>
+                        
+                        <!-- API Key -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                <i class="bi bi-key me-1" style="color: var(--amber);"></i>API Key
+                            </label>
+                            <input type="password" class="form-control form-control-custom" id="ai-api-key" placeholder="输入AI服务的API Key">
+                        </div>
+                        
+                        <!-- API URL -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                <i class="bi bi-link-45deg me-1" style="color: var(--blue);"></i>API URL
+                            </label>
+                            <input type="text" class="form-control form-control-custom" id="ai-api-url" placeholder="API地址，留空使用默认">
+                            <div class="form-text" style="font-size: 0.7rem;" id="ai-url-hint">OpenAI: https://api.openai.com/v1/chat/completions</div>
+                        </div>
+                        
+                        <!-- 模型选择 -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                <i class="bi bi-diagram-3 me-1" style="color: var(--green);"></i>模型名称
+                            </label>
+                            <input type="text" class="form-control form-control-custom" id="ai-model" placeholder="如 gpt-4, ernie-bot, qwen-turbo">
+                            <div class="form-text" style="font-size: 0.7rem;" id="ai-model-hint">GPT-4: gpt-4, 文心一言: ernie-bot, 通义千问: qwen-turbo</div>
+                        </div>
+                        
+                        <!-- 启用开关 -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="ai-enabled">
+                                <label class="form-check-label" style="font-size: 0.8rem;" for="ai-enabled">启用AI分析功能</label>
+                            </div>
+                        </div>
+                        
+                        <!-- 保存按钮 -->
+                        <button class="btn btn-primary-custom btn-custom w-100" onclick="saveAIConfig()">
+                            <i class="bi bi-check-lg me-1"></i>保存AI配置
+                        </button>
+                        
+                        <!-- 测试按钮 -->
+                        <button class="btn btn-outline-custom btn-custom w-100 mt-2" onclick="testAI()">
+                            <i class="bi bi-lightning me-1"></i>测试AI连接
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 白名单 -->
                 <div class="card-custom">
                     <div class="card-header-custom">
@@ -489,6 +556,81 @@
             } catch (e) {
                 showToast('测试失败: ' + e.message, 'error');
             }
+        }
+
+        // AI配置相关函数
+        const AI_PROVIDERS = {
+            openai: { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4', hint: 'GPT-4: gpt-4, GPT-3.5: gpt-3.5-turbo' },
+            baidu: { url: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions', model: 'ernie-bot-4', hint: '文心一言4.0: ernie-bot-4, 文心一言: ernie-bot' },
+            alibaba: { url: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', model: 'qwen-turbo', hint: '通义千问: qwen-turbo, qwen-plus, qwen-max' },
+            zhipu: { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', model: 'glm-4', hint: 'ChatGLM4: glm-4, ChatGLM3: glm-3-turbo' },
+            moonshot: { url: 'https://api.moonshot.cn/v1/chat/completions', model: 'moonshot-v1-8k', hint: 'Kimi: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k' },
+            custom: { url: '', model: '', hint: '自定义API地址和模型名称' }
+        };
+
+        // 更新AI配置提示
+        function updateAIConfig() {
+            const provider = document.getElementById('ai-provider').value;
+            const config = AI_PROVIDERS[provider];
+            
+            document.getElementById('ai-api-url').value = config.url;
+            document.getElementById('ai-api-url').placeholder = provider === 'custom' ? '输入API地址' : config.url;
+            document.getElementById('ai-model').placeholder = config.model;
+            document.getElementById('ai-url-hint').textContent = provider === 'custom' ? '支持OpenAI兼容格式的API' : `默认: ${config.url}`;
+            document.getElementById('ai-model-hint').textContent = config.hint;
+        }
+
+        // 保存AI配置
+        async function saveAIConfig() {
+            const config = {
+                ai: {
+                    provider: document.getElementById('ai-provider').value,
+                    api_key: document.getElementById('ai-api-key').value,
+                    api_url: document.getElementById('ai-api-url').value,
+                    model: document.getElementById('ai-model').value,
+                    enabled: document.getElementById('ai-enabled').checked
+                }
+            };
+            
+            try {
+                // 读取现有配置
+                const resp = await fetch('/api/settings/file/api_config.json');
+                const data = await resp.json();
+                const existingConfig = data.content || {};
+                
+                // 合并AI配置
+                existingConfig.ai = config.ai;
+                
+                // 保存
+                const saveResp = await fetch('/api/settings/file/api_config.json', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: existingConfig })
+                });
+                
+                const saveData = await saveResp.json();
+                if (saveData.success) {
+                    showToast('AI配置已保存');
+                } else {
+                    showToast(saveData.error || '保存失败', 'error');
+                }
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        // 测试AI连接
+        async function testAI() {
+            const apiKey = document.getElementById('ai-api-key').value;
+            const apiUrl = document.getElementById('ai-api-url').value;
+            const model = document.getElementById('ai-model').value;
+            
+            if (!apiKey) {
+                showToast('请先填写API Key', 'error');
+                return;
+            }
+            
+            showToast('AI测试功能预留，请配置后在报告页面使用', 'warning');
         }
 
         // 渲染白名单
