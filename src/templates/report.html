@@ -1409,14 +1409,8 @@
             }
             
             const alertId = currentResult.id;
-            // 使用隐藏链接触发下载
-            const link = document.createElement('a');
-            link.href = `/api/alerts/${alertId}/export`;
-            link.download = `email_${alertId}.eml`;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // 使用window.open打开下载链接，让用户选择保存位置
+            window.open(`/api/alerts/${alertId}/export`, '_blank');
         }
 
         // AI分析（预留功能）
@@ -1497,13 +1491,7 @@
             } else {
                 // 从数据库获取的报告，调用API导出
                 const alertId = currentResult.id;
-                const link = document.createElement('a');
-                link.href = `/api/alerts/${alertId}/export/json`;
-                link.download = `report_${alertId}.json`;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                window.open(`/api/alerts/${alertId}/export/json`, '_blank');
             }
         }
     </script>
