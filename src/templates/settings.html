@@ -421,6 +421,16 @@
             document.getElementById('email-server').value = config.email?.server || '';
             document.getElementById('email-protocol').value = config.email?.protocol || 'imap';
             document.getElementById('email-port').value = config.email?.port || 993;
+            
+            // 填充AI配置
+            if (config.ai) {
+                document.getElementById('ai-provider').value = config.ai.provider || 'openai';
+                document.getElementById('ai-api-key').value = config.ai.api_key || '';
+                document.getElementById('ai-api-url').value = config.ai.api_url || '';
+                document.getElementById('ai-model').value = config.ai.model || '';
+                document.getElementById('ai-enabled').checked = config.ai.enabled || false;
+                updateAIConfig();  // 更新提示信息
+            }
         }
 
         // 保存API配置
@@ -582,12 +592,16 @@
 
         // 保存AI配置
         async function saveAIConfig() {
+            const provider = document.getElementById('ai-provider').value;
+            const modelInput = document.getElementById('ai-model').value;
+            const defaultModel = AI_PROVIDERS[provider]?.model || 'gpt-4';
+            
             const config = {
                 ai: {
-                    provider: document.getElementById('ai-provider').value,
+                    provider: provider,
                     api_key: document.getElementById('ai-api-key').value,
                     api_url: document.getElementById('ai-api-url').value,
-                    model: document.getElementById('ai-model').value,
+                    model: modelInput || defaultModel,  // 如果为空使用默认模型
                     enabled: document.getElementById('ai-enabled').checked
                 }
             };
