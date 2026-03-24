@@ -4,6 +4,9 @@ Alerts API Routes
 from flask import Blueprint, jsonify, request
 import sys
 import os
+import json
+import requests
+from typing import Dict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.core import get_logger
