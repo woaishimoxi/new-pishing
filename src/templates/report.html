@@ -1706,14 +1706,39 @@ ${formatAnalysisText(analysisText)}
             if (!window._aiResult) return;
             
             const result = window._aiResult;
+            
+            // 处理详细分析（可能是数组或字符串）
+            let analysisText = result.analysis || '无';
+            if (Array.isArray(analysisText)) {
+                analysisText = analysisText.map((item, i) => `${i+1}. ${item}`).join('\n\n');
+            }
+            
+            // 处理关键指标
+            const indicators = result.key_indicators || [];
+            const indicatorsText = indicators.length > 0 
+                ? indicators.map(ind => `- ${ind}`).join('\n')
+                : '无';
+            
+            // 处理安全建议
+            const suggestions = result.suggestions || [];
+            const suggestionsText = suggestions.length > 0
+                ? suggestions.map((s, i) => `${i+1}. ${s}`).join('\n')
+                : '无';
+            
             const text = `AI分析结果
 ================
 结论: ${result.is_phishing ? '疑似钓鱼邮件' : '邮件安全'}
 风险评分: ${result.risk_score}%
+一句话总结: ${result.conclusion || '无'}
+
+关键风险指标:
+${indicatorsText}
+
 详细分析:
-${result.analysis || '无'}
+${analysisText}
+
 安全建议:
-${(result.suggestions || []).join('\n')}
+${suggestionsText}
 `;
             
             navigator.clipboard.writeText(text).then(() => {
