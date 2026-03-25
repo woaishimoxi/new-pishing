@@ -121,8 +121,9 @@ class DatabaseRepository:
         cursor.execute('''
             INSERT INTO alerts (from_addr, from_display_name, from_email, to_addr, subject, detection_time,
                                label, confidence, source_ip, risk_indicators,
-                               raw_email, traceback_data, attachment_data, url_data, header_data, source, email_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               raw_email, traceback_data, attachment_data, url_data, header_data, source, email_hash,
+                               body, html_body)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             parsed.get('from', ''),
             parsed.get('from_display_name', ''),
@@ -140,7 +141,9 @@ class DatabaseRepository:
             json.dumps(parsed.get('urls', [])),
             json.dumps(parsed.get('headers', {})),
             source,
-            email_hash
+            email_hash,
+            parsed.get('body', ''),  # 添加body字段
+            parsed.get('html_body', '')  # 添加html_body字段
         ))
         
         alert_id = cursor.lastrowid
