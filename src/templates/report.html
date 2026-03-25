@@ -1507,50 +1507,104 @@
 
         // 显示AI分析结果
         function showAIResult(result) {
+            // 格式化分析文本
+            let analysisText = result.analysis || '无详细分析';
+            if (typeof analysisText === 'object') {
+                analysisText = analysisText.join('\n\n');
+            }
+            
+            // 获取关键指标
+            const indicators = result.key_indicators || [];
+            const suggestions = result.suggestions || [];
+            
+            // 风险评分颜色
+            let riskColor = 'success';
+            let riskText = '低风险';
+            if (result.risk_score > 70) {
+                riskColor = 'danger';
+                riskText = '高风险';
+            } else if (result.risk_score > 40) {
+                riskColor = 'warning';
+                riskText = '中风险';
+            }
+            
             const modal = document.createElement('div');
             modal.innerHTML = `
                 <div class="modal fade" id="aiResultModal" tabindex="-1">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <div class="modal-header bg-primary text-white">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white;">
                                 <h5 class="modal-title"><i class="bi bi-robot me-2"></i>AI深度分析报告</h5>
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
-                            <div class="modal-body">
-                                <div class="mb-4">
-                                    <h6 class="text-primary"><i class="bi bi-check-circle me-1"></i>分析结论</h6>
-                                    <div class="alert alert-${result.is_phishing ? 'danger' : 'success'}">
-                                        <strong>${result.is_phishing ? '⚠️ 疑似钓鱼邮件' : '✅ 邮件安全'}</strong>
-                                        <p class="mb-0 mt-2">${result.conclusion || '无'}</p>
+                            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                                <!-- 结论卡片 -->
+                                <div class="card mb-3 border-${riskColor}">
+                                    <div class="card-header bg-${riskColor} bg-opacity-10">
+                                        <strong><i class="bi bi-shield-${result.is_phishing ? 'x' : 'check'} me-2"></i>分析结论</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-3">
+                                            <span class="badge bg-${riskColor} fs-5 me-3">${result.is_phishing ? '⚠️ 疑似钓鱼' : '✅ 安全'}</span>
+                                            <span class="text-muted">风险评分: <strong class="text-${riskColor}">${result.risk_score}/100</strong> (${riskText})</span>
+                                        </div>
+                                        <p class="mb-0" style="font-size: 1rem; line-height: 1.6;">
+                                            ${result.conclusion || '无结论'}
+                                        </p>
                                     </div>
                                 </div>
                                 
-                                <div class="mb-4">
-                                    <h6 class="text-primary"><i class="bi bi-graph-up me-1"></i>风险评分</h6>
-                                    <div class="progress" style="height: 25px;">
-                                        <div class="progress-bar ${result.risk_score > 70 ? 'bg-danger' : result.risk_score > 40 ? 'bg-warning' : 'bg-success'}" 
-                                             style="width: ${result.risk_score}%">${result.risk_score}%</div>
+                                <!-- 风险进度条 -->
+                                <div class="mb-3">
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-${riskColor}" style="width: ${result.risk_score}%; transition: width 1s ease;"></div>
                                     </div>
                                 </div>
                                 
-                                <div class="mb-4">
-                                    <h6 class="text-primary"><i class="bi bi-list-check me-1"></i>详细分析</h6>
-                                    <div class="bg-light p-3 rounded">
-                                        <pre style="white-space: pre-wrap; font-size: 0.85rem;">${result.analysis || '无详细分析'}</pre>
+                                <!-- 关键指标 -->
+                                ${indicators.length > 0 ? `
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <strong><i class="bi bi-exclamation-triangle text-warning me-2"></i>关键风险指标</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex flex-wrap gap-2">
+                                            ${indicators.map(ind => `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">${ind}</span>`).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- 详细分析 -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <strong><i class="bi bi-clipboard-data me-2"></i>详细分析</strong>
+                                    </div>
+                                    <div class="card-body">
+                                        <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.9rem;">
+${formatAnalysisText(analysisText)}
+                                        </div>
                                     </div>
                                 </div>
                                 
-                                <div class="mb-4">
-                                    <h6 class="text-primary"><i class="bi bi-lightbulb me-1"></i>安全建议</h6>
-                                    <ul class="list-group">
-                                        ${(result.suggestions || []).map(s => `<li class="list-group-item">${s}</li>`).join('')}
-                                    </ul>
+                                <!-- 安全建议 -->
+                                ${suggestions.length > 0 ? `
+                                <div class="card">
+                                    <div class="card-header bg-success bg-opacity-10">
+                                        <strong><i class="bi bi-lightbulb text-success me-2"></i>安全建议</strong>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <ol class="list-group list-group-numbered list-group-flush">
+                                            ${suggestions.map(s => `<li class="list-group-item">${s}</li>`).join('')}
+                                        </ol>
+                                    </div>
                                 </div>
+                                ` : ''}
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
                                 <button type="button" class="btn btn-primary" onclick="copyAIResult()">
-                                    <i class="bi bi-clipboard me-1"></i>复制分析结果
+                                    <i class="bi bi-clipboard me-1"></i>复制结果
                                 </button>
                             </div>
                         </div>
@@ -1567,8 +1621,33 @@
                 document.body.removeChild(modal);
             });
             
-            // 存储结果供复制
             window._aiResult = result;
+        }
+        
+        // 格式化分析文本
+        function formatAnalysisText(text) {
+            if (!text) return '无详细分析';
+            
+            let formatted = text;
+            
+            // 处理数字开头的分析点
+            formatted = formatted.replace(/(\d+)\.\s*\*\*([^*]+)\*\*[:：]?\s*/g, 
+                '<div class="card mb-2 mt-2"><div class="card-header bg-light py-2"><strong>$1. $2</strong></div><div class="card-body py-2">');
+            
+            // 处理普通数字点
+            formatted = formatted.replace(/(\d+)\.\s*([^<\n]+)/g, 
+                '<div class="mb-2"><strong class="text-primary">$1.</strong> $2</div>');
+            
+            // 处理分隔线
+            formatted = formatted.replace(/---/g, '<hr class="my-2">');
+            
+            // 处理加粗文本
+            formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            
+            // 保持换行
+            formatted = formatted.replace(/\n/g, '<br>');
+            
+            return formatted;
         }
 
         // 显示AI配置引导
