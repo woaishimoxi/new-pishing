@@ -148,8 +148,10 @@ def ai_analyze(alert_id):
         return jsonify({'error': '报告不存在'}), 404
     
     # 读取AI配置
+    # alerts.py 在 backend/app/api/ 目录
+    # 配置文件在 项目根目录/config/ 目录
     config_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
         'config', 'api_config.json'
     )
     
