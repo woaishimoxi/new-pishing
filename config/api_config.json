@@ -3,7 +3,7 @@
     "provider": "alibaba",
     "api_key": "sk-899f6b5d9bc64336b9265efd514b9a43",
     "api_url": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
-    "model": "",
+    "model": "qwen-turbo",
     "enabled": true
   },
   "email": {

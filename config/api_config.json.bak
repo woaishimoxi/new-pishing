@@ -1,4 +1,11 @@
 {
+  "ai": {
+    "provider": "alibaba",
+    "api_key": "sk-899f6b5d9bc64336b9265efd514b9a43",
+    "api_url": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+    "model": "qwen-turbo",
+    "enabled": true
+  },
   "email": {
     "email": "3437195366@qq.com",
     "enabled": true,
@@ -13,12 +20,5 @@
   "virustotal": {
     "api_key": "f70b679ce193c9177b79a7b240433b165a539e88471f54f3200d635a97d34b71",
     "api_url": "https://www.virustotal.com/vtapi/v2/url/report"
-  },
-  "ai": {
-    "provider": "alibaba",
-    "api_key": "sk-899f6b5d9bc64336b9265efd514b9a43",
-    "api_url": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
-    "model": "测试bot",
-    "enabled": true
   }
 }

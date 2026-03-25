@@ -139,30 +139,13 @@ def export_report_json(alert_id):
 @alerts_bp.route('/<int:alert_id>/ai-analyze', methods=['POST'])
 def ai_analyze(alert_id):
     """
-    AI analysis for email (预留接口，为接入大模型做准备)
+    AI deep analysis for email
     
     POST /api/alerts/{alert_id}/ai-analyze
-    Body: {"model": "gpt-4", "prompt": "分析这封邮件是否为钓鱼邮件"}
     """
     alert = db.get_alert(alert_id)
     if not alert:
         return jsonify({'error': '报告不存在'}), 404
-    
-    data = request.get_json() or {}
-    model = data.get('model', 'default')
-    prompt = data.get('prompt', '请分析这封邮件是否为钓鱼邮件，并说明原因。')
-    
-    # 准备邮件数据
-    email_data = {
-        'subject': alert.get('subject', ''),
-        'from_email': alert.get('from_email', ''),
-        'from_display_name': alert.get('from_display_name', ''),
-        'to': alert.get('to_addr', ''),
-        'body': alert.get('body', ''),
-        'urls': alert.get('urls', []),
-        'current_label': alert.get('label', ''),
-        'current_confidence': alert.get('confidence', 0)
-    }
     
     # 读取AI配置
     config_file = os.path.join(
@@ -192,21 +175,74 @@ def ai_analyze(alert_id):
             }
         })
     
-    # 准备邮件信息
-    email_summary = f"""
-邮件主题: {email_data['subject']}
-发件人: {email_data['from_display_name']} <{email_data['from_email']}>
-收件人: {email_data['to']}
-URL数量: {len(email_data['urls'])}
-当前检测结果: {email_data['current_label']} (置信度: {email_data['current_confidence']:.2%})
+    # 解析溯源数据
+    traceback_data = {}
+    if alert.get('traceback_data'):
+        try:
+            if isinstance(alert['traceback_data'], str):
+                traceback_data = json.loads(alert['traceback_data'])
+            else:
+                traceback_data = alert['traceback_data']
+        except:
+            pass
+    
+    # 解析URL数据
+    urls = []
+    if alert.get('url_data'):
+        try:
+            if isinstance(alert['url_data'], str):
+                urls = json.loads(alert['url_data'])
+            else:
+                urls = alert['url_data']
+        except:
+            pass
+    
+    # 构建完整的邮件信息给AI
+    email_full_info = f"""
+========================================
+邮件基本信息
+========================================
+邮件ID: {alert.get('id')}
+检测时间: {alert.get('detection_time')}
+邮件主题: {alert.get('subject', '无')}
+发件人: {alert.get('from_display_name', '')} <{alert.get('from_email', '')}>
+收件人: {alert.get('to_addr', '')}
 
-邮件内容摘要:
-{(alert.get('body') or '')[:500]}
+========================================
+邮件头信息
+========================================
+SPF验证: {alert.get('spf_result', 'none')}
+DKIM验证: {alert.get('dkim_result', 'none')}
+DMARC验证: {alert.get('dmarc_result', 'none')}
+X-Mailer: {alert.get('x_mailer', '未知')}
+
+========================================
+邮件正文
+========================================
+{(alert.get('body') or '无正文内容')[:2000]}
+
+========================================
+URL链接分析
+========================================
+共发现 {len(urls)} 个URL:
+{chr(10).join([f'- {url}' for url in urls[:10]])}
+
+溯源分析:
+- 源IP: {traceback_data.get('email_source', {}).get('source_ip', '未知')}
+- 地理位置: {traceback_data.get('email_source', {}).get('geolocation', {}).get('country', '未知')}
+- 威胁评分: {traceback_data.get('correlation_analysis', {}).get('threat_score', 0)}
+
+========================================
+系统初步检测结果
+========================================
+检测标签: {alert.get('label', '未知')}
+置信度: {(alert.get('confidence', 0) * 100):.1f}%
+来源: {alert.get('source', '未知')}
 """
     
     # 调用AI服务
     try:
-        ai_result = call_ai_service(ai_config, email_summary, prompt)
+        ai_result = call_ai_service(ai_config, email_full_info)
         return jsonify({
             'status': 'success',
             'ai_result': ai_result
@@ -283,9 +319,9 @@ def get_analysis_detail(alert_id):
     return jsonify(detail)
 
 
-def call_ai_service(ai_config: Dict, email_content: str, prompt: str) -> Dict:
+def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     """
-    调用AI服务进行邮件分析
+    调用AI服务进行邮件深度分析
     
     支持：OpenAI、文心一言、通义千问、智谱AI、月之暗面
     """
@@ -294,24 +330,50 @@ def call_ai_service(ai_config: Dict, email_content: str, prompt: str) -> Dict:
     api_url = ai_config.get('api_url', '')
     model = ai_config.get('model', 'gpt-4')
     
-    # 构建系统提示
-    system_prompt = """你是一个专业的邮件安全分析师。请分析以下邮件是否为钓鱼邮件，并提供详细的分析报告。
+    # 构建系统提示 - 专业邮件安全分析师角色
+    system_prompt = """你是一位资深的邮件安全分析师，拥有10年的网络安全经验。你的任务是分析用户收到的可疑邮件，判断其是否为钓鱼邮件。
 
-请按以下格式返回JSON：
+请从以下几个维度进行专业分析：
+
+1. **发件人分析**
+   - 发件人邮箱地址是否可疑
+   - 显示名称是否与邮箱地址匹配
+   - 域名是否为知名企业的官方域名
+   - SPF/DKIM/DMARC验证结果
+
+2. **内容分析**
+   - 是否包含紧急、威胁性语言
+   - 是否要求提供敏感信息（密码、银行卡等）
+   - 是否有拼写、语法错误
+   - 是否使用了社会工程学技巧
+
+3. **链接分析**
+   - URL是否指向可疑域名
+   - 是否使用了短链接
+   - 链接文字与实际URL是否匹配
+   - 域名是否模仿知名品牌
+
+4. **邮件头分析**
+   - SPF/DKIM/DMARC是否通过
+   - 邮件路由是否正常
+   - 是否存在伪造痕迹
+
+请以JSON格式返回分析结果，格式如下：
 {
-    "is_phishing": true/false,
-    "risk_score": 0-100,
-    "conclusion": "简短结论",
-    "analysis": "详细分析（从发件人、内容、链接、语气等方面分析）",
-    "suggestions": ["建议1", "建议2", ...]
+    "is_phishing": true或false,
+    "risk_score": 0-100的风险评分,
+    "conclusion": "一句话总结",
+    "analysis": "详细的分析过程，分点说明",
+    "key_indicators": ["关键指标1", "关键指标2", ...],
+    "suggestions": ["安全建议1", "安全建议2", ...]
 }"""
     
     # 构建用户消息
-    user_message = f"""请分析以下邮件：
+    user_message = f"""请分析以下邮件的详细信息，判断是否为钓鱼邮件：
 
 {email_content}
 
-分析要求：{prompt}"""
+请给出你的专业分析和判断。"""
     
     # 根据不同提供商调用API
     if provider == 'openai' or provider == 'moonshot' or provider == 'custom':
