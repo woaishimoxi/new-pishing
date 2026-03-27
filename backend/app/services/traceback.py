@@ -341,16 +341,6 @@ class TracebackService:
                         self.logger.warning(f"URL analysis failed: {e}")
             except Exception as e:
                 self.logger.warning(f"URL parallel processing timeout: {e}")
-                        
-                        # 模式匹配
-                        for pattern in KNOWN_MALICIOUS_IOCS.get('domain_patterns', []):
-                            try:
-                                if re.match(pattern, domain, re.IGNORECASE):
-                                    report['ioc_matches']['suspicious_patterns'].append(f'域名匹配模式: {pattern}')
-                                    report['correlation_analysis']['threat_score'] += 25
-                                    break
-                            except re.error:
-                                pass
         
         # 构建攻击链
         report['correlation_analysis']['attack_chain'] = self._build_attack_chain(
