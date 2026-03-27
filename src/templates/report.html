@@ -333,8 +333,8 @@
                                         <button class="btn btn-info me-2" onclick="showEmailContent()">
                                             <i class="bi bi-envelope-open"></i> 查看邮件内容
                                         </button>
-                                        <button class="btn btn-warning" onclick="viewTraceback()">
-                                            <i class="bi bi-diagram-3"></i> 查看溯源
+                                        <button class="btn btn-success" id="tracebackBtn" onclick="goToTraceback()">
+                                            <i class="bi bi-diagram-3"></i> 查看溯源分析
                                         </button>
                                     </div>
                                 </div>
@@ -448,6 +448,7 @@
                     </div>
                 </div>
 
+                <!-- 溯源分析已移至独立页面 -->
             </div>
         </div>
     </div>
@@ -460,252 +461,123 @@
             loadReportData();
         });
 
-        function loadReportData() {
-            console.log('加载报告数据...');
-            
-            // 从URL参数或localStorage获取数据
+        async function loadReportData() {
             const urlParams = new URLSearchParams(window.location.search);
             const sessionId = urlParams.get('session');
-            let alertId = urlParams.get('id');
-            
-            console.log('Session ID:', sessionId);
-            console.log('Alert ID:', alertId);
-            
-            // 如果session是alert_xxx格式，提取数字ID
-            if (sessionId && sessionId.startsWith('alert_')) {
-                alertId = sessionId.replace('alert_', '');
-                console.log('从session提取Alert ID:', alertId);
-            }
+            const alertId = urlParams.get('id');
             
             if (alertId) {
-                // 从API获取指定ID的数据
-                loadFromAPI(alertId);
-            } else if (sessionId) {
-                // 从localStorage获取数据
-                const storedData = localStorage.getItem(`phishing_report_${sessionId}`);
-                console.log('从localStorage获取数据:', storedData ? '有数据' : '无数据');
-                
-                if (storedData) {
-                    try {
-                        currentResult = JSON.parse(storedData);
-                        console.log('解析成功，显示报告');
-                        displayReport(currentResult);
-                    } catch (e) {
-                        console.error('解析失败:', e);
-                        loadLatestFromAPI();
+                // 从API加载已保存的报告数据
+                try {
+                    const response = await fetch(`/api/alerts/${alertId}`);
+                    if (!response.ok) {
+                        alert('报告数据不存在');
+                        window.location.href = '/';
+                        return;
                     }
+                    currentResult = await response.json();
+                    displayReport(currentResult);
+                } catch (e) {
+                    alert('加载报告失败: ' + e.message);
+                    window.location.href = '/';
+                }
+            } else if (sessionId) {
+                // 从localStorage获取数据（新检测的报告）
+                const storedData = localStorage.getItem(`phishing_report_${sessionId}`);
+                if (storedData) {
+                    currentResult = JSON.parse(storedData);
+                    displayReport(currentResult);
                 } else {
-                    // localStorage没有数据，从API获取
-                    console.log('localStorage无数据，从API加载');
-                    loadLatestFromAPI();
+                    alert('报告数据不存在');
+                    window.location.href = '/';
                 }
             } else {
-                // 没有参数，加载最新检测结果
-                loadLatestFromAPI();
+                alert('缺少报告会话ID');
+                window.location.href = '/';
             }
-        }
-        
-        // 从API加载指定ID的报告
-        async function loadFromAPI(id) {
-            try {
-                console.log('从API加载报告ID:', id);
-                const response = await fetch(`/api/alerts/${id}`);
-                if (response.ok) {
-                    currentResult = await response.json();
-                    console.log('API返回数据:', currentResult);
-                    displayReport(currentResult);
-                } else {
-                    showError('报告数据不存在 (ID: ' + id + ')');
-                }
-            } catch (e) {
-                console.error('API加载失败:', e);
-                showError('加载报告失败: ' + e.message);
-            }
-        }
-        
-        // 从API加载最新报告
-        async function loadLatestFromAPI() {
-            try {
-                console.log('从API加载最新报告');
-                const response = await fetch('/api/alerts?page=1&per_page=1');
-                const data = await response.json();
-                console.log('API返回:', data);
-                
-                if (data.alerts && data.alerts.length > 0) {
-                    currentResult = data.alerts[0];
-                    console.log('获取到最新报告，ID:', currentResult.id);
-                    displayReport(currentResult);
-                } else {
-                    showError('暂无检测记录，请先在首页进行邮件检测');
-                }
-            } catch (e) {
-                console.error('加载失败:', e);
-                showError('加载报告失败: ' + e.message);
-            }
-        }
-        
-        // 显示错误信息
-        function showError(message) {
-            console.error('错误:', message);
-            document.body.innerHTML = `
-                <div style="max-width: 600px; margin: 100px auto; text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-                    <i class="bi bi-exclamation-triangle" style="font-size: 4rem; color: #f59e0b;"></i>
-                    <h3 style="margin-top: 1rem; color: #1e293b;">${message}</h3>
-                    <p style="color: #64748b; margin: 1rem 0;">请先在首页进行邮件检测，然后再查看报告。</p>
-                    <a href="/" style="display: inline-block; padding: 0.75rem 1.5rem; background: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
-                        <i class="bi bi-arrow-left"></i> 返回首页
-                    </a>
-                </div>
-            `;
         }
 
         function displayReport(result) {
-            try {
-                // 生成报告编号
-                const reportId = generateReportId();
-                
-                // 设置报告信息
-                const timestamp = new Date().toLocaleString();
-                const reportInfo = document.getElementById('report-info');
-                if (reportInfo) {
-                    reportInfo.textContent = `报告编号：${reportId} | 生成时间：${timestamp}`;
-                }
-                
-                // 安全评分图表
-                const isPhish = result.label === 'PHISHING';
-                updateSecurityScoreChart(result.confidence || 0, isPhish, result.label || 'UNKNOWN');
-                
-                // 基础概览信息
-                const verdict = document.getElementById('verdict');
-                if (verdict) verdict.textContent = result.label || '未知';
-                
-                const confidence = document.getElementById('confidence');
-                if (confidence) confidence.textContent = `${(result.confidence || 0).toFixed(2)}%`;
-                
-                const riskScore = document.getElementById('riskScore');
-                if (riskScore) riskScore.textContent = `${Math.round((result.confidence || 0) * 100)}`;
-                
-                const keyReason = document.getElementById('keyReason');
-                if (keyReason) keyReason.textContent = result.reason || '无';
-                
-                // 处理建议
-                let recommendation;
-                if (result.label === 'PHISHING') {
-                    recommendation = '建议立即删除';
-                } else if (result.label === 'SUSPICIOUS') {
-                    recommendation = '隔离审查';
-                } else {
-                    recommendation = '可安全阅读';
-                }
-                
-                const recEl = document.getElementById('recommendation');
-                if (recEl) recEl.textContent = recommendation;
-                
-                // 用户确认区域 - 仅对SUSPICIOUS显示
-                const confirmSection = document.getElementById('userConfirmSection');
-                const suspiciousItems = document.getElementById('suspiciousItems');
-                
-                if (confirmSection && suspiciousItems) {
-                    if (result.label === 'SUSPICIOUS') {
-                        confirmSection.style.display = 'block';
-                        const reasons = (result.reason || '').split('；').filter(r => r.trim());
-                        if (reasons.length > 0) {
-                            suspiciousItems.innerHTML = '<ul class="list-group">' + 
-                                reasons.map(r => `<li class="list-group-item"><i class="bi bi-exclamation-triangle text-warning me-2"></i>${r.trim()}</li>`).join('') +
-                                '</ul>';
-                        } else {
-                            suspiciousItems.innerHTML = '<p class="text-muted">检测到置信度在40%-70%之间，建议人工确认</p>';
-                        }
-                    } else {
-                        confirmSection.style.display = 'none';
-                    }
-                }
-                
-                // 更新邮件信息
-                const parsed = result.parsed || {};
-                const fromNameEl = document.getElementById('resultFromName');
-                if (fromNameEl) fromNameEl.textContent = parsed.from_display_name || result.from_display_name || '-';
-                
-                const fromEmailEl = document.getElementById('resultFromEmail');
-                if (fromEmailEl) fromEmailEl.textContent = parsed.from_email || result.from_email || result.from_addr || '-';
-                
-                // 发件人匹配性检查
-                const fromName = parsed.from_display_name || result.from_display_name || '';
-                const fromEmail = parsed.from_email || result.from_email || result.from_addr || '';
-                let nameMatchCheck = '-';
-                if (fromName && fromEmail) {
-                    const domain = fromEmail.split('@')[1] || '';
-                    if (domain && fromName.toLowerCase().includes(domain.split('.')[0].toLowerCase())) {
-                        nameMatchCheck = '<span class="badge bg-success">匹配</span>';
-                    } else {
-                        nameMatchCheck = '<span class="badge bg-warning">不匹配</span>';
-                    }
-                }
-                const nameMatchEl = document.getElementById('nameMatchCheck');
-                if (nameMatchEl) nameMatchEl.innerHTML = nameMatchCheck;
-                
-                const toEl = document.getElementById('resultTo');
-                if (toEl) toEl.textContent = parsed.to || result.to_addr || '-';
-                
-                const subjectEl = document.getElementById('resultSubject');
-                if (subjectEl) subjectEl.textContent = parsed.subject || result.subject || '-';
-                
-                const urlCountEl = document.getElementById('resultUrlCount');
-                if (urlCountEl) urlCountEl.textContent = parsed.url_count || (result.urls ? result.urls.length : 0) || 0;
-                
-                const attachmentCount = parsed.attachment_count || (result.attachments ? result.attachments.length : 0) || 0;
-                const attachEl = document.getElementById('resultAttachmentCount');
-                if (attachEl) {
-                    attachEl.innerHTML = attachmentCount > 0
-                        ? `<span class="badge bg-warning">${attachmentCount}</span>`
-                        : '0';
-                }
-                
-                // 显示认证状态
-                if (typeof displayAuthStatus === 'function') {
-                    displayAuthStatus(result.headers || {});
-                }
-                
-                // 显示路径
-                if (typeof displayRoutePath === 'function') {
-                    const traceback = result.traceback || (result.traceback_data ? JSON.parse(result.traceback_data) : null);
-                    displayRoutePath(traceback);
-                }
-                
-                // 显示风险指标
-                const riskIndicators = (result.traceback || {}).risk_indicators || result.risk_indicators || [];
-                if (typeof displayRiskIndicators === 'function') {
-                    displayRiskIndicators(riskIndicators, result.features || {});
-                }
-                
-                // 显示附件
-                const attachments = result.attachments || (result.attachment_data ? JSON.parse(result.attachment_data) : []);
-                if (typeof displayAttachments === 'function') {
-                    displayAttachments(attachments);
-                }
-                
-                // 显示URL
-                const urls = (result.traceback || {}).url_analysis || result.urls || (result.url_data ? JSON.parse(result.url_data) : []);
-                if (typeof displayUrls === 'function') {
-                    displayUrls(urls);
-                }
-                
-                // 显示模块评分
-                if (typeof displayModuleScores === 'function') {
-                    displayModuleScores(result.module_scores || {});
-                }
-                
-            } catch (e) {
-                console.error('显示报告出错:', e);
-                showError('显示报告数据时出错: ' + e.message);
+            // 生成报告编号
+            const reportId = generateReportId();
+            
+            // 设置报告信息
+            const timestamp = new Date().toLocaleString();
+            document.getElementById('report-info').textContent = `报告编号：${reportId} | 生成时间：${timestamp}`;
+            
+            // 安全评分图表
+            const isPhish = result.label === 'PHISHING';
+            updateSecurityScoreChart(result.confidence, isPhish, result.label);
+            
+            // 基础概览信息
+            document.getElementById('verdict').textContent = result.label;
+            document.getElementById('confidence').textContent = `${(result.confidence || 0).toFixed(2)}%`;
+            document.getElementById('riskScore').textContent = `${Math.round((result.confidence || 0) * 100)}`;
+            document.getElementById('keyReason').textContent = result.reason || '无';
+            
+            // 处理建议
+            let recommendation;
+            if (result.label === 'PHISHING') {
+                recommendation = '建议立即删除';
+            } else if (result.label === 'SUSPICIOUS') {
+                recommendation = '隔离审查';
+            } else {
+                recommendation = '可安全阅读';
             }
-        }
+            document.getElementById('recommendation').textContent = recommendation;
+            
+            // 用户确认区域 - 仅对SUSPICIOUS显示
+            const confirmSection = document.getElementById('userConfirmSection');
+            const suspiciousItems = document.getElementById('suspiciousItems');
+            
+            if (result.label === 'SUSPICIOUS') {
+                confirmSection.style.display = 'block';
+                // 解析reason，提取可疑项
+                const reasons = (result.reason || '').split('；').filter(r => r.trim());
+                if (reasons.length > 0) {
+                    suspiciousItems.innerHTML = '<ul class="list-group">' + 
+                        reasons.map(r => `<li class="list-group-item"><i class="bi bi-exclamation-triangle text-warning me-2"></i>${r.trim()}</li>`).join('') +
+                        '</ul>';
+                } else {
+                    suspiciousItems.innerHTML = '<p class="text-muted">检测到置信度在40%-70%之间，建议人工确认</p>';
+                }
+            } else {
+                confirmSection.style.display = 'none';
+            }
+            
+            // 更新邮件信息 - 兼容多种数据结构
+            const parsed = result.parsed || {};
+            document.getElementById('resultFromName').textContent = parsed.from_display_name || result.from_display_name || '-';
+            document.getElementById('resultFromEmail').textContent = parsed.from_email || result.from_email || result.from_addr || '-';
+            
+            // 发件人显示名与邮箱匹配性检查
+            const fromName = parsed.from_display_name || result.from_display_name || '';
+            const fromEmail = parsed.from_email || result.from_email || result.from_addr || '';
+            let nameMatchCheck;
+            if (fromName && fromEmail) {
+                // 简单的匹配性检查：显示名中是否包含邮箱域名的部分
+                const domain = fromEmail.split('@')[1] || '';
+                if (domain && fromName.toLowerCase().includes(domain.split('.')[0].toLowerCase())) {
+                    nameMatchCheck = '<span class="badge bg-success">匹配</span>';
+                } else {
+                    nameMatchCheck = '<span class="badge bg-warning">不匹配</span>';
+                }
+            } else {
+                nameMatchCheck = '-';
+            }
+            document.getElementById('nameMatchCheck').innerHTML = nameMatchCheck;
+            
+            document.getElementById('resultTo').textContent = parsed.to || result.to_addr || '-';
+            document.getElementById('resultSubject').textContent = parsed.subject || result.subject || '-';
+            document.getElementById('resultUrlCount').textContent = parsed.url_count || (result.urls ? result.urls.length : 0) || 0;
+            const attachmentCount = parsed.attachment_count || (result.attachments ? result.attachments.length : 0) || 0;
+            document.getElementById('resultAttachmentCount').innerHTML =
+                attachmentCount > 0
+                    ? `<span class="badge bg-warning">${attachmentCount}</span>`
+                    : '0';
             
             // 显示认证状态
             displayAuthStatus(result.headers);
-            
-            // 显示路由路径
-            displayRoutePath(result.traceback || (result.traceback_data ? JSON.parse(result.traceback_data) : null));
             
             // 显示风险指标 - 兼容风险指标的不同存储方式
             const riskIndicators = result.traceback?.risk_indicators || result.risk_indicators || [];
@@ -1310,15 +1182,15 @@
             container.innerHTML = html;
         }
 
-        // 查看溯源分析
-        function viewTraceback() {
-            if (!currentResult || !currentResult.id) {
+        // 跳转到溯源分析页面
+        function goToTraceback() {
+            if (currentResult && currentResult.id) {
+                window.location.href = `/traceback?id=${currentResult.id}`;
+            } else {
                 alert('无法获取邮件ID');
-                return;
             }
-            window.location.href = `/traceback?id=${currentResult.id}`;
         }
-
+        
         function showEmailContent() {
             const parsed = currentResult.parsed || {};
             const moduleScores = currentResult.module_scores || {};
@@ -1471,67 +1343,6 @@
             document.getElementById('emailContentModal').addEventListener('hidden.bs.modal', function() {
                 this.remove();
             });
-        }
-
-
-        function displaySandboxAnalysis(sandboxAnalysis) {
-                    <div class="card-body">
-                        <p><strong>检测到:</strong> ${se.categories?.join(', ') || '无'}</p>
-                        <p><strong>关键词数:</strong> ${se.detected_keywords?.length || 0}</p>
-                        <p class="mb-0"><strong>分析:</strong> ${se.analysis || '-'}</p>
-                    </div>
-                </div>
-            </div>`;
-            
-            // 4. 攻击载体
-            const vectors = dims.attack_vectors || {};
-            html += `<div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-light py-2"><strong><i class="bi bi-box me-1"></i>攻击载体</strong></div>
-                    <div class="card-body">
-                        <p><strong>可疑链接:</strong> ${vectors.malicious_links?.length || 0}</p>
-                        <p><strong>可疑附件:</strong> ${vectors.suspicious_attachments?.length || 0}</p>
-                        <p><strong>信息窃取:</strong> ${vectors.info_theft_request ? '是' : '否'}</p>
-                        <p class="mb-0"><strong>分析:</strong> ${vectors.analysis || '-'}</p>
-                    </div>
-                </div>
-            </div>`;
-            
-            // 5. 攻击动机
-            const motivation = dims.motivation || {};
-            html += `<div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-light py-2"><strong><i class="bi bi-lightbulb me-1"></i>攻击动机</strong></div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>主要动机:</strong> ${motivation.primary_label || '未知'}</p>
-                                <p><strong>置信度:</strong> ${(motivation.confidence * 100).toFixed(0)}%</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p class="mb-0"><strong>分析:</strong> ${motivation.analysis || '-'}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-            
-            html += '</div>';
-            
-            // 如果有传播链，显示路径
-            if (chain.hops && chain.hops.length > 0) {
-                html += '<h6 class="mt-3 mb-2"><i class="bi bi-signpost-split me-1"></i>传播链</h6>';
-                html += '<div class="d-flex flex-wrap gap-2 align-items-center">';
-                chain.hops.forEach((hop, i) => {
-                    html += `<span class="badge bg-secondary">${hop.server || hop.ip || '?'}</span>`;
-                    if (i < chain.hops.length - 1) {
-                        html += '<i class="bi bi-arrow-right"></i>';
-                    }
-                });
-                html += '</div>';
-            }
-            
-            container.innerHTML = html;
         }
 
         function displaySandboxAnalysis(sandboxAnalysis) {
@@ -1972,10 +1783,7 @@ ${suggestionsText}
 
         // 导出报告 - 支持选择保存位置
         async function exportReport() {
-            if (!currentResult) {
-                alert('没有可导出的报告数据');
-                return;
-            }
+            if (!currentResult) return;
 
             if (!currentResult.id) {
                 // 本地生成的报告，没有保存到数据库
