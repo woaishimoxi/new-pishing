@@ -21,6 +21,7 @@ from app.api.email import email_bp
 from app.api.system import system_bp
 from app.api.domains import domains_bp
 from app.api.settings import settings_bp
+from app.api.attachment import attachment_bp
 from app.api.docs import api_docs
 
 
@@ -68,6 +69,7 @@ def create_app(config_name: str = 'development') -> Flask:
     app.register_blueprint(system_bp)
     app.register_blueprint(domains_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(attachment_bp)
     app.register_blueprint(api_docs)
     
     register_error_handlers(app)
@@ -135,6 +137,14 @@ def register_template_routes(app: Flask) -> None:
     @app.route('/settings')
     def settings_page():
         return render_template('settings.html')
+    
+    @app.route('/bigscreen')
+    def bigscreen_page():
+        return render_template('bigscreen.html')
+    
+    @app.route('/adversarial')
+    def adversarial_page():
+        return render_template('adversarial.html')
     
     @app.route('/report.html')
     def report():

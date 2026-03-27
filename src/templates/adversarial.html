@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安全测试 - 钓鱼邮件检测系统</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-white: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --blue: #3b82f6;
+            --red: #ef4444;
+            --green: #10b981;
+            --amber: #f59e0b;
+            --purple: #8b5cf6;
+        }
+
+        body { background-color: var(--bg-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        
+        .navbar-custom { background: var(--bg-white); border-bottom: 1px solid var(--border-color); padding: 0.75rem 0; }
+        .main-container { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        
+        .card-custom { background: var(--bg-white); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); margin-bottom: 1.5rem; }
+        .card-header-custom { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .card-title { font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+        .card-title i { color: var(--blue); }
+        .card-body-custom { padding: 1.25rem; }
+        
+        .form-control-custom { border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+        .form-control-custom:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        
+        .btn-primary-custom { background: var(--blue); border: none; color: white; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+        .btn-primary-custom:hover { background: #2563eb; }
+        
+        .btn-danger-custom { background: var(--red); border: none; color: white; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+        
+        .result-card { border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        .result-safe { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--green); }
+        .result-suspicious { background: rgba(245, 158, 11, 0.1); border: 1px solid var(--amber); }
+        .result-phishing { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--red); }
+        
+        .diff-added { background: rgba(16, 185, 129, 0.2); text-decoration: line-through; }
+        .diff-removed { background: rgba(239, 68, 68, 0.2); }
+        
+        .attack-log { max-height: 400px; overflow-y: auto; }
+        .attack-item { padding: 0.75rem; border-bottom: 1px solid var(--border-color); }
+        .attack-item:last-child { border-bottom: none; }
+        
+        .toast-custom { position: fixed; top: 1rem; right: 1rem; z-index: 9999; }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar-custom">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/" style="font-weight: 600; color: var(--text-primary); text-decoration: none;">
+                <i class="bi bi-shield-check" style="color: var(--blue);"></i>
+                钓鱼邮件检测系统
+            </a>
+            <div class="d-flex gap-2">
+                <a href="/dashboard" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-speedometer2 me-1"></i>数据大屏
+                </a>
+                <a href="/" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-house me-1"></i>返回首页
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="row mb-4">
+            <div class="col">
+                <h5 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+                    <i class="bi bi-bug me-2" style="color: var(--red);"></i>对抗样本测试
+                </h5>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">测试系统对恶意变形邮件的检测鲁棒性</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- 左侧：测试输入 -->
+            <div class="col-lg-6">
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-pencil-square"></i>构造对抗样本</h5>
+                    </div>
+                    <div class="card-body-custom">
+                        <!-- 原始邮件 -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">原始邮件内容</label>
+                            <textarea class="form-control form-control-custom" id="originalEmail" rows="6" placeholder="输入要测试的邮件内容...">尊敬的用户，您的账户存在异常，请立即登录 http://bank-secure.com 验证身份，否则账户将在24小时内冻结。</textarea>
+                        </div>
+                        
+                        <!-- 攻击方式选择 -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">变形攻击方式</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-outline-secondary btn-sm attack-type-btn active" data-type="homophone">同音字替换</button>
+                                <button class="btn btn-outline-secondary btn-sm attack-type-btn" data-type="invisible">零宽字符插入</button>
+                                <button class="btn btn-outline-secondary btn-sm attack-type-btn" data-type="unicode">Unicode混淆</button>
+                                <button class="btn btn-outline-secondary btn-sm attack-type-btn" data-type="spaces">空格插入</button>
+                                <button class="btn btn-outline-secondary btn-sm attack-type-btn" data-type="random">随机组合</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 攻击强度 -->
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">攻击强度: <span id="intensityValue">30</span>%</label>
+                            <input type="range" class="form-range" id="attackIntensity" min="10" max="80" value="30">
+                        </div>
+                        
+                        <!-- 生成按钮 -->
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary-custom flex-fill" onclick="generateAttack()">
+                                <i class="bi bi-lightning me-1"></i>生成对抗样本
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="testBoth()">
+                                <i class="bi bi-arrow-left-right me-1"></i>对比测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 对抗样本结果 -->
+                <div class="card-custom" id="attackResultCard" style="display: none;">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-file-diff"></i>对抗样本</h5>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">变形后邮件</label>
+                            <textarea class="form-control form-control-custom" id="attackedEmail" rows="6" readonly></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">变形详情</label>
+                            <div id="attackDetails" class="p-3 bg-light rounded" style="font-family: monospace; font-size: 0.8rem;"></div>
+                        </div>
+                        
+                        <button class="btn btn-primary-custom w-100" onclick="testAttacked()">
+                            <i class="bi bi-play-circle me-1"></i>检测对抗样本
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧：测试结果 -->
+            <div class="col-lg-6">
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-clipboard-data"></i>检测结果对比</h5>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="row g-3">
+                            <!-- 原始邮件结果 -->
+                            <div class="col-md-6">
+                                <div class="result-card" id="originalResult" style="background: #f8fafc; border: 1px solid var(--border-color);">
+                                    <h6 style="font-size: 0.8rem; color: var(--text-secondary);">原始邮件</h6>
+                                    <div class="text-center py-3">
+                                        <span class="text-muted">未检测</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 对抗样本结果 -->
+                            <div class="col-md-6">
+                                <div class="result-card" id="attackedResult" style="background: #f8fafc; border: 1px solid var(--border-color);">
+                                    <h6 style="font-size: 0.8rem; color: var(--text-secondary);">对抗样本</h6>
+                                    <div class="text-center py-3">
+                                        <span class="text-muted">未检测</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 鲁棒性评估 -->
+                        <div class="mt-3 p-3 bg-light rounded" id="robustnessEval" style="display: none;">
+                            <h6 style="font-size: 0.8rem; font-weight: 600;"><i class="bi bi-shield-check me-1"></i>鲁棒性评估</h6>
+                            <div id="robustnessContent"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 测试日志 -->
+                <div class="card-custom">
+                    <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-clock-history"></i>测试日志</h5>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="clearLog()">清空</button>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="attack-log" id="attackLog">
+                            <div class="text-center text-muted py-3">
+                                <i class="bi bi-inbox"></i>
+                                <p class="mb-0 mt-2">暂无测试记录</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAttackType = 'homophone';
+        let testResults = { original: null, attacked: null };
+        
+        // 攻击类型选择
+        document.querySelectorAll('.attack-type-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.attack-type-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentAttackType = this.dataset.type;
+            });
+        });
+        
+        // 攻击强度滑块
+        document.getElementById('attackIntensity').addEventListener('input', function() {
+            document.getElementById('intensityValue').textContent = this.value;
+        });
+        
+        // 同音字替换字典
+        const homophoneMap = {
+            '是': ['时', '事', '市', '势'],
+            '在': ['再', '载'],
+            '的': ['得', '地', '德'],
+            '了': ['勒', '乐'],
+            '您': ['你', '妮'],
+            '请': ['清', '情', '轻'],
+            '立': ['利', '力', '丽'],
+            '即': ['几', '机', '鸡'],
+            '登': ['灯', '等'],
+            '录': ['路', '陆', '露'],
+            '验': ['演', '眼', '研'],
+            '证': ['正', '政', '整'],
+            '密': ['秘', '迷'],
+            '码': ['马', '妈'],
+            '账': ['张', '章'],
+            '户': ['护', '互'],
+            '冻': ['动', '东', '洞'],
+            '结': ['节', '洁'],
+            '永': ['勇', '涌'],
+            '封': ['风', '疯'],
+            'bank': ['b4nk', 'bаnk', 'bаnk'],
+            'account': ['acc0unt', 'аccount'],
+            'password': ['pаssword', 'passw0rd'],
+            'login': ['l0gin', 'lоgin'],
+            'verify': ['vеrify', 'ver1fy'],
+            'secure': ['sеcure', 'secur3']
+        };
+        
+        // 零宽字符
+        const zeroWidthChars = ['\u200B', '\u200C', '\u200D', '\uFEFF'];
+        
+        // Unicode相似字符
+        const unicodeSimilar = {
+            'a': 'ааɑαа',
+            'e': 'её℮ε',
+            'o': 'оοо0',
+            'p': 'рρ',
+            'c': 'сϲ',
+            'x': 'х×',
+            'i': 'іι1',
+            'l': 'ⅼ1|'
+        };
+        
+        // 生成对抗样本
+        function generateAttack() {
+            const original = document.getElementById('originalEmail').value;
+            const intensity = parseInt(document.getElementById('attackIntensity').value) / 100;
+            
+            let attacked = original;
+            let changes = [];
+            
+            switch(currentAttackType) {
+                case 'homophone':
+                    attacked = applyHomophoneAttack(original, intensity, changes);
+                    break;
+                case 'invisible':
+                    attacked = applyInvisibleAttack(original, intensity, changes);
+                    break;
+                case 'unicode':
+                    attacked = applyUnicodeAttack(original, intensity, changes);
+                    break;
+                case 'spaces':
+                    attacked = applySpaceAttack(original, intensity, changes);
+                    break;
+                case 'random':
+                    attacked = applyRandomAttack(original, intensity, changes);
+                    break;
+            }
+            
+            document.getElementById('attackedEmail').value = attacked;
+            document.getElementById('attackResultCard').style.display = 'block';
+            
+            // 显示变形详情
+            const detailsHtml = changes.map(c => 
+                `<div class="mb-1"><span class="diff-removed">${c.from}</span> → <span class="diff-added">${c.to}</span></div>`
+            ).join('');
+            document.getElementById('attackDetails').innerHTML = changes.length > 0 
+                ? `<strong>共 ${changes.length} 处变形：</strong><br>${detailsHtml}`
+                : '未进行变形';
+            
+            addToLog('生成对抗样本', `${currentAttackType} - 强度${intensity*100}%`);
+        }
+        
+        // 同音字攻击
+        function applyHomophoneAttack(text, intensity, changes) {
+            let result = text;
+            const chars = Object.keys(homophoneMap);
+            
+            for (const char of chars) {
+                if (result.includes(char) && Math.random() < intensity) {
+                    const replacements = homophoneMap[char];
+                    const replacement = replacements[Math.floor(Math.random() * replacements.length)];
+                    result = result.replace(new RegExp(char, 'g'), replacement);
+                    changes.push({ from: char, to: replacement });
+                }
+            }
+            
+            return result;
+        }
+        
+        // 零宽字符攻击
+        function applyInvisibleAttack(text, intensity, changes) {
+            let result = '';
+            let insertCount = 0;
+            
+            for (let i = 0; i < text.length; i++) {
+                result += text[i];
+                if (Math.random() < intensity * 0.3) {
+                    const zwc = zeroWidthChars[Math.floor(Math.random() * zeroWidthChars.length)];
+                    result += zwc;
+                    insertCount++;
+                }
+            }
+            
+            if (insertCount > 0) {
+                changes.push({ from: '正常文本', to: `插入${insertCount}个零宽字符` });
+            }
+            
+            return result;
+        }
+        
+        // Unicode攻击
+        function applyUnicodeAttack(text, intensity, changes) {
+            let result = text;
+            const letters = Object.keys(unicodeSimilar);
+            
+            for (const letter of letters) {
+                if (result.includes(letter) && Math.random() < intensity) {
+                    const similar = unicodeSimilar[letter];
+                    const replacement = similar[Math.floor(Math.random() * similar.length)];
+                    result = result.replace(new RegExp(letter, 'g'), replacement);
+                    changes.push({ from: letter, to: `${letter}(Unicode:${replacement.charCodeAt(0)})` });
+                }
+            }
+            
+            return result;
+        }
+        
+        // 空格攻击
+        function applySpaceAttack(text, intensity, changes) {
+            let result = '';
+            let insertCount = 0;
+            
+            const words = text.split(/(\s+)/);
+            for (const word of words) {
+                if (word.trim() && Math.random() < intensity) {
+                    result += word.split('').join(' ');
+                    insertCount++;
+                } else {
+                    result += word;
+                }
+            }
+            
+            if (insertCount > 0) {
+                changes.push({ from: '正常单词', to: `在${insertCount}个单词中插入空格` });
+            }
+            
+            return result;
+        }
+        
+        // 随机攻击
+        function applyRandomAttack(text, intensity, changes) {
+            let result = text;
+            const attacks = ['homophone', 'invisible', 'unicode', 'spaces'];
+            const numAttacks = Math.ceil(intensity * 3);
+            
+            for (let i = 0; i < numAttacks; i++) {
+                const attack = attacks[Math.floor(Math.random() * attacks.length)];
+                const subChanges = [];
+                
+                switch(attack) {
+                    case 'homophone':
+                        result = applyHomophoneAttack(result, 0.3, subChanges);
+                        break;
+                    case 'invisible':
+                        result = applyInvisibleAttack(result, 0.2, subChanges);
+                        break;
+                    case 'unicode':
+                        result = applyUnicodeAttack(result, 0.2, subChanges);
+                        break;
+                    case 'spaces':
+                        result = applySpaceAttack(result, 0.2, subChanges);
+                        break;
+                }
+                
+                changes.push(...subChanges.map(c => ({ ...c, attack })));
+            }
+            
+            return result;
+        }
+        
+        // 检测原始邮件
+        async function testOriginal() {
+            const email = document.getElementById('originalEmail').value;
+            const result = await detectEmail(email, '原始邮件');
+            testResults.original = result;
+            updateResultCard('originalResult', result);
+            return result;
+        }
+        
+        // 检测对抗样本
+        async function testAttacked() {
+            const email = document.getElementById('attackedEmail').value;
+            const result = await detectEmail(email, '对抗样本');
+            testResults.attacked = result;
+            updateResultCard('attackedResult', result);
+            evaluateRobustness();
+            return result;
+        }
+        
+        // 对比测试
+        async function testBoth() {
+            generateAttack();
+            await testOriginal();
+            await testAttacked();
+        }
+        
+        // 调用检测API
+        async function detectEmail(emailContent, label) {
+            try {
+                const response = await fetch('/api/detection/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: emailContent, source: '对抗测试' })
+                });
+                
+                const data = await response.json();
+                
+                return {
+                    label: data.label,
+                    confidence: data.confidence,
+                    reason: data.reason
+                };
+            } catch (e) {
+                return { label: 'ERROR', confidence: 0, reason: e.message };
+            }
+        }
+        
+        // 更新结果卡片
+        function updateResultCard(cardId, result) {
+            const card = document.getElementById(cardId);
+            let bgClass = 'result-safe';
+            let icon = 'bi-check-circle';
+            let label = '安全';
+            
+            if (result.label === 'PHISHING') {
+                bgClass = 'result-phishing';
+                icon = 'bi-exclamation-triangle';
+                label = '钓鱼';
+            } else if (result.label === 'SUSPICIOUS') {
+                bgClass = 'result-suspicious';
+                icon = 'bi-question-circle';
+                label = '可疑';
+            }
+            
+            card.className = `result-card ${bgClass}`;
+            card.innerHTML = `
+                <h6 style="font-size: 0.8rem; color: var(--text-secondary);">${cardId === 'originalResult' ? '原始邮件' : '对抗样本'}</h6>
+                <div class="text-center">
+                    <i class="bi ${icon}" style="font-size: 2rem;"></i>
+                    <div class="mt-2" style="font-size: 1.25rem; font-weight: 600;">${label}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">置信度: ${(result.confidence * 100).toFixed(1)}%</div>
+                </div>
+            `;
+            
+            addToLog(`检测${cardId === 'originalResult' ? '原始邮件' : '对抗样本'}`, `${result.label} (${(result.confidence * 100).toFixed(1)}%)`);
+        }
+        
+        // 评估鲁棒性
+        function evaluateRobustness() {
+            const evalDiv = document.getElementById('robustnessEval');
+            const contentDiv = document.getElementById('robustnessContent');
+            
+            if (!testResults.original || !testResults.attacked) {
+                evalDiv.style.display = 'none';
+                return;
+            }
+            
+            evalDiv.style.display = 'block';
+            
+            const originalLabel = testResults.original.label;
+            const attackedLabel = testResults.attacked.label;
+            
+            let robustness = '';
+            let robustnessClass = '';
+            
+            if (originalLabel === attackedLabel) {
+                robustness = '✅ 系统鲁棒性良好';
+                robustnessClass = 'text-success';
+                contentDiv.innerHTML = `
+                    <p class="${robustnessClass} mb-2"><strong>${robustness}</strong></p>
+                    <p style="font-size: 0.85rem;">系统成功识别了经过变形攻击的邮件，两种邮件的检测结果一致。</p>
+                    <ul style="font-size: 0.85rem; color: var(--text-secondary);">
+                        <li>原始邮件: ${originalLabel}</li>
+                        <li>对抗样本: ${attackedLabel}</li>
+                    </ul>
+                `;
+            } else if (originalLabel === 'PHISHING' && attackedLabel !== 'PHISHING') {
+                robustness = '⚠️ 检测到逃逸攻击';
+                robustnessClass = 'text-warning';
+                contentDiv.innerHTML = `
+                    <p class="${robustnessClass} mb-2"><strong>${robustness}</strong></p>
+                    <p style="font-size: 0.85rem;">对抗样本成功绕过了检测，建议：</p>
+                    <ul style="font-size: 0.85rem; color: var(--text-secondary);">
+                        <li>增加同音字/变形字符的检测规则</li>
+                        <li>在训练数据中加入对抗样本</li>
+                        <li>增加文本预处理步骤</li>
+                    </ul>
+                `;
+            } else {
+                robustness = '📊 检测结果差异';
+                robustnessClass = 'text-info';
+                contentDiv.innerHTML = `
+                    <p class="${robustnessClass} mb-2"><strong>${robustness}</strong></p>
+                    <p style="font-size: 0.85rem;">检测结果存在差异，需要进一步分析。</p>
+                    <ul style="font-size: 0.85rem; color: var(--text-secondary);">
+                        <li>原始邮件: ${originalLabel} (${(testResults.original.confidence * 100).toFixed(1)}%)</li>
+                        <li>对抗样本: ${attackedLabel} (${(testResults.attacked.confidence * 100).toFixed(1)}%)</li>
+                    </ul>
+                `;
+            }
+        }
+        
+        // 添加日志
+        function addToLog(action, detail) {
+            const log = document.getElementById('attackLog');
+            const time = new Date().toLocaleTimeString();
+            
+            // 移除空状态提示
+            const emptyState = log.querySelector('.text-center');
+            if (emptyState) emptyState.remove();
+            
+            const item = document.createElement('div');
+            item.className = 'attack-item';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <strong style="font-size: 0.8rem;">${action}</strong>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary);">${time}</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">${detail}</div>
+            `;
+            
+            log.insertBefore(item, log.firstChild);
+        }
+        
+        // 清空日志
+        function clearLog() {
+            document.getElementById('attackLog').innerHTML = `
+                <div class="text-center text-muted py-3">
+                    <i class="bi bi-inbox"></i>
+                    <p class="mb-0 mt-2">暂无测试记录</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据大屏 - 钓鱼邮件检测系统</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --blue: #3b82f6;
+            --red: #ef4444;
+            --green: #10b981;
+            --amber: #f59e0b;
+        }
+        
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 100vh;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, var(--blue), #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--green);
+        }
+        
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: auto 1fr;
+            gap: 1rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .stat-card::before {
+            content: '';
+            display: block;
+            height: 3px;
+            border-radius: 3px 3px 0 0;
+            margin: -1.5rem -1.5rem 1rem -1.5rem;
+        }
+        
+        .stat-card.blue::before { background: var(--blue); }
+        .stat-card.red::before { background: var(--red); }
+        .stat-card.green::before { background: var(--green); }
+        .stat-card.amber::before { background: var(--amber); }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        .stat-card.blue .stat-value { color: var(--blue); }
+        .stat-card.red .stat-value { color: var(--red); }
+        .stat-card.green .stat-value { color: var(--green); }
+        .stat-card.amber .stat-value { color: var(--amber); }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        
+        .chart-area {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 1rem;
+            grid-column: span 4;
+        }
+        
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+        
+        .chart-card.wide { grid-column: span 2; }
+        
+        .chart-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .chart-title i { color: var(--blue); }
+        
+        .chart-container {
+            height: calc(100% - 2rem);
+            position: relative;
+        }
+        
+        .threat-feed {
+            height: calc(100% - 2rem);
+            overflow-y: auto;
+        }
+        
+        .threat-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .threat-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .threat-icon.danger { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+        .threat-icon.warning { background: rgba(245, 158, 11, 0.2); color: var(--amber); }
+        .threat-icon.success { background: rgba(16, 185, 129, 0.2); color: var(--green); }
+        
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-left: 1rem;
+        }
+        
+        .footer a:hover { color: var(--blue); }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="header">
+            <h1><i class="bi bi-shield-check me-2"></i>钓鱼邮件检测系统 - 数据大屏</h1>
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <div class="live-indicator">
+                    <span class="live-dot"></span>
+                    <span>实时监控中</span>
+                </div>
+                <div id="currentTime"></div>
+            </div>
+        </header>
+        
+        <main class="main-content">
+            <div class="stat-card blue">
+                <div class="stat-value" id="totalCount">0</div>
+                <div class="stat-label">今日检测邮件</div>
+            </div>
+            <div class="stat-card red">
+                <div class="stat-value" id="phishingCount">0</div>
+                <div class="stat-label">拦截钓鱼邮件</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-value" id="safeCount">0</div>
+                <div class="stat-label">安全邮件</div>
+            </div>
+            <div class="stat-card amber">
+                <div class="stat-value" id="suspiciousCount">0</div>
+                <div class="stat-label">可疑邮件</div>
+            </div>
+            
+            <div class="chart-area">
+                <div class="chart-card wide">
+                    <div class="chart-title"><i class="bi bi-graph-up"></i>检测趋势（近7天）</div>
+                    <div class="chart-container"><canvas id="trendChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title"><i class="bi bi-pie-chart"></i>威胁类型分布</div>
+                    <div class="chart-container"><canvas id="threatChart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title"><i class="bi bi-lightning"></i>最近威胁事件</div>
+                    <div class="threat-feed" id="threatFeed"></div>
+                </div>
+            </div>
+        </main>
+        
+        <footer class="footer">
+            <div>
+                <span>系统状态: <span style="color: var(--green);">● 正常</span></span>
+            </div>
+            <div>
+                <a href="/">返回首页</a>
+                <a href="/settings">配置</a>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        function updateTime() {
+            document.getElementById('currentTime').textContent = 
+                new Date().toLocaleString('zh-CN');
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        function initCharts() {
+            new Chart(document.getElementById('trendChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+                    datasets: [
+                        { label: '总检测', data: [45, 52, 38, 65, 48, 72, 58], borderColor: '#3b82f6', fill: true, tension: 0.4 },
+                        { label: '钓鱼', data: [8, 12, 5, 18, 9, 15, 11], borderColor: '#ef4444', fill: true, tension: 0.4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8' } } },
+                    scales: {
+                        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('threatChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['钓鱼链接', '恶意附件', '域名欺骗', '其他'],
+                    datasets: [{ data: [45, 25, 20, 10], backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#64748b'] }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '60%',
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }
+                }
+            });
+        }
+
+        function loadThreatFeed() {
+            document.getElementById('threatFeed').innerHTML = [
+                { type: 'danger', title: '钓鱼邮件拦截', info: 'security@fake-bank.com', time: '2分钟前' },
+                { type: 'warning', title: '可疑附件扫描', info: 'invoice.pdf.exe', time: '15分钟前' },
+                { type: 'success', title: '系统更新完成', info: 'IOC数据库已同步', time: '1小时前' },
+                { type: 'danger', title: '恶意链接检测', info: 'phishing-site.com', time: '2小时前' },
+                { type: 'warning', title: '可疑发件人', info: 'admin@secure-bank.net', time: '3小时前' }
+            ].map(t => `
+                <div class="threat-item">
+                    <div class="threat-icon ${t.type}"><i class="bi bi-shield-x"></i></div>
+                    <div>
+                        <div style="font-size: 0.8rem; font-weight: 500;">${t.title}</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">${t.info}</div>
+                    </div>
+                    <div style="font-size: 0.65rem; color: #64748b; margin-left: auto;">${t.time}</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadData() {
+            try {
+                const resp = await fetch('/api/stats/overview');
+                const data = await resp.json();
+                document.getElementById('totalCount').textContent = data.total || 0;
+                document.getElementById('phishingCount').textContent = data.phishing || 0;
+                document.getElementById('safeCount').textContent = data.normal || 0;
+                document.getElementById('suspiciousCount').textContent = data.suspicious || 0;
+            } catch (e) { console.error(e); }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            loadData();
+            loadThreatFeed();
+            setInterval(loadData, 30000);
+        });
+    </script>
+</body>
+</html>
