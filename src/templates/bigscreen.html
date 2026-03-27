@@ -118,17 +118,6 @@
             margin-top: 0.25rem;
         }
         
-        .stat-trend {
-            font-size: 0.7rem;
-            margin-top: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        
-        .stat-trend.up { color: #10b981; }
-        .stat-trend.down { color: #ef4444; }
-        
         .charts-row {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -229,6 +218,12 @@
         
         .footer a:hover { color: #3b82f6; }
         
+        .empty-state {
+            text-align: center;
+            color: #64748b;
+            padding: 2rem;
+        }
+        
         @media (max-width: 1024px) {
             .stats-row { grid-template-columns: repeat(2, 1fr); }
             .charts-row { grid-template-columns: 1fr; }
@@ -252,68 +247,70 @@
     <div class="stats-row">
         <div class="stat-card blue">
             <div class="stat-icon"><i class="bi bi-envelope"></i></div>
-            <div class="stat-value" id="totalCount">0</div>
-            <div class="stat-label">今日检测</div>
-            <div class="stat-trend up"><i class="bi bi-arrow-up"></i> +12%</div>
+            <div class="stat-value" id="totalCount">-</div>
+            <div class="stat-label">总检测数</div>
         </div>
         <div class="stat-card red">
             <div class="stat-icon"><i class="bi bi-shield-x"></i></div>
-            <div class="stat-value" id="phishingCount">0</div>
-            <div class="stat-label">拦截钓鱼</div>
-            <div class="stat-trend up"><i class="bi bi-arrow-up"></i> +5%</div>
+            <div class="stat-value" id="phishingCount">-</div>
+            <div class="stat-label">钓鱼邮件</div>
         </div>
         <div class="stat-card green">
             <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
-            <div class="stat-value" id="safeCount">0</div>
+            <div class="stat-value" id="safeCount">-</div>
             <div class="stat-label">安全邮件</div>
-            <div class="stat-trend up"><i class="bi bi-arrow-up"></i> +15%</div>
         </div>
         <div class="stat-card amber">
             <div class="stat-icon"><i class="bi bi-question-circle"></i></div>
-            <div class="stat-value" id="suspiciousCount">0</div>
+            <div class="stat-value" id="suspiciousCount">-</div>
             <div class="stat-label">可疑邮件</div>
-            <div class="stat-trend down"><i class="bi bi-arrow-down"></i> -3%</div>
         </div>
     </div>
     
     <!-- 图表区域 -->
     <div class="charts-row">
         <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-graph-up"></i>检测趋势（近7天）</div>
+            <div class="chart-title"><i class="bi bi-graph-up"></i>检测趋势</div>
             <div class="chart-container"><canvas id="trendChart"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-pie-chart"></i>威胁类型分布</div>
-            <div class="chart-container"><canvas id="threatChart"></canvas></div>
+            <div class="chart-title"><i class="bi bi-pie-chart"></i>检测结果分布</div>
+            <div class="chart-container"><canvas id="pieChart"></canvas></div>
         </div>
     </div>
     
     <!-- 底部区域 -->
     <div class="bottom-row">
         <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-lightning"></i>最近威胁事件</div>
-            <div class="threat-feed" id="threatFeed"></div>
+            <div class="chart-title"><i class="bi bi-bar-chart"></i>每日检测统计</div>
+            <div class="chart-container"><canvas id="barChart"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-bar-chart"></i>检测模块得分</div>
-            <div class="chart-container"><canvas id="moduleChart"></canvas></div>
+            <div class="chart-title"><i class="bi bi-lightning"></i>最近检测记录</div>
+            <div class="threat-feed" id="recentAlerts">
+                <div class="empty-state">加载中...</div>
+            </div>
         </div>
     </div>
     
     <footer class="footer">
         <div>
-            <span>系统状态: <span style="color: #10b981;">● 正常运行</span></span>
+            <span>系统状态: <span style="color: #10b981;">● 运行中</span></span>
             <span class="mx-3">|</span>
-            <span>数据更新: <span id="lastUpdate">刚刚</span></span>
+            <span>数据更新: <span id="lastUpdate">-</span></span>
         </div>
         <div>
-            <a href="/"><i class="bi bi-house me-1"></i>首页</a>
-            <a href="/settings"><i class="bi bi-gear me-1"></i>配置</a>
-            <a href="/adversarial"><i class="bi bi-bug me-1"></i>测试</a>
+            <a href="/">首页</a>
+            <a href="/settings">配置</a>
+            <a href="/adversarial">测试</a>
         </div>
     </footer>
 
     <script>
+        let trendChart = null;
+        let pieChart = null;
+        let barChart = null;
+        
         // 更新时间
         function updateTime() {
             document.getElementById('currentTime').textContent = new Date().toLocaleString('zh-CN');
@@ -321,143 +318,217 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // 初始化图表
-        function initCharts() {
-            // 趋势图
-            new Chart(document.getElementById('trendChart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-                    datasets: [
-                        {
-                            label: '总检测',
-                            data: [45, 52, 38, 65, 48, 72, 58],
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 4,
-                            pointBackgroundColor: '#3b82f6'
-                        },
-                        {
-                            label: '钓鱼',
-                            data: [8, 12, 5, 18, 9, 15, 11],
-                            borderColor: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 4,
-                            pointBackgroundColor: '#ef4444'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { labels: { color: '#94a3b8', usePointStyle: true } } },
-                    scales: {
-                        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
-                    }
-                }
-            });
-
-            // 威胁饼图
-            new Chart(document.getElementById('threatChart').getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: ['钓鱼链接', '恶意附件', '域名欺骗', '社会工程'],
-                    datasets: [{
-                        data: [45, 25, 20, 10],
-                        backgroundColor: ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4'],
-                        borderWidth: 0,
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '65%',
-                    plugins: {
-                        legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 15, usePointStyle: true } }
-                    }
-                }
-            });
-
-            // 模块得分雷达图
-            new Chart(document.getElementById('moduleChart').getContext('2d'), {
-                type: 'radar',
-                data: {
-                    labels: ['邮件头', 'URL', '文本', '附件', 'HTML'],
-                    datasets: [{
-                        label: '风险得分',
-                        data: [0.3, 0.5, 0.4, 0.2, 0.1],
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        borderColor: '#3b82f6',
-                        pointBackgroundColor: '#3b82f6',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: '#3b82f6'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        r: {
-                            angleLines: { color: 'rgba(255,255,255,0.1)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' },
-                            pointLabels: { color: '#94a3b8' },
-                            ticks: { display: false }
-                        }
-                    }
-                }
-            });
-        }
-
-        // 加载威胁事件
-        function loadThreatFeed() {
-            const threats = [
-                { type: 'danger', icon: 'bi-shield-x', title: '钓鱼邮件拦截', info: 'security@fake-bank.com - 伪造银行', time: '2分钟前' },
-                { type: 'danger', icon: 'bi-link-45deg', title: '恶意链接检测', info: 'http://phishing-site.com/verify', time: '15分钟前' },
-                { type: 'warning', icon: 'bi-file-earmark', title: '可疑附件', info: 'invoice.pdf.exe - 双重扩展名', time: '1小时前' },
-                { type: 'warning', icon: 'bi-envelope', title: '可疑发件人', info: 'admin@secure-bank.net - 非官方', time: '2小时前' },
-                { type: 'success', icon: 'bi-arrow-repeat', title: '系统更新', info: 'IOC数据库已同步', time: '3小时前' },
-                { type: 'success', icon: 'bi-shield-check', title: '安全扫描', info: '全量邮件扫描完成', time: '6小时前' }
-            ];
-            
-            document.getElementById('threatFeed').innerHTML = threats.map(t => `
-                <div class="threat-item">
-                    <div class="threat-icon ${t.type}"><i class="bi ${t.icon}"></i></div>
-                    <div>
-                        <div class="threat-title">${t.title}</div>
-                        <div class="threat-info">${t.info}</div>
-                    </div>
-                    <div class="threat-time">${t.time}</div>
-                </div>
-            `).join('');
-        }
-
         // 加载统计数据
-        async function loadData() {
+        async function loadStats() {
             try {
                 const resp = await fetch('/api/stats/overview');
                 const data = await resp.json();
+                
                 document.getElementById('totalCount').textContent = data.total || 0;
                 document.getElementById('phishingCount').textContent = data.phishing || 0;
                 document.getElementById('safeCount').textContent = data.normal || 0;
                 document.getElementById('suspiciousCount').textContent = data.suspicious || 0;
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('zh-CN');
-            } catch (e) { console.error('加载数据失败:', e); }
+                
+                // 更新趋势图
+                updateTrendChart(data.trend || []);
+                
+                // 更新饼图
+                updatePieChart(data);
+                
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
         }
-
+        
+        // 更新趋势图
+        function updateTrendChart(trend) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            const labels = trend.map(t => t.day);
+            const totals = trend.map(t => t.count);
+            const phishing = trend.map(t => t.phish_count || 0);
+            
+            if (trendChart) {
+                trendChart.data.labels = labels;
+                trendChart.data.datasets[0].data = totals;
+                trendChart.data.datasets[1].data = phishing;
+                trendChart.update();
+            } else {
+                trendChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: '总检测',
+                                data: totals,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: '钓鱼',
+                                data: phishing,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#94a3b8' } } },
+                        scales: {
+                            x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                            y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // 更新饼图
+        function updatePieChart(data) {
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            
+            const values = [data.phishing || 0, data.suspicious || 0, data.normal || 0];
+            const hasData = values.some(v => v > 0);
+            
+            if (pieChart) {
+                pieChart.data.datasets[0].data = values;
+                pieChart.update();
+            } else {
+                pieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['钓鱼', '可疑', '安全'],
+                        datasets: [{
+                            data: hasData ? values : [1, 1, 1],
+                            backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '60%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8' } }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // 加载每日统计
+        async function loadDailyStats() {
+            try {
+                const resp = await fetch('/api/stats/daily?days=7');
+                const data = await resp.json();
+                
+                const ctx = document.getElementById('barChart').getContext('2d');
+                
+                const labels = data.map(d => d.day.slice(5)); // MM-DD
+                const values = data.map(d => d.total);
+                
+                if (barChart) {
+                    barChart.data.labels = labels;
+                    barChart.data.datasets[0].data = values;
+                    barChart.update();
+                } else {
+                    barChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '检测数',
+                                data: values,
+                                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                                borderColor: '#3b82f6',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                                y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('加载每日统计失败:', e);
+            }
+        }
+        
+        // 加载最近检测
+        async function loadRecentAlerts() {
+            try {
+                const resp = await fetch('/api/alerts?page=1&per_page=5');
+                const data = await resp.json();
+                
+                const container = document.getElementById('recentAlerts');
+                
+                if (!data.alerts || data.alerts.length === 0) {
+                    container.innerHTML = '<div class="empty-state">暂无检测记录</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.alerts.map(alert => {
+                    let iconClass = 'success';
+                    let icon = 'bi-check-circle';
+                    
+                    if (alert.label === 'PHISHING') {
+                        iconClass = 'danger';
+                        icon = 'bi-shield-x';
+                    } else if (alert.label === 'SUSPICIOUS') {
+                        iconClass = 'warning';
+                        icon = 'bi-question-circle';
+                    }
+                    
+                    const time = new Date(alert.detection_time).toLocaleString('zh-CN', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    return `
+                        <div class="threat-item">
+                            <div class="threat-icon ${iconClass}"><i class="bi ${icon}"></i></div>
+                            <div>
+                                <div class="threat-title">${alert.subject || '无主题'}</div>
+                                <div class="threat-info">${alert.from_email || '未知发件人'}</div>
+                            </div>
+                            <div class="threat-time">${time}</div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (e) {
+                console.error('加载最近检测失败:', e);
+                document.getElementById('recentAlerts').innerHTML = '<div class="empty-state">加载失败</div>';
+            }
+        }
+        
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            initCharts();
-            loadData();
-            loadThreatFeed();
-            setInterval(loadData, 30000);
+            loadStats();
+            loadDailyStats();
+            loadRecentAlerts();
+            
+            // 每30秒刷新
+            setInterval(() => {
+                loadStats();
+                loadRecentAlerts();
+            }, 30000);
         });
     </script>
 </body>
