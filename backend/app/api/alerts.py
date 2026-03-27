@@ -4,6 +4,7 @@ Alerts API Routes
 from flask import Blueprint, jsonify, request
 import sys
 import os
+import re
 import json
 import requests
 from typing import Dict
