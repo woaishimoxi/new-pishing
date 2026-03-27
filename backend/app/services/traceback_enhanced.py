@@ -248,8 +248,8 @@ class TracebackAnalyzer:
             'analysis': ''
         }
         
-        subject = parsed_email.get('subject', '').lower()
-        body = parsed_email.get('body', '').lower()
+        subject = (parsed_email.get('subject') or '').lower()
+        body = (parsed_email.get('body') or '').lower()
         full_text = subject + ' ' + body
         
         # 检测各类关键词
@@ -328,8 +328,8 @@ class TracebackAnalyzer:
         
         # 分析附件
         for att in attachments:
-            filename = att.get('filename', '')
-            if any(filename.lower().endswith(ext) for ext in DANGEROUS_EXTENSIONS):
+            filename = att.get('filename') or ''
+            if filename and any(filename.lower().endswith(ext) for ext in DANGEROUS_EXTENSIONS):
                 vectors['suspicious_attachments'].append({
                     'filename': filename,
                     'risk': 'high' if filename.endswith(('.exe', '.scr', '.bat', '.ps1')) else 'medium'
@@ -445,7 +445,7 @@ class TracebackAnalyzer:
             return []
         
         email_pattern = r'[\w\.-]+@[\w\.-]+\.\w+'
-        return re.findall(email_pattern, field.lower())
+        return re.findall(email_pattern, (field or '').lower())
     
     def _is_private_ip(self, ip: str) -> bool:
         """检查是否为私有IP"""
