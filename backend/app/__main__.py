@@ -146,6 +146,10 @@ def register_template_routes(app: Flask) -> None:
     def adversarial_page():
         return render_template('adversarial.html')
     
+    @app.route('/traceback')
+    def traceback_page():
+        return render_template('traceback.html')
+    
     @app.route('/report.html')
     def report():
         return render_template('report.html')

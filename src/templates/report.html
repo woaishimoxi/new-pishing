@@ -330,8 +330,11 @@
                                         <button class="btn btn-primary me-2" onclick="window.location.href='/'">
                                             <i class="bi bi-arrow-left"></i> 再次检测
                                         </button>
-                                        <button class="btn btn-info" onclick="showEmailContent()">
+                                        <button class="btn btn-info me-2" onclick="showEmailContent()">
                                             <i class="bi bi-envelope-open"></i> 查看邮件内容
+                                        </button>
+                                        <button class="btn btn-warning" onclick="viewTraceback()">
+                                            <i class="bi bi-diagram-3"></i> 查看溯源
                                         </button>
                                     </div>
                                 </div>
@@ -1183,6 +1186,15 @@
             html += '</div></div></div></div>';
 
             container.innerHTML = html;
+        }
+
+        // 查看溯源分析
+        function viewTraceback() {
+            if (!currentResult || !currentResult.id) {
+                alert('无法获取邮件ID');
+                return;
+            }
+            window.location.href = `/traceback?id=${currentResult.id}`;
         }
 
         function showEmailContent() {

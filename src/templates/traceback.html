@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>溯源分析报告 - 钓鱼邮件检测系统</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text2: #64748b;
+            --blue: #3b82f6;
+            --red: #ef4444;
+            --green: #10b981;
+            --amber: #f59e0b;
+            --purple: #8b5cf6;
+        }
+        
+        body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+        
+        .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .nav-brand { font-weight: 600; color: var(--text); text-decoration: none; }
+        .nav-brand i { color: var(--blue); }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+        
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+        .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+        .card-header i { color: var(--blue); }
+        .card-body { padding: 1.25rem; }
+        
+        .risk-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .risk-high { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .risk-medium { background: rgba(245, 158, 11, 0.1); color: var(--amber); }
+        .risk-low { background: rgba(16, 185, 129, 0.1); color: var(--green); }
+        
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 0.5rem 0; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .progress-fill.high { background: var(--red); }
+        .progress-fill.medium { background: var(--amber); }
+        .progress-fill.low { background: var(--green); }
+        
+        .dimension-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            height: 100%;
+        }
+        
+        .dimension-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .dimension-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        
+        .dimension-icon.blue { background: rgba(59, 130, 246, 0.1); color: var(--blue); }
+        .dimension-icon.red { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .dimension-icon.green { background: rgba(16, 185, 129, 0.1); color: var(--green); }
+        .dimension-icon.amber { background: rgba(245, 158, 11, 0.1); color: var(--amber); }
+        .dimension-icon.purple { background: rgba(139, 92, 246, 0.1); color: var(--purple); }
+        
+        .dimension-title { font-weight: 600; font-size: 0.95rem; }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: var(--text2); }
+        .info-value { font-weight: 500; }
+        
+        .chain-path {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .chain-node {
+            padding: 0.375rem 0.75rem;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: monospace;
+        }
+        
+        .chain-arrow { color: var(--text2); }
+        
+        .keyword-tag {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin: 0.25rem;
+        }
+        
+        .loading { text-align: center; padding: 3rem; color: var(--text2); }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top: 3px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--card);
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+        .btn-back:hover { background: var(--bg); }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a class="nav-brand" href="/"><i class="bi bi-shield-check me-1"></i>钓鱼邮件检测系统</a>
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="/" class="btn-back"><i class="bi bi-house"></i> 首页</a>
+            <a id="reportLink" href="/" class="btn-back"><i class="bi bi-file-text"></i> 返回报告</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+                <h5 style="margin-bottom: 0.25rem;"><i class="bi bi-diagram-3 me-2" style="color: var(--blue);"></i>溯源分析报告</h5>
+                <p style="color: var(--text2); font-size: 0.875rem; margin: 0;">邮件攻击来源与意图深度分析</p>
+            </div>
+            <div id="alertInfo" style="text-align: right; font-size: 0.8rem; color: var(--text2);"></div>
+        </div>
+        
+        <!-- 加载中 -->
+        <div id="loadingState" class="card">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <div>正在加载溯源分析...</div>
+            </div>
+        </div>
+        
+        <!-- 主要内容 -->
+        <div id="mainContent" style="display: none;">
+            <!-- 风险评估总览 -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-shield-check"></i> 综合风险评估
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; align-items: center; gap: 2rem;">
+                        <div id="riskBadge"></div>
+                        <div style="flex: 1;">
+                            <div class="progress-bar">
+                                <div id="riskProgress" class="progress-fill" style="width: 0%;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text2);">
+                                <span>低风险</span>
+                                <span>中风险</span>
+                                <span>高风险</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="riskSummary" style="margin-top: 1rem; padding: 1rem; background: var(--bg); border-radius: 8px; font-size: 0.9rem;"></div>
+                </div>
+            </div>
+            
+            <!-- 5维度分析 -->
+            <div class="row g-4">
+                <!-- 1. 攻击目标 -->
+                <div class="col-md-6">
+                    <div class="dimension-card">
+                        <div class="dimension-header">
+                            <div class="dimension-icon red"><i class="bi bi-bullseye"></i></div>
+                            <div class="dimension-title">攻击目标</div>
+                        </div>
+                        <div id="targetsContent"></div>
+                    </div>
+                </div>
+                
+                <!-- 2. IP来源 -->
+                <div class="col-md-6">
+                    <div class="dimension-card">
+                        <div class="dimension-header">
+                            <div class="dimension-icon blue"><i class="bi bi-geo-alt"></i></div>
+                            <div class="dimension-title">IP来源与传播链</div>
+                        </div>
+                        <div id="sourceContent"></div>
+                    </div>
+                </div>
+                
+                <!-- 3. 社会工程学 -->
+                <div class="col-md-6">
+                    <div class="dimension-card">
+                        <div class="dimension-header">
+                            <div class="dimension-icon amber"><i class="bi bi-person-exclamation"></i></div>
+                            <div class="dimension-title">攻击特性（社会工程学）</div>
+                        </div>
+                        <div id="socialContent"></div>
+                    </div>
+                </div>
+                
+                <!-- 4. 攻击载体 -->
+                <div class="col-md-6">
+                    <div class="dimension-card">
+                        <div class="dimension-header">
+                            <div class="dimension-icon purple"><i class="bi bi-box"></i></div>
+                            <div class="dimension-title">攻击载体</div>
+                        </div>
+                        <div id="vectorsContent"></div>
+                    </div>
+                </div>
+                
+                <!-- 5. 攻击动机 -->
+                <div class="col-12">
+                    <div class="dimension-card">
+                        <div class="dimension-header">
+                            <div class="dimension-icon green"><i class="bi bi-lightbulb"></i></div>
+                            <div class="dimension-title">攻击动机与意图</div>
+                        </div>
+                        <div id="motivationContent"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 传播链可视化 -->
+            <div class="card" id="chainCard" style="display: none;">
+                <div class="card-header">
+                    <i class="bi bi-signpost-split"></i> 传播链路径
+                </div>
+                <div class="card-body">
+                    <div id="chainPath" class="chain-path"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 错误状态 -->
+        <div id="errorState" class="card" style="display: none;">
+            <div class="loading">
+                <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--red);"></i>
+                <div style="margin-top: 1rem;" id="errorMessage">加载失败</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let alertId = null;
+        
+        // 获取URL参数中的alertId
+        function getAlertId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+        
+        // 加载溯源数据
+        async function loadTraceback() {
+            alertId = getAlertId();
+            
+            if (!alertId) {
+                showError('未指定邮件ID');
+                return;
+            }
+            
+            document.getElementById('reportLink').href = `/report.html?id=${alertId}`;
+            document.getElementById('alertInfo').textContent = `邮件ID: ${alertId}`;
+            
+            try {
+                const response = await fetch(`/api/alerts/${alertId}/traceback`);
+                
+                if (!response.ok) {
+                    throw new Error('加载失败');
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                displayTraceback(data);
+                
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+        
+        // 显示溯源数据
+        function displayTraceback(data) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            
+            const dims = data.dimensions || {};
+            
+            // 风险评估
+            displayRiskAssessment(data);
+            
+            // 5维度
+            displayTargets(dims.targets || {});
+            displaySourceChain(dims.source_chain || {});
+            displaySocialEngineering(dims.social_engineering || {});
+            displayAttackVectors(dims.attack_vectors || {});
+            displayMotivation(dims.motivation || {});
+            
+            // 传播链
+            const chain = dims.source_chain || {};
+            if (chain.hops && chain.hops.length > 0) {
+                displayChainPath(chain.hops);
+                document.getElementById('chainCard').style.display = 'block';
+            }
+        }
+        
+        // 显示风险评估
+        function displayRiskAssessment(data) {
+            const score = data.risk_score || 0;
+            const scorePercent = Math.round(score * 100);
+            
+            let riskClass = 'low';
+            let riskLabel = '低风险';
+            if (score > 0.6) { riskClass = 'high'; riskLabel = '高风险'; }
+            else if (score > 0.3) { riskClass = 'medium'; riskLabel = '中风险'; }
+            
+            document.getElementById('riskBadge').innerHTML = `
+                <span class="risk-badge risk-${riskClass}">
+                    <i class="bi bi-shield-${riskClass === 'high' ? 'x' : 'check'}"></i>
+                    ${riskLabel}
+                </span>
+            `;
+            
+            const progress = document.getElementById('riskProgress');
+            progress.style.width = `${scorePercent}%`;
+            progress.className = `progress-fill ${riskClass}`;
+            
+            document.getElementById('riskSummary').textContent = data.summary || '暂无分析结果';
+        }
+        
+        // 攻击目标
+        function displayTargets(targets) {
+            const content = document.getElementById('targetsContent');
+            
+            content.innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">收件人数量</span>
+                    <span class="info-value">${targets.total_count || 0}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">攻击类型</span>
+                    <span class="info-value">${getRiskLabel(targets.risk_level)}</span>
+                </div>
+                <div class="info-row" style="border: none;">
+                    <span class="info-label">分析结论</span>
+                </div>
+                <div style="padding: 0.5rem; background: var(--bg); border-radius: 6px; font-size: 0.85rem;">
+                    ${targets.analysis || '暂无分析'}
+                </div>
+            `;
+        }
+        
+        // IP来源
+        function displaySourceChain(chain) {
+            const content = document.getElementById('sourceContent');
+            const geo = chain.geolocation || {};
+            
+            content.innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">源IP地址</span>
+                    <span class="info-value" style="font-family: monospace;">${chain.source_ip || '未知'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">地理位置</span>
+                    <span class="info-value">${geo.country || '未知'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">ISP</span>
+                    <span class="info-value">${geo.isp || '未知'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">传输跳数</span>
+                    <span class="info-value">${chain.hops?.length || 0}</span>
+                </div>
+                <div class="info-row" style="border: none;">
+                    <span class="info-label">分析结论</span>
+                </div>
+                <div style="padding: 0.5rem; background: var(--bg); border-radius: 6px; font-size: 0.85rem;">
+                    ${chain.analysis || '暂无分析'}
+                </div>
+            `;
+        }
+        
+        // 社会工程学
+        function displaySocialEngineering(se) {
+            const content = document.getElementById('socialContent');
+            const categories = se.categories || [];
+            const keywords = se.detected_keywords || [];
+            
+            content.innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">检测到类型</span>
+                    <span class="info-value">${categories.length > 0 ? categories.join(', ') : '无'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">匹配关键词</span>
+                    <span class="info-value">${keywords.length} 个</span>
+                </div>
+                ${keywords.length > 0 ? `
+                    <div style="margin-top: 0.5rem;">
+                        ${keywords.slice(0, 8).map(kw => `<span class="keyword-tag">${kw.keyword}</span>`).join('')}
+                        ${keywords.length > 8 ? `<span style="font-size: 0.75rem; color: var(--text2);">+${keywords.length - 8} more</span>` : ''}
+                    </div>
+                ` : ''}
+                <div style="margin-top: 0.75rem; padding: 0.5rem; background: var(--bg); border-radius: 6px; font-size: 0.85rem;">
+                    ${se.analysis || '暂无分析'}
+                </div>
+            `;
+        }
+        
+        // 攻击载体
+        function displayAttackVectors(vectors) {
+            const content = document.getElementById('vectorsContent');
+            const links = vectors.malicious_links || [];
+            const attachments = vectors.suspicious_attachments || [];
+            
+            content.innerHTML = `
+                <div class="info-row">
+                    <span class="info-label">可疑链接</span>
+                    <span class="info-value">${links.length} 个</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">危险附件</span>
+                    <span class="info-value">${attachments.length} 个</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">信息窃取请求</span>
+                    <span class="info-value">${vectors.info_theft_request ? '是' : '否'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">二维码</span>
+                    <span class="info-value">${vectors.qr_codes || 0} 个</span>
+                </div>
+                <div style="margin-top: 0.75rem; padding: 0.5rem; background: var(--bg); border-radius: 6px; font-size: 0.85rem;">
+                    ${vectors.analysis || '暂无分析'}
+                </div>
+            `;
+        }
+        
+        // 攻击动机
+        function displayMotivation(motivation) {
+            const content = document.getElementById('motivationContent');
+            
+            content.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-row">
+                            <span class="info-label">主要动机</span>
+                            <span class="info-value">${motivation.primary_label || '未知'}</span>
+                        </div>
+                        <div class="info-row" style="border: none;">
+                            <span class="info-label">置信度</span>
+                            <span class="info-value">${Math.round((motivation.confidence || 0) * 100)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ${motivation.confidence > 0.7 ? 'high' : motivation.confidence > 0.4 ? 'medium' : 'low'}" 
+                                 style="width: ${(motivation.confidence || 0) * 100}%;"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div style="padding: 0.5rem; background: var(--bg); border-radius: 6px; font-size: 0.85rem; height: 100%;">
+                            ${motivation.analysis || '暂无分析'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 显示传播链
+        function displayChainPath(hops) {
+            const container = document.getElementById('chainPath');
+            
+            container.innerHTML = hops.map((hop, i) => `
+                <span class="chain-node" title="${hop.server || ''}">
+                    ${hop.ip || hop.server || '?'}
+                </span>
+                ${i < hops.length - 1 ? '<span class="chain-arrow"><i class="bi bi-arrow-right"></i></span>' : ''}
+            `).join('');
+        }
+        
+        // 获取风险标签
+        function getRiskLabel(level) {
+            const labels = {
+                'high': '高风险',
+                'medium': '中风险',
+                'low': '低风险'
+            };
+            return labels[level] || '未知';
+        }
+        
+        // 显示错误
+        function showError(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+        
+        // 页面加载
+        document.addEventListener('DOMContentLoaded', loadTraceback);
+    </script>
+</body>
+</html>
