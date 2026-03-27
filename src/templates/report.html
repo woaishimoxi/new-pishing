@@ -448,21 +448,6 @@
                     </div>
                 </div>
 
-                <!-- 溯源路径可视化 -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="bi bi-map"></i> 溯源路径可视化
-                            <span class="help-icon ms-2">
-                                <i class="bi bi-question-circle"></i>
-                                <span class="tooltip">显示邮件的传输路径和来源信息</span>
-                            </span>
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="tracebackInfo"></div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -596,10 +581,6 @@
             
             // 显示特征分析
             displayFeatureAnalysis(result.features);
-            
-            // 显示溯源信息 - 兼容不同存储方式
-            const traceback = result.traceback || (result.traceback_data ? JSON.parse(result.traceback_data) : null);
-            displayTracebackInfo(traceback);
             
             // 显示云沙箱分析
             displaySandboxAnalysis(result.sandbox_analysis);
@@ -1351,126 +1332,8 @@
             });
         }
 
-        function displayTracebackInfo(traceback) {
-            const container = document.getElementById('tracebackInfo');
-            const emailSource = traceback?.email_source || {};
 
-            // 尝试加载增强版溯源
-            if (currentResult && currentResult.id) {
-                loadEnhancedTraceback(currentResult.id);
-            }
-
-            if (!emailSource.source_ip && (!emailSource.hops || emailSource.hops.length === 0)) {
-                container.innerHTML = '<div class="alert alert-secondary"><i class="bi bi-map"></i> 无溯源信息</div>';
-                return;
-            }
-
-            let html = '<h6 class="mb-3">邮件来源</h6>';
-            html += '<div class="card mb-3"><div class="card-body">';
-            html += `<p class="mb-1"><strong>源 IP:</strong> ${emailSource.source_ip || '未知'}</p>`;
-
-            if (emailSource.full_path) {
-                html += `<p class="mb-1"><strong>传输路径:</strong> <code>${emailSource.full_path}</code></p>`;
-            }
-
-            const geo = emailSource.geolocation || {};
-            if (geo.country && geo.country !== 'Unknown') {
-                html += `<p class="mb-1"><strong>地理位置:</strong> ${geo.country} ${geo.regionName || ''} ${geo.city || ''}</p>`;
-                html += `<p class="mb-0"><strong>ISP:</strong> ${geo.isp || '未知'}</p>`;
-            }
-
-            const blacklist = emailSource.blacklist_check || {};
-            if (blacklist.is_blacklisted) {
-                html += `<p class="text-danger mb-0"><i class="bi bi-exclamation-triangle"></i> <strong>黑名单:</strong> 被标记于 ${blacklist.blacklists?.join(', ') || '未知'}</p>`;
-            } else {
-                html += `<p class="text-success mb-0"><i class="bi bi-check-circle"></i> <strong>黑名单:</strong> 未被标记</p>`;
-            }
-            html += '</div></div>';
-
-            // 时间轴展示传输路径
-            if (emailSource.hops && emailSource.hops.length > 0) {
-                html += '<h6 class="mb-3">传输路径时间轴</h6>';
-                html += '<div class="timeline">';
-                
-                emailSource.hops.forEach((hop, index) => {
-                    html += `<div class="timeline-item">
-                        <div class="timeline-content">
-                            <h6> hop ${index + 1}</h6>
-                            <p><strong>IP:</strong> ${hop.ip || '未知'}</p>
-                            <p><strong>主机名:</strong> ${hop.hostname || '未知'}</p>
-                            <p><strong>时间:</strong> ${hop.timestamp || '未知'}</p>
-                        </div>
-                    </div>`;
-                });
-                
-                html += '</div>';
-            }
-
-            container.innerHTML = html;
-        }
-
-        // 加载增强版溯源
-        async function loadEnhancedTraceback(alertId) {
-            try {
-                const response = await fetch(`/api/alerts/${alertId}/traceback`);
-                const data = await response.json();
-                
-                if (data.dimensions) {
-                    displayEnhancedTraceback(data);
-                }
-            } catch (e) {
-                console.error('加载增强版溯源失败:', e);
-            }
-        }
-
-        // 显示增强版溯源
-        function displayEnhancedTraceback(data) {
-            const container = document.getElementById('tracebackInfo');
-            const dims = data.dimensions || {};
-            
-            let html = '';
-            
-            // 风险评分
-            html += `<div class="alert alert-${data.risk_score > 0.6 ? 'danger' : data.risk_score > 0.3 ? 'warning' : 'info'} mb-3">
-                <strong><i class="bi bi-shield-${data.risk_score > 0.6 ? 'x' : 'check'} me-1"></i>综合风险评分: ${(data.risk_score * 100).toFixed(0)}%</strong>
-                <p class="mb-0 mt-1" style="font-size: 0.85rem;">${data.summary || ''}</p>
-            </div>`;
-            
-            // 5个维度分析
-            html += '<div class="row g-3">';
-            
-            // 1. 攻击目标
-            const targets = dims.targets || {};
-            html += `<div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-light py-2"><strong><i class="bi bi-bullseye me-1"></i>攻击目标</strong></div>
-                    <div class="card-body">
-                        <p><strong>收件人数量:</strong> ${targets.total_count || 0}</p>
-                        <p><strong>分析:</strong> ${targets.analysis || '-'}</p>
-                        <p class="mb-0"><strong>风险:</strong> <span class="badge bg-${targets.risk_level === 'high' ? 'danger' : targets.risk_level === 'medium' ? 'warning' : 'success'}">${targets.risk_level || 'low'}</span></p>
-                    </div>
-                </div>
-            </div>`;
-            
-            // 2. IP来源
-            const chain = dims.source_chain || {};
-            html += `<div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-light py-2"><strong><i class="bi bi-geo-alt me-1"></i>IP来源</strong></div>
-                    <div class="card-body">
-                        <p><strong>源IP:</strong> ${chain.source_ip || '未知'}</p>
-                        <p><strong>位置:</strong> ${chain.geolocation?.country || '未知'}</p>
-                        <p><strong>跳数:</strong> ${chain.hops?.length || 0}</p>
-                        <p class="mb-0"><strong>分析:</strong> ${chain.analysis || '-'}</p>
-                    </div>
-                </div>
-            </div>`;
-            
-            // 3. 社会工程学
-            const se = dims.social_engineering || {};
-            html += `<div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-light py-2"><strong><i class="bi bi-person me-1"></i>社会工程学</strong></div>
+        function displaySandboxAnalysis(sandboxAnalysis) {
                     <div class="card-body">
                         <p><strong>检测到:</strong> ${se.categories?.join(', ') || '无'}</p>
                         <p><strong>关键词数:</strong> ${se.detected_keywords?.length || 0}</p>
