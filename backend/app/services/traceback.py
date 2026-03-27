@@ -351,8 +351,6 @@ class TracebackService:
                                     break
                             except re.error:
                                 pass
-                except Exception as e:
-                    self.logger.warning(f"URL analysis failed: {e}")
         
         # 构建攻击链
         report['correlation_analysis']['attack_chain'] = self._build_attack_chain(
