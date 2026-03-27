@@ -308,15 +308,29 @@ class DetectionService:
             _, model_prob = self._demo_predict(features, email_data)
             model_prob = float(model_prob)
         
-        url_weight = 0.4
-        model_weight = 0.6
+        # 可配置的权重 - 从配置文件读取或使用默认值
+        model_weight = float(self.config.detection.get('model_weight', 0.6) if hasattr(self.config.detection, 'get') else 0.6)
+        url_weight = float(self.config.detection.get('url_weight', 0.4) if hasattr(self.config.detection, 'get') else 0.4)
         
+        # 获取规则评分
+        _, rule_score = self._demo_predict(features, email_data)
+        
+        # 三维度融合：模型 + URL + 规则
         if url_risk_level == 'HIGH':
             final_confidence = max(base_confidence, model_prob, url_risk_score / 100)
         elif url_risk_level == 'MEDIUM':
-            final_confidence = max(base_confidence, model_prob * model_weight + (url_risk_score / 100) * url_weight)
+            final_confidence = (
+                model_prob * model_weight + 
+                (url_risk_score / 100) * url_weight
+            )
         else:
-            final_confidence = max(base_confidence, model_prob)
+            final_confidence = model_prob
+        
+        # 规则评分微调（±0.1）
+        if rule_score > 0.7:
+            final_confidence = min(1.0, final_confidence + 0.1)
+        elif rule_score < 0.3:
+            final_confidence = max(0.0, final_confidence - 0.1)
         
         if features.get('first_external_ip_is_blacklisted'):
             final_confidence = min(1.0, final_confidence + 0.2)
@@ -473,9 +487,75 @@ class DetectionService:
         if features.get('exclamation_count', 0) > 20:
             reasons.append("感叹号使用异常")
         
+        # 添加风险分级
+        risk_level = self._get_risk_level(features, reasons)
+        
         reason = "；".join(reasons) if reasons else "检测到高置信度钓鱼邮件特征"
         
+        # 附加风险等级提示
+        if risk_level['high']:
+            reason += f"\n[高危项] {'；'.join(risk_level['high'])}"
+        
         return "PHISHING", confidence, reason
+    
+    def _get_risk_level(self, features: Dict, reasons: List[str]) -> Dict:
+        """
+        获取风险分级
+        
+        返回: {
+            'high': [高危项列表],
+            'medium': [中危项列表],
+            'low': [低危项列表]
+        }
+        """
+        high_risk = []
+        medium_risk = []
+        low_risk = []
+        
+        # 高危特征
+        if features.get('has_executable_attachment'):
+            high_risk.append("包含可执行文件")
+        if features.get('sandbox_detected'):
+            high_risk.append("沙箱检测到恶意代码")
+        if features.get('spf_fail') and features.get('dkim_fail') and features.get('dmarc_fail'):
+            high_risk.append("三重认证全部失败")
+        if features.get('first_external_ip_is_blacklisted'):
+            high_risk.append("源IP在黑名单中")
+        
+        # 中风险特征
+        if features.get('is_suspicious_from_domain'):
+            medium_risk = True
+        if features.get('has_hidden_links'):
+            medium_risk = True
+        if features.get('ip_address_count', 0) > 0:
+            medium_risk = True
+        
+        return {
+            'high': len([r for r in reasons if any(k in r for k in ['可执行', '恶意', '黑名单', '沙箱'])]),
+            'medium': len(reasons),
+            'low': 0
+        }
+    
+    def _get_risk_level(self, features: Dict, reasons: List[str]) -> Dict:
+        """获取风险等级分类"""
+        high_risk = []
+        medium_risk = []
+        low_risk = []
+        
+        for reason in reasons:
+            if any(kw in reason for kw in ['可执行', '恶意代码', '黑名单', '沙箱', '双重扩展']):
+                high_risk.append(reason)
+            elif any(kw in reason for kw in ['可疑', '失败', '隐藏', 'IP地址', '表单']):
+                medium_risk.append(reason)
+            else:
+                low_risk.append(reason)
+        
+        return {
+            'high_risk': high_risk,
+            'medium_risk': medium_risk,
+            'low_risk': low_risk,
+            'total_risk_score': len(high_risk) * 3 + len(medium_risk) * 2 + len(low_risk)
+        }
     
     def _build_suspicious_result(
         self,
@@ -534,14 +614,20 @@ class DetectionService:
         feature_vector: Dict,
         email_data: Dict
     ) -> Tuple[bool, float]:
-        """Demo prediction using rule-based approach"""
+        """
+        规则评分引擎 - 细粒度评分系统
+        
+        返回: (是否钓鱼, 置信度)
+        """
         score = 0.0
+        reasons = []  # 记录扣分原因
         
         subject = email_data.get('subject', '') if email_data else ''
         body = ""
         if email_data:
             body = email_data.get('body', '') + email_data.get('html_body', '')
         
+        # ==================== 规则1: 域名信誉 (权重: 0.25) ====================
         has_trusted_domain = False
         urls = feature_vector.get('urls', [])
         for url in urls:
@@ -558,47 +644,133 @@ class DetectionService:
             except:
                 pass
         
+        if has_trusted_domain:
+            score -= 0.3  # 可信域名大幅降低风险
+        else:
+            # 新域名风险
+            domain_age = float(feature_vector.get('avg_domain_age_days', 365))
+            if domain_age < 30:
+                score += 0.15
+                reasons.append("新注册域名（<30天）")
+            elif domain_age < 90:
+                score += 0.08
+                reasons.append("较新域名（<90天）")
+        
+        # ==================== 规则2: 邮件认证 (权重: 0.20) ====================
+        spf_fail = float(feature_vector.get('spf_fail', 0))
+        dkim_fail = float(feature_vector.get('dkim_fail', 0))
+        dmarc_fail = float(feature_vector.get('dmarc_fail', 0))
+        
+        if spf_fail and dkim_fail and dmarc_fail:
+            score += 0.25
+            reasons.append("邮件认证全部失败(SPF/DKIM/DMARC)")
+        elif spf_fail or dkim_fail:
+            score += 0.12
+            reasons.append("邮件认证部分失败")
+        
+        # ==================== 规则3: 发件人异常 (权重: 0.15) ====================
+        if float(feature_vector.get('is_suspicious_from_domain', 0)):
+            score += 0.15
+            reasons.append("可疑发件人域名")
+        
+        if float(feature_vector.get('from_display_name_mismatch', 0)):
+            score += 0.10
+            reasons.append("显示名称与邮箱不匹配")
+        
+        # ==================== 规则4: URL风险 (权重: 0.20) ====================
+        ip_count = float(feature_vector.get('ip_address_count', 0))
+        if ip_count > 0:
+            score += 0.15
+            reasons.append(f"包含{int(ip_count)}个IP地址URL")
+        
+        short_url = float(feature_vector.get('short_url_count', 0))
+        if short_url > 0:
+            score += 0.08
+            reasons.append(f"包含{int(short_url)}个短链接")
+        
+        if not has_trusted_domain and len(urls) > 5:
+            score += 0.05
+            reasons.append("URL数量异常")
+        
+        # ==================== 规则5: 文本风险 (权重: 0.10) ====================
+        urgent_count = float(feature_vector.get('urgent_keywords_count', 0))
+        if urgent_count > 3:
+            score += 0.10
+            reasons.append(f"紧急关键词过多({int(urgent_count)}个)")
+        
+        financial_count = float(feature_vector.get('financial_keywords_count', 0))
+        if financial_count > 2:
+            score += 0.08
+            reasons.append(f"金融关键词过多({int(financial_count)}个)")
+        
+        caps_ratio = float(feature_vector.get('caps_ratio', 0))
+        if caps_ratio > 0.5:
+            score += 0.05
+            reasons.append("大写字母比例异常")
+        
+        exclamation = float(feature_vector.get('exclamation_count', 0))
+        if exclamation > 10:
+            score += 0.03
+            reasons.append("感叹号使用过多")
+        
+        # ==================== 规则6: 附件风险 (权重: 0.10) ====================
+        if float(feature_vector.get('has_executable_attachment', 0)):
+            score += 0.20
+            reasons.append("包含可执行文件附件")
+        
+        if float(feature_vector.get('has_suspicious_attachment', 0)):
+            score += 0.12
+            reasons.append("包含可疑附件")
+        
+        if float(feature_vector.get('has_double_extension', 0)):
+            score += 0.15
+            reasons.append("附件使用双重扩展名")
+        
+        # ==================== 规则7: HTML风险 (权重: 0.05) ====================
+        if float(feature_vector.get('has_hidden_links', 0)):
+            score += 0.15
+            reasons.append("包含隐藏链接")
+        
+        if float(feature_vector.get('has_form', 0)):
+            score += 0.10
+            reasons.append("包含表单（可能窃取信息）")
+        
+        if float(feature_vector.get('has_iframe', 0)):
+            score += 0.08
+            reasons.append("包含iframe")
+        
+        # ==================== 规则8: 验证码邮件保护 ====================
         is_verification = self._is_verification_email(subject, body)
         
-        weight_scale = 0.6
-        
-        for feature, weight in self.demo_weights.items():
-            value = float(feature_vector.get(feature, 0))
-            adjusted_weight = weight * weight_scale
-            
-            if feature == 'avg_domain_age_days':
-                if not has_trusted_domain:
-                    if value < 30:
-                        score += adjusted_weight * 0.6
-                    elif value < 90:
-                        score += adjusted_weight * 0.3
-                    elif value < 365:
-                        score += adjusted_weight * 0.1
-            elif feature == 'text_length':
-                score += adjusted_weight * max(0, (1000 - value)) / 1000
-            else:
-                score += adjusted_weight * value
-        
-        if has_trusted_domain:
-            score -= 0.5
-        
         if is_verification:
-            high_risk_features = [
+            high_risk_count = sum(1 for f in [
                 feature_vector.get('has_executable_attachment', 0),
-                feature_vector.get('sandbox_detected', 0),
                 feature_vector.get('has_hidden_links', 0),
                 feature_vector.get('ip_address_count', 0),
-                feature_vector.get('has_suspicious_attachment', 0),
-            ]
-            high_risk_count = sum(1 for f in high_risk_features if f > 0)
+            ] if float(f) > 0)
             
             if high_risk_count == 0:
-                score -= 0.4
-            elif high_risk_count <= 1:
-                score -= 0.2
+                score -= 0.35  # 验证码邮件保护
+                reasons.append("验证码邮件保护")
+            elif high_risk_count == 1:
+                score -= 0.15
         
+        # ==================== 规则9: 黑名单检查 ====================
+        if float(feature_vector.get('first_external_ip_is_blacklisted', 0)):
+            score += 0.25
+            reasons.append("源IP在黑名单中")
+        
+        # ==================== 规则10: 沙箱检测 ====================
+        if float(feature_vector.get('sandbox_detected', 0)):
+            score += 0.40
+            reasons.append("沙箱检测到恶意代码")
+        
+        # ==================== 计算最终置信度 ====================
         import math
         confidence = 1 / (1 + math.exp(-score))
+        
+        # 保存评分原因
+        self._last_rule_reasons = reasons
         
         is_phish = confidence > self.config.detection.phishing_threshold
         
