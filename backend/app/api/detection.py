@@ -103,17 +103,58 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
     feature_extractor = FeatureExtractionService()
     traceback = TracebackService()
     url_analyzer = URLAnalyzerService()
+    sandbox_analyzer = SandboxAnalyzerService()  # 添加沙箱分析器
     
     parsed = parser.parse(raw_email)
     
     max_raw_size = 500 * 1024
     raw_email_stored = raw_email[:max_raw_size] if len(raw_email) > max_raw_size else raw_email
     
+    # 附件沙箱分析
+    sandbox_results = []
+    attachments = parsed.get('attachments', [])
+    
+    for att in attachments:
+        att_result = {
+            'filename': att.get('filename', ''),
+            'content_type': att.get('content_type', ''),
+            'size': att.get('size', 0),
+            'sandbox_detected': False,
+            'sandbox_report': None
+        }
+        
+        # 检查是否需要分析
+        if sandbox_analyzer.should_analyze(
+            att.get('filename', ''),
+            att.get('content_type', ''),
+            att.get('size', 0)
+        ):
+            try:
+                # 如果有VirusTotal API Key，进行沙箱分析
+                if config.api.virustotal_api_key:
+                    sandbox_result = sandbox_analyzer.analyze_attachment(
+                        att, 
+                        config.api.virustotal_api_key
+                    )
+                    att_result['sandbox_detected'] = sandbox_result.get('sandbox_detected', False)
+                    att_result['sandbox_report'] = sandbox_result.get('sandbox_report')
+            except Exception as e:
+                logger.warning(f"Sandbox analysis failed for {att.get('filename')}: {e}")
+        
+        sandbox_results.append(att_result)
+    
+    # 更新parsed中的沙箱结果
+    parsed['sandbox_results'] = sandbox_results
+    
     features = feature_extractor.extract_features(
         parsed, 
         config.api.virustotal_api_key,
         config.api.virustotal_api_url
     )
+    
+    # 更新特征中的沙箱检测结果
+    if any(r.get('sandbox_detected') for r in sandbox_results):
+        features['sandbox_detected'] = 1
     
     # 先进行URL分析，然后传入检测器
     url_analysis = url_analyzer.analyze_urls(parsed.get('urls', []))
@@ -137,11 +178,16 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
         parsed, label, confidence, traceback_report, source, raw_email_stored, email_uid
     )
     
+    # 处理附件信息（包含沙箱分析结果）
     attachments_with_analysis = []
-    for att in parsed.get('attachments', []):
+    for i, att in enumerate(attachments):
         att_with_analysis = {**att}
         if 'content' in att_with_analysis:
             del att_with_analysis['content']
+        # 添加沙箱分析结果
+        if i < len(sandbox_results):
+            att_with_analysis['sandbox_detected'] = sandbox_results[i].get('sandbox_detected', False)
+            att_with_analysis['sandbox_report'] = sandbox_results[i].get('sandbox_report')
         attachments_with_analysis.append(att_with_analysis)
     
     safe_features = {}
