@@ -38,6 +38,20 @@ def get_alert_detail(alert_id: int):
     if not alert:
         return jsonify({'error': '邮件不存在'}), 404
     
+    # 添加reason字段（数据库中没有这个字段）
+    if 'reason' not in alert or not alert.get('reason'):
+        label = alert.get('label', 'UNKNOWN')
+        confidence = alert.get('confidence', 0)
+        
+        if label == 'PHISHING':
+            alert['reason'] = '检测到高置信度钓鱼邮件特征'
+        elif label == 'SUSPICIOUS':
+            alert['reason'] = '检测到可疑特征，建议人工复核'
+        elif label == 'SAFE':
+            alert['reason'] = '未检测到显著威胁'
+        else:
+            alert['reason'] = '检测完成'
+    
     return jsonify(alert)
 
 
