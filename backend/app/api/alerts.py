@@ -343,13 +343,13 @@ def get_enhanced_traceback(alert_id):
     
     # 构建解析后的邮件数据
     parsed = {
-        'subject': alert.get('subject', ''),
-        'from': alert.get('from_addr', ''),
-        'from_email': alert.get('from_email', ''),
-        'to': alert.get('to_addr', ''),
+        'subject': alert.get('subject', '') or '',
+        'from': alert.get('from_addr', '') or '',
+        'from_email': alert.get('from_email', '') or '',
+        'to': alert.get('to_addr', '') or '',
         'cc': '',  # 数据库中可能没有CC字段
-        'body': alert.get('body', ''),
-        'html_body': alert.get('html_body', ''),
+        'body': alert.get('body', '') or '',
+        'html_body': alert.get('html_body', '') or '',
         'urls': [],
         'attachments': [],
         'headers': {},
