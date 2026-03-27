@@ -1343,6 +1343,11 @@
             const container = document.getElementById('tracebackInfo');
             const emailSource = traceback?.email_source || {};
 
+            // 尝试加载增强版溯源
+            if (currentResult && currentResult.id) {
+                loadEnhancedTraceback(currentResult.id);
+            }
+
             if (!emailSource.source_ip && (!emailSource.hops || emailSource.hops.length === 0)) {
                 container.innerHTML = '<div class="alert alert-secondary"><i class="bi bi-map"></i> 无溯源信息</div>';
                 return;
@@ -1389,6 +1394,127 @@
                 html += '</div>';
             }
 
+            container.innerHTML = html;
+        }
+
+        // 加载增强版溯源
+        async function loadEnhancedTraceback(alertId) {
+            try {
+                const response = await fetch(`/api/alerts/${alertId}/traceback`);
+                const data = await response.json();
+                
+                if (data.dimensions) {
+                    displayEnhancedTraceback(data);
+                }
+            } catch (e) {
+                console.error('加载增强版溯源失败:', e);
+            }
+        }
+
+        // 显示增强版溯源
+        function displayEnhancedTraceback(data) {
+            const container = document.getElementById('tracebackInfo');
+            const dims = data.dimensions || {};
+            
+            let html = '';
+            
+            // 风险评分
+            html += `<div class="alert alert-${data.risk_score > 0.6 ? 'danger' : data.risk_score > 0.3 ? 'warning' : 'info'} mb-3">
+                <strong><i class="bi bi-shield-${data.risk_score > 0.6 ? 'x' : 'check'} me-1"></i>综合风险评分: ${(data.risk_score * 100).toFixed(0)}%</strong>
+                <p class="mb-0 mt-1" style="font-size: 0.85rem;">${data.summary || ''}</p>
+            </div>`;
+            
+            // 5个维度分析
+            html += '<div class="row g-3">';
+            
+            // 1. 攻击目标
+            const targets = dims.targets || {};
+            html += `<div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-light py-2"><strong><i class="bi bi-bullseye me-1"></i>攻击目标</strong></div>
+                    <div class="card-body">
+                        <p><strong>收件人数量:</strong> ${targets.total_count || 0}</p>
+                        <p><strong>分析:</strong> ${targets.analysis || '-'}</p>
+                        <p class="mb-0"><strong>风险:</strong> <span class="badge bg-${targets.risk_level === 'high' ? 'danger' : targets.risk_level === 'medium' ? 'warning' : 'success'}">${targets.risk_level || 'low'}</span></p>
+                    </div>
+                </div>
+            </div>`;
+            
+            // 2. IP来源
+            const chain = dims.source_chain || {};
+            html += `<div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-light py-2"><strong><i class="bi bi-geo-alt me-1"></i>IP来源</strong></div>
+                    <div class="card-body">
+                        <p><strong>源IP:</strong> ${chain.source_ip || '未知'}</p>
+                        <p><strong>位置:</strong> ${chain.geolocation?.country || '未知'}</p>
+                        <p><strong>跳数:</strong> ${chain.hops?.length || 0}</p>
+                        <p class="mb-0"><strong>分析:</strong> ${chain.analysis || '-'}</p>
+                    </div>
+                </div>
+            </div>`;
+            
+            // 3. 社会工程学
+            const se = dims.social_engineering || {};
+            html += `<div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-light py-2"><strong><i class="bi bi-person me-1"></i>社会工程学</strong></div>
+                    <div class="card-body">
+                        <p><strong>检测到:</strong> ${se.categories?.join(', ') || '无'}</p>
+                        <p><strong>关键词数:</strong> ${se.detected_keywords?.length || 0}</p>
+                        <p class="mb-0"><strong>分析:</strong> ${se.analysis || '-'}</p>
+                    </div>
+                </div>
+            </div>`;
+            
+            // 4. 攻击载体
+            const vectors = dims.attack_vectors || {};
+            html += `<div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-light py-2"><strong><i class="bi bi-box me-1"></i>攻击载体</strong></div>
+                    <div class="card-body">
+                        <p><strong>可疑链接:</strong> ${vectors.malicious_links?.length || 0}</p>
+                        <p><strong>可疑附件:</strong> ${vectors.suspicious_attachments?.length || 0}</p>
+                        <p><strong>信息窃取:</strong> ${vectors.info_theft_request ? '是' : '否'}</p>
+                        <p class="mb-0"><strong>分析:</strong> ${vectors.analysis || '-'}</p>
+                    </div>
+                </div>
+            </div>`;
+            
+            // 5. 攻击动机
+            const motivation = dims.motivation || {};
+            html += `<div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light py-2"><strong><i class="bi bi-lightbulb me-1"></i>攻击动机</strong></div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>主要动机:</strong> ${motivation.primary_label || '未知'}</p>
+                                <p><strong>置信度:</strong> ${(motivation.confidence * 100).toFixed(0)}%</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-0"><strong>分析:</strong> ${motivation.analysis || '-'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            
+            html += '</div>';
+            
+            // 如果有传播链，显示路径
+            if (chain.hops && chain.hops.length > 0) {
+                html += '<h6 class="mt-3 mb-2"><i class="bi bi-signpost-split me-1"></i>传播链</h6>';
+                html += '<div class="d-flex flex-wrap gap-2 align-items-center">';
+                chain.hops.forEach((hop, i) => {
+                    html += `<span class="badge bg-secondary">${hop.server || hop.ip || '?'}</span>`;
+                    if (i < chain.hops.length - 1) {
+                        html += '<i class="bi bi-arrow-right"></i>';
+                    }
+                });
+                html += '</div>';
+            }
+            
             container.innerHTML = html;
         }
 

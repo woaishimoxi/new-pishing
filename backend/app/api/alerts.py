@@ -321,6 +321,73 @@ def get_analysis_detail(alert_id):
     return jsonify(detail)
 
 
+@alerts_bp.route('/<int:alert_id>/traceback', methods=['GET'])
+def get_enhanced_traceback(alert_id):
+    """
+    获取增强版溯源分析报告
+    
+    GET /api/alerts/{alert_id}/traceback
+    返回5个维度的深度分析：
+    1. 攻击目标
+    2. IP来源与传播链
+    3. 攻击特性（社会工程学）
+    4. 攻击载体
+    5. 攻击动机
+    """
+    alert = db.get_alert(alert_id)
+    if not alert:
+        return jsonify({'error': '报告不存在'}), 404
+    
+    from app.services.traceback_enhanced import traceback_analyzer
+    
+    # 构建解析后的邮件数据
+    parsed = {
+        'subject': alert.get('subject', ''),
+        'from': alert.get('from_addr', ''),
+        'from_email': alert.get('from_email', ''),
+        'to': alert.get('to_addr', ''),
+        'cc': '',  # 数据库中可能没有CC字段
+        'body': alert.get('body', ''),
+        'html_body': alert.get('html_body', ''),
+        'urls': [],
+        'attachments': [],
+        'headers': {},
+        'received_chain': []
+    }
+    
+    # 解析URL
+    if alert.get('url_data'):
+        try:
+            parsed['urls'] = json.loads(alert['url_data']) if isinstance(alert['url_data'], str) else alert['url_data']
+        except:
+            pass
+    
+    # 解析附件
+    if alert.get('attachment_data'):
+        try:
+            parsed['attachments'] = json.loads(alert['attachment_data']) if isinstance(alert['attachment_data'], str) else alert['attachment_data']
+        except:
+            pass
+    
+    # 解析邮件头
+    if alert.get('header_data'):
+        try:
+            parsed['headers'] = json.loads(alert['header_data']) if isinstance(alert['header_data'], str) else alert['header_data']
+        except:
+            pass
+    
+    # 从原始邮件提取Received链
+    raw_email = alert.get('raw_email', '')
+    if raw_email:
+        received_matches = re.findall(r'Received:.*?(?=\n\S|\n\n)', raw_email, re.DOTALL | re.IGNORECASE)
+        parsed['received_chain'] = [r.strip() for r in received_matches]
+    
+    # 执行增强版溯源分析
+    traceback_report = traceback_analyzer.analyze(parsed)
+    
+    return jsonify(traceback_report)
+
+
 def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     """
     调用AI服务进行邮件深度分析
