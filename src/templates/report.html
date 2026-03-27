@@ -466,12 +466,21 @@
             // 从URL参数或localStorage获取数据
             const urlParams = new URLSearchParams(window.location.search);
             const sessionId = urlParams.get('session');
-            const alertId = urlParams.get('id');
+            let alertId = urlParams.get('id');
             
             console.log('Session ID:', sessionId);
             console.log('Alert ID:', alertId);
             
-            if (sessionId) {
+            // 如果session是alert_xxx格式，提取数字ID
+            if (sessionId && sessionId.startsWith('alert_')) {
+                alertId = sessionId.replace('alert_', '');
+                console.log('从session提取Alert ID:', alertId);
+            }
+            
+            if (alertId) {
+                // 从API获取指定ID的数据
+                loadFromAPI(alertId);
+            } else if (sessionId) {
                 // 从localStorage获取数据
                 const storedData = localStorage.getItem(`phishing_report_${sessionId}`);
                 console.log('从localStorage获取数据:', storedData ? '有数据' : '无数据');
@@ -486,13 +495,10 @@
                         loadLatestFromAPI();
                     }
                 } else {
-                    // localStorage没有数据，尝试从API获取
-                    console.log('尝试从API加载最新报告');
+                    // localStorage没有数据，从API获取
+                    console.log('localStorage无数据，从API加载');
                     loadLatestFromAPI();
                 }
-            } else if (alertId) {
-                // 从API获取指定ID的数据
-                loadFromAPI(alertId);
             } else {
                 // 没有参数，加载最新检测结果
                 loadLatestFromAPI();
