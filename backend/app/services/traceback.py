@@ -315,27 +315,32 @@ class TracebackService:
         urls = parsed_email.get('urls', [])
         if urls:
             url_futures = []
-            for url in urls[:10]:  # 最多分析10个URL
+            for url in urls[:5]:  # 最多分析5个URL
                 future = self.executor.submit(self._analyze_single_url, url)
                 url_futures.append(future)
             
-            for future in as_completed(url_futures, timeout=URL_TRACE_TIMEOUT * 3):
-                try:
-                    url_analysis = future.result()
-                    if url_analysis:
-                        report['url_analysis'].append(url_analysis)
-                        
-                        # IOC匹配
-                        domain = url_analysis.get('domain_info', {}).get('domain', '')
-                        url = url_analysis.get('url', '')
-                        
-                        if domain in BLACKLISTED_DOMAINS or domain in KNOWN_MALICIOUS_IOCS['domains']:
-                            report['ioc_matches']['malicious_domains'].append(domain)
-                            report['correlation_analysis']['threat_score'] += 40
-                        
-                        if url in KNOWN_MALICIOUS_IOCS['urls']:
-                            report['ioc_matches']['malicious_urls'].append(url)
-                            report['correlation_analysis']['threat_score'] += 50
+            try:
+                for future in as_completed(url_futures, timeout=30):
+                    try:
+                        url_analysis = future.result(timeout=5)
+                        if url_analysis:
+                            report['url_analysis'].append(url_analysis)
+                            
+                            # IOC匹配
+                            domain = url_analysis.get('domain_info', {}).get('domain', '')
+                            url = url_analysis.get('url', '')
+                            
+                            if domain in BLACKLISTED_DOMAINS or domain in KNOWN_MALICIOUS_IOCS['domains']:
+                                report['ioc_matches']['malicious_domains'].append(domain)
+                                report['correlation_analysis']['threat_score'] += 40
+                            
+                            if url in KNOWN_MALICIOUS_IOCS['urls']:
+                                report['ioc_matches']['malicious_urls'].append(url)
+                                report['correlation_analysis']['threat_score'] += 50
+                    except Exception as e:
+                        self.logger.warning(f"URL analysis failed: {e}")
+            except Exception as e:
+                self.logger.warning(f"URL parallel processing timeout: {e}")
                         
                         # 模式匹配
                         for pattern in KNOWN_MALICIOUS_IOCS.get('domain_patterns', []):
