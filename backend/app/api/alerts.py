@@ -390,28 +390,71 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     api_url = ai_config.get('api_url', '')
     model = ai_config.get('model', 'gpt-4')
     
-    # 构建系统提示（支持原始邮件编码处理）
+    # 构建系统提示（中文版，支持多种编码）
+    system_prompt = """你是一位邮件安全分析专家，任务是分析原始邮件并判断是否为钓鱼邮件。
 
-    system_prompt = """You are an email security analyst. Analyze this email for phishing.
+一、邮件编码处理指南（必须先解码再分析）：
 
-ENCODING GUIDE - Decode before analyzing:
-- Base64: Lines after "Content-Transfer-Encoding: base64" need base64 decode
-- Quoted-printable: =XX means hex char (e.g. =E4=BD=A0 = 你)
-- MIME header: =?charset?B?base64?= or =?charset?Q?quoted?=
+1. Base64编码
+   - 识别：Content-Transfer-Encoding: base64 后的内容
+   - 解码：将base64字符串转为原始文本
+   - 示例：5L2g5b+r5omT = "你的密码"
 
-ANALYZE:
-1. Sender: Check SPF/DKIM/DMARC, compare display name with email
-2. Content: Look for urgency, threats, rewards, requests for sensitive info
-3. URLs: Check for IP addresses, short links, suspicious domains
-4. Attachments: Flag .exe, .zip, .docm, .scr files
+2. Quoted-Printable编码  
+   - 识别：=XX 格式（如 =E4=BD=A0）
+   - 解码：将每个=XX转为对应UTF-8字符
+   - 示例：=E4=BD=A0=E5=A5=BD = "你好"
 
-Return JSON ONLY:
-{"is_phishing":bool,"risk_score":int,"conclusion":"brief","analysis":"detailed with decoded content","decoded_content":"decoded email body text","key_indicators":["list"],"suggestions":["list"]}"""
-    
+3. MIME主题编码
+   - 识别：=?UTF-8?B?...?=（B=base64）或 =?UTF-8?Q?...?=（Q=quoted）
+   - 解码：按编码类型解码中间内容
+   - 示例：=?UTF-8?B?56eY5a+G?= = "秘密"
+
+4. URL编码
+   - 识别：%XX 格式（如 %20 = 空格）
+   - 解码：将%XX转为对应字符
+
+5. HTML实体
+   - 识别：&#XX; 或 &amp; &lt; &gt; 等
+   - 解码：转为对应字符
+
+二、分析要点：
+
+1. 发件人伪造
+   - 显示名与邮箱是否匹配
+   - SPF/DKIM/DMARC验证结果
+   - 是否冒充知名品牌
+
+2. 社会工程学
+   - 紧迫感：立即、紧急、24小时内
+   - 威胁：账户冻结、数据泄露
+   - 利诱：中奖、退款、补贴
+   - 权威：管理员、IT部门、财务部
+
+3. 可疑链接
+   - 使用IP地址而非域名
+   - 短链接（bit.ly等）
+   - 域名仿冒（如paypa1.com）
+
+4. 危险附件
+   - 可执行文件：.exe, .bat, .ps1
+   - 带宏文档：.docm, .xlsm
+   - 双重扩展：invoice.pdf.exe
+
+三、返回格式（必须是有效JSON）：
+
+{"is_phishing":true或false,"risk_score":0到100的整数,"conclusion":"一句话结论","analysis":"详细分析","decoded_content":"解码后的邮件正文","key_indicators":["指标1","指标2"],"suggestions":["建议1","建议2"]}"""
+
     # 构建用户消息
-    user_message = f"Analyze this email for phishing. Decode any encoded content first:
+    user_message = f"""请分析以下原始邮件，判断是否为钓鱼邮件。
 
-{email_content}"
+注意：
+1. 先解码邮件中的编码内容（base64、quoted-printable等）
+2. 然后分析解码后的内容
+3. 返回JSON格式结果
+
+原始邮件：
+{email_content}"""
     # 根据不同提供商调用API
     if provider == 'openai' or provider == 'moonshot' or provider == 'custom':
         # OpenAI兼容格式
