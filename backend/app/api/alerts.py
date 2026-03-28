@@ -214,41 +214,23 @@ def ai_analyze(alert_id):
         except:
             pass
     
-    # 解析附件数据
-    attachments = []
-    if alert.get('attachment_data'):
-        try:
-            if isinstance(alert['attachment_data'], str):
-                attachments = json.loads(alert['attachment_data'])
-            else:
-                attachments = alert['attachment_data']
-        except:
-            pass
-    
-    # 获取解码后的邮件内容（优先使用已解析的内容）
-    subject = alert.get('subject', '无主题')
-    from_name = alert.get('from_display_name', '')
-    from_email = alert.get('from_email', '')
+    # 获取原始邮件内容
+    raw_email = alert.get('raw_email', '')
     body = alert.get('body', '') or ''
     
-    # 构建发送给AI的邮件内容（使用已解码的纯文本，避免编码问题）
-    email_content = f"""邮件主题: {subject}
-发件人: {from_name} <{from_email}>
+    # 构建发送给AI的邮件内容（优先发送原始邮件）
+    if raw_email:
+        # 限制长度避免token过多
+        email_content = raw_email[:10000] if len(raw_email) > 10000 else raw_email
+    else:
+        # 如果没有原始邮件，使用解析后的内容
+        email_content = f"""
+邮件主题: {alert.get('subject', '无')}
+发件人: {alert.get('from_display_name', '')} <{alert.get('from_email', '')}>
 收件人: {alert.get('to_addr', '')}
 
-邮件认证:
-- SPF: {alert.get('spf_result', '未知')}
-- DKIM: {alert.get('dkim_result', '未知')}
-- DMARC: {alert.get('dmarc_result', '未知')}
-
 邮件正文:
-{body[:5000] if body else '无正文内容'}
-
-URL链接 ({len(urls)}个):
-{chr(10).join(['- ' + url[:100] for url in urls[:10]])}
-
-附件 ({len(attachments)}个):
-{chr(10).join(['- ' + str(att.get('filename', 'unknown')) + ' (' + str(att.get('size', 0)) + '字节)' for att in attachments[:5]])}
+{body[:3000] if body else '无正文内容'}
 """
     
     # 调用AI服务
@@ -408,28 +390,40 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     api_url = ai_config.get('api_url', '')
     model = ai_config.get('model', 'gpt-4')
     
-    # 构建系统提示
-    system_prompt = """你是一位资深的邮件安全分析师。请分析以下邮件，判断是否为钓鱼邮件。
+    # 构建系统提示（支持原始邮件编码处理）
+    system_prompt = """你是一位资深的邮件安全分析师。我会给你一封完整的原始邮件，请你分析并判断是否为钓鱼邮件。
+
+重要提示 - 处理邮件编码：
+1. 邮件可能包含base64编码的内容，你需要识别并解码
+   - 格式：Content-Transfer-Encoding: base64
+   - 解码：使用base64解码获取原始文本
+2. 邮件头可能包含quoted-printable编码
+   - 格式：=E4=BD=A0=E5=A5=BD 表示中文字符
+   - 解码：将=XX格式转换为对应字符
+3. 邮件主题可能使用MIME编码
+   - 格式：=?UTF-8?B?base64内容?= 或 =?UTF-8?Q?quoted内容?=
+   - 解码：识别编码类型并解码
 
 分析要点：
-1. 发件人是否伪造
-2. 邮件头认证(SPF/DKIM/DMARC)是否通过
-3. 是否包含可疑链接
-4. 是否使用社会工程学技巧(紧迫感、威胁、利诱)
-5. 是否要求提供敏感信息
+1. 发件人是否伪造（检查SPF/DKIM/DMARC）
+2. 邮件正文是否包含诱导内容（紧急、威胁、利诱）
+3. 是否有可疑链接（短链接、IP地址、异常域名）
+4. 附件是否危险（可执行文件、宏文档）
+5. 是否使用社会工程学技巧
 
 请按JSON格式返回结果：
 {
     "is_phishing": true/false,
     "risk_score": 0-100,
     "conclusion": "一句话结论",
-    "analysis": "详细分析",
-    "key_indicators": ["风险指标"],
-    "suggestions": ["安全建议"]
+    "analysis": "详细分析（包括你解码后的邮件内容摘要）",
+    "decoded_content": "你解码后的邮件正文内容",
+    "key_indicators": ["风险指标1", "风险指标2"],
+    "suggestions": ["建议1", "建议2"]
 }"""
     
     # 构建用户消息
-    user_message = f"""请分析这封邮件是否为钓鱼邮件：
+    user_message = f"""请分析以下原始邮件，判断是否为钓鱼邮件。注意处理邮件中的编码内容：
 
 {email_content}"""
     
