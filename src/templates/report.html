@@ -526,23 +526,21 @@
             }
             document.getElementById('recommendation').textContent = recommendation;
             
-            // 用户确认区域 - 仅对SUSPICIOUS显示
+            // 用户确认区域 - 对所有邮件显示
             const confirmSection = document.getElementById('userConfirmSection');
             const suspiciousItems = document.getElementById('suspiciousItems');
             
-            if (result.label === 'SUSPICIOUS') {
-                confirmSection.style.display = 'block';
-                // 解析reason，提取可疑项
-                const reasons = (result.reason || '').split('；').filter(r => r.trim());
-                if (reasons.length > 0) {
-                    suspiciousItems.innerHTML = '<ul class="list-group">' + 
-                        reasons.map(r => `<li class="list-group-item"><i class="bi bi-exclamation-triangle text-warning me-2"></i>${r.trim()}</li>`).join('') +
-                        '</ul>';
-                } else {
-                    suspiciousItems.innerHTML = '<p class="text-muted">检测到置信度在40%-70%之间，建议人工确认</p>';
-                }
+            // 始终显示用户确认区域
+            confirmSection.style.display = 'block';
+            
+            // 解析reason，提取可疑项
+            const reasons = (result.reason || '').split('；').filter(r => r.trim());
+            if (reasons.length > 0) {
+                suspiciousItems.innerHTML = '<ul class="list-group">' + 
+                    reasons.map(r => `<li class="list-group-item"><i class="bi bi-exclamation-triangle text-warning me-2"></i>${r.trim()}</li>`).join('') +
+                    '</ul>';
             } else {
-                confirmSection.style.display = 'none';
+                suspiciousItems.innerHTML = '<p class="text-muted">系统检测结果: ' + result.label + '，请确认是否准确</p>';
             }
             
             // 更新邮件信息 - 兼容多种数据结构
