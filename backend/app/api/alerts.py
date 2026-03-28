@@ -391,42 +391,27 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     model = ai_config.get('model', 'gpt-4')
     
     # 构建系统提示（支持原始邮件编码处理）
-    system_prompt = """你是一位资深的邮件安全分析师。我会给你一封完整的原始邮件，请你分析并判断是否为钓鱼邮件。
 
-重要提示 - 处理邮件编码：
-1. 邮件可能包含base64编码的内容，你需要识别并解码
-   - 格式：Content-Transfer-Encoding: base64
-   - 解码：使用base64解码获取原始文本
-2. 邮件头可能包含quoted-printable编码
-   - 格式：=E4=BD=A0=E5=A5=BD 表示中文字符
-   - 解码：将=XX格式转换为对应字符
-3. 邮件主题可能使用MIME编码
-   - 格式：=?UTF-8?B?base64内容?= 或 =?UTF-8?Q?quoted内容?=
-   - 解码：识别编码类型并解码
+    system_prompt = """You are an email security analyst. Analyze this email for phishing.
 
-分析要点：
-1. 发件人是否伪造（检查SPF/DKIM/DMARC）
-2. 邮件正文是否包含诱导内容（紧急、威胁、利诱）
-3. 是否有可疑链接（短链接、IP地址、异常域名）
-4. 附件是否危险（可执行文件、宏文档）
-5. 是否使用社会工程学技巧
+ENCODING GUIDE - Decode before analyzing:
+- Base64: Lines after "Content-Transfer-Encoding: base64" need base64 decode
+- Quoted-printable: =XX means hex char (e.g. =E4=BD=A0 = 你)
+- MIME header: =?charset?B?base64?= or =?charset?Q?quoted?=
 
-请按JSON格式返回结果：
-{
-    "is_phishing": true/false,
-    "risk_score": 0-100,
-    "conclusion": "一句话结论",
-    "analysis": "详细分析（包括你解码后的邮件内容摘要）",
-    "decoded_content": "你解码后的邮件正文内容",
-    "key_indicators": ["风险指标1", "风险指标2"],
-    "suggestions": ["建议1", "建议2"]
-}"""
+ANALYZE:
+1. Sender: Check SPF/DKIM/DMARC, compare display name with email
+2. Content: Look for urgency, threats, rewards, requests for sensitive info
+3. URLs: Check for IP addresses, short links, suspicious domains
+4. Attachments: Flag .exe, .zip, .docm, .scr files
+
+Return JSON ONLY:
+{"is_phishing":bool,"risk_score":int,"conclusion":"brief","analysis":"detailed with decoded content","decoded_content":"decoded email body text","key_indicators":["list"],"suggestions":["list"]}"""
     
     # 构建用户消息
-    user_message = f"""请分析以下原始邮件，判断是否为钓鱼邮件。注意处理邮件中的编码内容：
+    user_message = f"Analyze this email for phishing. Decode any encoded content first:
 
-{email_content}"""
-    
+{email_content}"
     # 根据不同提供商调用API
     if provider == 'openai' or provider == 'moonshot' or provider == 'custom':
         # OpenAI兼容格式
