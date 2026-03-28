@@ -214,23 +214,41 @@ def ai_analyze(alert_id):
         except:
             pass
     
-    # 获取原始邮件内容
-    raw_email = alert.get('raw_email', '')
+    # 解析附件数据
+    attachments = []
+    if alert.get('attachment_data'):
+        try:
+            if isinstance(alert['attachment_data'], str):
+                attachments = json.loads(alert['attachment_data'])
+            else:
+                attachments = alert['attachment_data']
+        except:
+            pass
+    
+    # 获取解码后的邮件内容（优先使用已解析的内容）
+    subject = alert.get('subject', '无主题')
+    from_name = alert.get('from_display_name', '')
+    from_email = alert.get('from_email', '')
     body = alert.get('body', '') or ''
     
-    # 构建发送给AI的邮件内容
-    if raw_email:
-        # 优先发送原始邮件（限制长度避免token过多）
-        email_content = raw_email[:8000] if len(raw_email) > 8000 else raw_email
-    else:
-        # 如果没有原始邮件，使用解析后的内容
-        email_content = f"""
-邮件主题: {alert.get('subject', '无')}
-发件人: {alert.get('from_display_name', '')} <{alert.get('from_email', '')}>
+    # 构建发送给AI的邮件内容（使用已解码的纯文本，避免编码问题）
+    email_content = f"""邮件主题: {subject}
+发件人: {from_name} <{from_email}>
 收件人: {alert.get('to_addr', '')}
 
+邮件认证:
+- SPF: {alert.get('spf_result', '未知')}
+- DKIM: {alert.get('dkim_result', '未知')}
+- DMARC: {alert.get('dmarc_result', '未知')}
+
 邮件正文:
-{body[:3000] if body else '无正文内容'}
+{body[:5000] if body else '无正文内容'}
+
+URL链接 ({len(urls)}个):
+{chr(10).join(['- ' + url[:100] for url in urls[:10]])}
+
+附件 ({len(attachments)}个):
+{chr(10).join(['- ' + str(att.get('filename', 'unknown')) + ' (' + str(att.get('size', 0)) + '字节)' for att in attachments[:5]])}
 """
     
     # 调用AI服务
