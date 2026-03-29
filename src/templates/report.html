@@ -1189,6 +1189,24 @@
             }
         }
         
+        function showBodyType(type) {
+            const decoded = document.getElementById('bodyDecoded');
+            const raw = document.getElementById('bodyRaw');
+            const btns = document.querySelectorAll('.btn-group .btn');
+            
+            if (type === 'decoded') {
+                decoded.style.display = 'block';
+                raw.style.display = 'none';
+                btns[0].classList.add('active');
+                btns[1].classList.remove('active');
+            } else {
+                decoded.style.display = 'none';
+                raw.style.display = 'block';
+                btns[0].classList.remove('active');
+                btns[1].classList.add('active');
+            }
+        }
+
         function showEmailContent() {
             const parsed = currentResult.parsed || {};
             const moduleScores = currentResult.module_scores || {};
@@ -1245,7 +1263,16 @@
                                 <h6><i class="bi bi-file-text"></i> 邮件正文</h6>
                                 <div class="card">
                                     <div class="card-body">
-                                        <pre class="bg-light p-3 rounded" style="white-space: pre-wrap;">${parsed.body || '无正文内容'}</pre>
+                                        <div class="btn-group mb-2">
+                                            <button class="btn btn-sm btn-outline-secondary active" onclick="showBodyType('decoded')">解码内容</button>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="showBodyType('raw')">原始邮件</button>
+                                        </div>
+                                        <div id="bodyDecoded">
+                                            <pre class="bg-light p-3 rounded" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto;">${parsed.body || '无正文内容'}</pre>
+                                        </div>
+                                        <div id="bodyRaw" style="display: none;">
+                                            <pre class="bg-light p-3 rounded" style="white-space: pre-wrap; max-height: 400px; overflow-y: auto; font-size: 0.75rem;">${currentResult.raw_email || '无原始邮件'}</pre>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
