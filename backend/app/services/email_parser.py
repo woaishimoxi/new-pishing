@@ -120,22 +120,22 @@ class EmailParserService:
                         continue
                     
                     if content_type == "text/plain":
-                        payload = part.get_payload(decode=True)
-                        if payload:
-                            body += payload.decode('utf-8', errors='ignore')
+                        decoded = self._decode_payload(part)
+                        if decoded:
+                            body += decoded
                     
                     elif content_type == "text/html":
-                        payload = part.get_payload(decode=True)
-                        if payload:
-                            html_body += payload.decode('utf-8', errors='ignore')
+                        decoded = self._decode_payload(part)
+                        if decoded:
+                            html_body += decoded
             else:
                 content_type = msg.get_content_type()
-                payload = msg.get_payload(decode=True)
-                if payload:
+                decoded = self._decode_payload(msg)
+                if decoded:
                     if content_type == "text/plain":
-                        body = payload.decode('utf-8', errors='ignore')
+                        body = decoded
                     elif content_type == "text/html":
-                        html_body = payload.decode('utf-8', errors='ignore')
+                        html_body = decoded
                     elif content_type.startswith('application/') or content_type.startswith('image/'):
                         attachment_info = self._parse_attachment(msg)
                         if attachment_info:
@@ -215,6 +215,33 @@ class EmailParserService:
         
         return (email_addr.strip(), "")
     
+
+    def _decode_payload(self, part) -> str:
+        """
+        Decode email payload with proper encoding handling
+        
+        Supports:
+        - Base64
+        - Quoted-printable  
+        - Multiple charsets
+        """
+        try:
+            # 方法1: 使用get_payload(decode=True)自动解码
+            payload = part.get_payload(decode=True)
+            if payload:
+                # 尝试多种编码
+                for encoding in ['utf-8', 'gb2312', 'gbk', 'big5', 'latin-1']:
+                    try:
+                        return payload.decode(encoding, errors='strict')
+                    except (UnicodeDecodeError, AttributeError):
+                        continue
+                # 如果都失败，使用ignore
+                return payload.decode('utf-8', errors='ignore')
+        except Exception as e:
+            self.logger.warning(f"Failed to decode payload: {e}")
+        
+        return ""
+
     def _decode_mime_header(self, header: str) -> str:
         """Decode MIME encoded header"""
         if not header:
