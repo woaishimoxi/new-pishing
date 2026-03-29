@@ -9,380 +9,414 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --neutral-bg: #f9fafb;
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #e8e8ed;
+            --bg-card: #ffffff;
+            --bg-card-hover: #fafafa;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --border-glow: rgba(0, 113, 227, 0.3);
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-muted: #86868b;
+            --cyan: #0071e3;
+            --cyan-light: #00c7be;
+            --green: #34c759;
+            --green-light: #30d158;
+            --red: #ff3b30;
+            --red-light: #ff453a;
+            --amber: #ff9500;
+            --amber-light: #ffb340;
+            --purple: #af52de;
+            --blue: #0071e3;
+            --gradient-primary: linear-gradient(135deg, #0071e3 0%, #00c7be 100%);
+            --gradient-success: linear-gradient(135deg, #34c759 0%, #00c7be 100%);
+            --gradient-danger: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);
+            --gradient-warning: linear-gradient(135deg, #ff9500 0%, #ffb340 100%);
+            --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+            --radius-xl: 22px;
         }
 
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            background-color: var(--neutral-bg);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(180deg, #f5f5f7 0%, #ffffff 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%233b82f6' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
         }
 
         .navbar {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            padding: 0.625rem 0;
         }
 
-        .card {
-            border: none;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-            border-radius: 12px;
+        .navbar-brand {
+            font-weight: 600;
+            font-size: 1.05rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            transition: color 0.3s;
         }
 
-        .detection-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-            overflow: hidden;
-            background: #fff;
+        .navbar-brand:hover {
+            color: var(--blue);
         }
 
-        .detection-card .card-header {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            border-radius: 16px 16px 0 0;
+        .navbar-brand i {
+            color: var(--blue);
         }
 
-        .upload-area {
-            border: 2px dashed #d1d5db;
-            border-radius: 12px;
+        .btn-nav {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
             transition: all 0.3s ease;
+            text-decoration: none;
         }
 
-        .upload-area:hover {
-            border-color: var(--secondary-color);
-            background-color: #f0f9ff;
+        .btn-nav:hover {
+            border-color: var(--blue);
+            color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
 
-        .form-control {
-            border-radius: 8px;
-            border: 1px solid #d1d5db;
-            transition: all 0.3s ease;
-        }
-
-        .form-control:focus {
-            border-color: var(--secondary-color);
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border: none;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        .main-container {
+            position: relative;
+            z-index: 1;
+            padding: 1.5rem;
+            max-width: 1800px;
+            margin: 0 auto;
         }
 
         .stat-card {
-            transition: transform 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-
-        /* 渐变背景 */
-        .bg-gradient-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        }
-
-        .bg-gradient-danger {
-            background: linear-gradient(135deg, #dc2626, #ef4444);
-        }
-
-        .bg-gradient-success {
-            background: linear-gradient(135deg, #059669, #10b981);
-        }
-
-        .bg-gradient-info {
-            background: linear-gradient(135deg, #0284c7, #3b82f6);
-        }
-
-        /* 脉冲动画 */
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.8;
-            }
-        }
-
-        .pulse-animation {
-            animation: pulse 2s infinite;
-        }
-
-        /* 悬浮按钮脉冲动画 */
-        @keyframes pulse-fab {
-            0% {
-                box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7);
-            }
-            70% {
-                box-shadow: 0 0 0 10px rgba(52, 152, 219, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
-            }
-        }
-
-        .pulse-fab {
-            animation: pulse-fab 2s infinite;
-        }
-
-        /* 响应式调整 */
-        @media (max-width: 768px) {
-            .stats-banner .row {
-                flex-direction: column;
-            }
-
-            .stats-banner .col-md-3 {
-                width: 100%;
-                margin-bottom: 1rem;
-            }
-
-            .row.g-6 {
-                flex-direction: column;
-            }
-
-            .col-md-7,
-            .col-md-5 {
-                width: 100%;
-            }
-
-            .fixed.bottom-6.right-6 {
-                bottom: 2rem;
-                right: 2rem;
-            }
-
-            .btn.btn-primary.rounded-full.w-16.h-16 {
-                width: 4rem;
-                height: 4rem;
-            }
-        }
-
-        /* 辅助类 */
-        .flex {
-            display: flex;
-        }
-
-        .items-center {
-            align-items: center;
-        }
-
-        .justify-content-between {
-            justify-content: space-between;
-        }
-
-        .mt-1 {
-            margin-top: 0.25rem;
-        }
-
-        .mt-2 {
-            margin-top: 0.5rem;
-        }
-
-        .mr-1 {
-            margin-right: 0.25rem;
-        }
-
-        .space-x-2 > * + * {
-            margin-left: 0.5rem;
-        }
-
-        .text-xs {
-            font-size: 0.75rem;
-        }
-
-        .text-sm {
-            font-size: 0.875rem;
-        }
-
-        .text-xl {
-            font-size: 1.25rem;
-        }
-
-        .font-medium {
-            font-weight: 500;
-        }
-
-        .font-semibold {
-            font-weight: 600;
-        }
-
-        .font-bold {
-            font-weight: 700;
-        }
-
-        .text-gray-400 {
-            color: #9ca3af;
-        }
-
-        .text-gray-500 {
-            color: #6b7280;
-        }
-
-        .text-gray-700 {
-            color: #374151;
-        }
-
-        .text-gray-900 {
-            color: #111827;
-        }
-
-        .text-primary {
-            color: var(--secondary-color);
-        }
-
-        .text-success {
-            color: var(--success-color);
-        }
-
-        .text-danger {
-            color: var(--danger-color);
-        }
-
-        .bg-white {
-            background-color: #ffffff;
-        }
-
-        .border-bottom {
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .rounded-full {
-            border-radius: 9999px;
-        }
-
-        .rounded-xl {
-            border-radius: 0.75rem;
-        }
-
-        .shadow-lg {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        .shadow-xl {
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-
-        .overflow-hidden {
-            overflow: hidden;
-        }
-
-        .p-4 {
-            padding: 1rem;
-        }
-
-        .p-5 {
-            padding: 1.25rem;
-        }
-
-        .p-6 {
-            padding: 1.5rem;
-        }
-
-        .mt-3 {
-            margin-top: 0.75rem;
-        }
-
-        .mt-4 {
-            margin-top: 1rem;
-        }
-
-        .mt-6 {
-            margin-top: 1.5rem;
-        }
-
-        .mb-4 {
-            margin-bottom: 1rem;
-        }
-
-        .mb-6 {
-            margin-bottom: 1.5rem;
-        }
-
-        .g-4 {
-            gap: 1rem;
-        }
-
-        .g-6 {
-            gap: 1.5rem;
-        }
-
-        .space-y-6 > * + * {
-            margin-top: 1.5rem;
-        }
-
-        .list-group-flush {
-            border-radius: 0;
-        }
-
-        .list-group-item {
+            background: var(--bg-card);
             border: none;
-            border-bottom: 1px solid #e5e7eb;
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-card);
         }
-
-        .list-group-item:last-child {
-            border-bottom: none;
-        }
-
+        
         .stat-card:hover {
-            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
         }
+
+        .stat-card.danger::before { background: var(--gradient-danger); }
+        .stat-card.success::before { background: var(--gradient-success); }
+        .stat-card.warning::before { background: var(--gradient-warning); }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.01em;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--blue);
+            letter-spacing: -0.03em;
+        }
+
+        .stat-card.danger .stat-value { color: var(--red); }
+        .stat-card.success .stat-value { color: var(--green); }
+        .stat-card.warning .stat-value { color: var(--amber); }
 
         .stat-icon {
-            font-size: 2.5rem;
-            opacity: 0.8;
-        }
-
-        .status-badge {
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-
-        .status-phishing {
-            background-color: var(--danger-color);
-            color: white;
-        }
-
-        .status-normal {
-            background-color: var(--success-color);
-            color: white;
-        }
-
-        .progress-threshold {
-            position: relative;
-        }
-
-        .threshold-line {
             position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 3px;
-            background-color: var(--warning-color);
-            z-index: 1;
-        }
-
-        .confidence-bar {
-            height: 40px;
-            border-radius: 10px;
+            top: 1rem;
+            right: 1rem;
+            width: 50px;
+            height: 50px;
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: bold;
-            position: relative;
+            font-size: 1.5rem;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--blue);
+        }
+
+        .stat-card.danger .stat-icon { background: rgba(239, 68, 68, 0.1); color: var(--red); }
+        .stat-card.success .stat-icon { background: rgba(16, 185, 129, 0.1); color: var(--green); }
+        .stat-card.warning .stat-icon { background: rgba(245, 158, 11, 0.1); color: var(--amber); }
+
+        .stat-trend {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .trend-up { color: var(--green); }
+        .trend-down { color: var(--red); }
+
+        .card-cyber {
+            background: var(--bg-card);
+            border: none;
+            border-radius: var(--radius-lg);
             overflow: hidden;
+            box-shadow: var(--shadow-card);
+            transition: all 0.3s ease;
+        }
+
+        .card-cyber:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header-cyber {
+            background: transparent;
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.06);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title-cyber {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-body-cyber {
+            padding: 1.25rem;
+        }
+
+        .table-cyber {
+            color: var(--text-primary);
+            margin-bottom: 0;
+        }
+
+        .table-cyber thead th {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+            border-bottom: 2px solid var(--border-color);
+            color: var(--blue);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 1rem;
+        }
+
+        .table-cyber tbody tr {
+            border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .table-cyber tbody tr:hover {
+            background: rgba(59, 130, 246, 0.03);
+        }
+
+        .table-cyber tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            border: none;
+        }
+
+        .badge-cyber {
+            padding: 0.4rem 0.8rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--blue);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .progress-cyber {
+            height: 8px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-cyber {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-bar-cyber.danger { background: var(--gradient-danger); }
+        .progress-bar-cyber.warning { background: var(--gradient-warning); }
+        .progress-bar-cyber.success { background: var(--gradient-success); }
+
+        .btn-cyber {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-cyber:hover {
+            border-color: var(--blue);
+            color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn-cyber.primary {
+            background: var(--gradient-primary);
+            border: none;
+            color: white;
+        }
+
+        .btn-cyber.primary:hover {
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+            color: white;
+        }
+
+        .btn-cyber.danger {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .btn-cyber.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .btn-group-cyber {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .form-control-cyber {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control-cyber:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-control-cyber::placeholder {
+            color: var(--text-muted);
+        }
+
+        .upload-area-cyber {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: rgba(59, 130, 246, 0.02);
+        }
+
+        .upload-area-cyber:hover {
+            border-color: var(--blue);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .upload-area-cyber i {
+            font-size: 3rem;
+            color: var(--blue);
+            margin-bottom: 1rem;
+        }
+
+        .fab-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fab-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
         }
 
         .loading-overlay {
@@ -391,7 +425,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255,255,255,0.95);
+            background: rgba(255, 255, 255, 0.95);
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -402,405 +436,449 @@
         .loading-content {
             text-align: center;
             max-width: 400px;
-            padding: 30px;
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            padding: 2rem;
         }
 
         .loading-spinner {
             width: 80px;
             height: 80px;
-            margin: 0 auto 20px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: var(--blue);
+            margin-bottom: 0.5rem;
+        }
+
+        .loading-subtext {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
 
         .loading-progress {
             width: 100%;
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 4px;
+            height: 4px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 2px;
+            margin-top: 1.5rem;
             overflow: hidden;
-            margin: 20px 0;
         }
 
         .loading-progress-bar {
             height: 100%;
-            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-            border-radius: 4px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
             width: 0%;
             transition: width 0.3s ease;
         }
 
-        .loading-text {
-            font-size: 16px;
-            color: #374151;
-            margin-bottom: 10px;
+        .modal-content-cyber {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
         }
 
-        .loading-subtext {
-            font-size: 14px;
-            color: #6b7280;
+        .modal-header-cyber {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.25rem 1.5rem;
         }
 
-        .risk-indicator {
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            border-left: 4px solid;
+        .modal-title-cyber {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--blue);
+            font-size: 1.1rem;
+            letter-spacing: 1px;
         }
 
-        .risk-high {
-            background-color: #fce4e4;
-            border-color: var(--danger-color);
+        .modal-body-cyber {
+            padding: 1.5rem;
         }
 
-        .risk-medium {
-            background-color: #fff3cd;
-            border-color: var(--warning-color);
+        .nav-tabs-cyber {
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
         }
 
-        .risk-low {
-            background-color: #d4edda;
-            border-color: var(--success-color);
+        .nav-tabs-cyber .nav-link {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.75rem 1.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
         }
 
-        .result-section {
-            display: none;
-            animation: fadeIn 0.5s ease;
+        .nav-tabs-cyber .nav-link:hover {
+            color: var(--blue);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .nav-tabs-cyber .nav-link.active {
+            color: var(--blue);
+            border-bottom-color: var(--blue);
+            background: rgba(59, 130, 246, 0.05);
         }
 
-        .feature-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            margin: 2px;
-        }
-
-        .feature-danger {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .feature-warning {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-
-        .feature-success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .attachment-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            background: #f8f9fa;
-        }
-
-        .attachment-icon {
-            font-size: 2rem;
-            margin-right: 10px;
-        }
-
-        .url-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 8px;
-            background: #fff;
-        }
-
-        .detail-table th {
-            width: 180px;
-            background-color: #f8f9fa;
-        }
-
-        /* 邮件列表表格样式 */
-        .table-hover tbody tr:hover {
-            background-color: #f8f9ff !important;
-            transform: translateY(-1px);
-            transition: all 0.2s ease;
-        }
-
-        .table th {
-            font-weight: 600;
-            color: #495057;
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        .table td {
-            vertical-align: middle;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .table-responsive {
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        /* 调整邮件列表卡片高度 */
-        .card {
-            margin-bottom: 1rem;
-        }
-
-        /* 调整统计卡片高度 */
-        .stats-banner .card {
-            margin-bottom: 1rem;
-        }
-
-        /* 调整主内容区域间距 */
-        .row.g-6 {
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
             gap: 1rem;
         }
 
-        /* 响应式调整 */
-        @media (min-height: 768px) {
-            .table-responsive {
-                max-height: 700px;
-            }
+        .resource-item {
+            text-align: center;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%);
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            transition: all 0.3s ease;
         }
 
-        @media (min-height: 1080px) {
-            .table-responsive {
-                max-height: 800px;
-            }
+        .resource-item:hover {
+            border-color: var(--border-glow);
+            background: rgba(59, 130, 246, 0.05);
         }
 
-        /* 滚动条样式 */
-        .table-responsive::-webkit-scrollbar {
+        .resource-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--blue);
+        }
+
+        .resource-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 200px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0;
+        }
+
+        .status-dot {
             width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
         }
 
-        .table-responsive::-webkit-scrollbar-track {
-            background: #f1f1f1;
+        .status-dot.online { background: var(--green); }
+        .status-dot.offline { background: var(--red); }
+        .status-dot.warning { background: var(--amber); }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .switch-cyber {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .switch-cyber input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #e2e8f0;
+            border: 1px solid var(--border-color);
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .switch-slider::before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .switch-cyber input:checked + .switch-slider {
+            background: var(--gradient-primary);
+            border-color: var(--blue);
+        }
+
+        .switch-cyber input:checked + .switch-slider::before {
+            transform: translateX(24px);
+        }
+
+        .pagination-cyber {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .pagination-cyber .page-link {
+            background: white;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-sm);
+            transition: all 0.3s ease;
+        }
+
+        .pagination-cyber .page-link:hover {
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .pagination-cyber .page-item.active .page-link {
+            background: var(--gradient-primary);
+            border-color: transparent;
+            color: white;
+        }
+
+        .alert-cyber {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-md);
+            background: white;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            z-index: 1100;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-cyber.success { border-left: 4px solid var(--green); }
+        .alert-cyber.danger { border-left: 4px solid var(--red); }
+        .alert-cyber.warning { border-left: 4px solid var(--amber); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .table-responsive {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .checkbox-cyber {
+            width: 18px;
+            height: 18px;
+            border: 1px solid var(--border-color);
             border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            -webkit-appearance: none;
         }
 
-        .table-responsive::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 4px;
+        .checkbox-cyber:checked {
+            background: var(--blue);
+            border-color: var(--blue);
         }
 
-        .table-responsive::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
+        .checkbox-cyber:checked::after {
+            content: '✓';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
         }
 
-        /* 响应式表格 */
         @media (max-width: 1200px) {
-            .table th:nth-child(5),
-            .table td:nth-child(5) {
-                display: none;
-            }
-        }
-
-        @media (max-width: 992px) {
-            .table th:nth-child(4),
-            .table td:nth-child(4) {
-                display: none;
-            }
+            .resource-grid { grid-template-columns: repeat(3, 1fr); }
         }
 
         @media (max-width: 768px) {
-            .table th:nth-child(6),
-            .table td:nth-child(6) {
-                display: none;
-            }
+            .main-container { padding: 1rem; }
+            .resource-grid { grid-template-columns: repeat(2, 1fr); }
+            .stat-value { font-size: 2rem; }
         }
     </style>
 </head>
 <body>
-    <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid">
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid px-4">
             <a class="navbar-brand" href="/">
-                <i class="bi bi-shield-check"></i>
-                钓鱼邮件检测与溯源系统
+                <i class="bi bi-shield-check me-2"></i>
+                PHISHING DETECTOR
             </a>
-            <div class="d-flex ms-auto gap-2">
-                <a href="/bigscreen" class="btn btn-sm btn-outline-light" title="数据大屏">
-                    <i class="bi bi-speedometer2"></i> 数据大屏
+            <div class="d-flex gap-2">
+                <a href="/bigscreen" class="btn-nav">
+                    <i class="bi bi-speedometer2 me-1"></i> 数据大屏
                 </a>
-                <a href="/adversarial" class="btn btn-sm btn-outline-light" title="对抗测试">
-                    <i class="bi bi-bug"></i> 对抗测试
+                <a href="/adversarial" class="btn-nav">
+                    <i class="bi bi-bug me-1"></i> 对抗测试
                 </a>
-                <a href="/domains" class="btn btn-sm btn-outline-light" title="域名管理">
-                    <i class="bi bi-globe"></i> 域名管理
+                <a href="/domains" class="btn-nav">
+                    <i class="bi bi-globe me-1"></i> 域名管理
                 </a>
-                <a href="/settings" class="btn btn-sm btn-outline-light" title="系统配置">
-                    <i class="bi bi-sliders"></i> 系统配置
+                <a href="/settings" class="btn-nav">
+                    <i class="bi bi-sliders me-1"></i> 系统配置
                 </a>
-                <button class="btn btn-sm btn-outline-light" type="button" onclick="shutdownSystem()" title="关闭系统">
-                    <i class="bi bi-power"></i> 关闭
+                <button class="btn-nav" onclick="shutdownSystem()">
+                    <i class="bi bi-power me-1"></i> 关闭
                 </button>
             </div>
         </div>
     </nav>
 
-    <div class="container-fluid">
-        <!-- 顶部统计区域 - 采用网格布局 -->
-        <div class="grid-container" style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-bottom: 1rem;">
-            <!-- 主要统计卡片 -->
-            <div class="grid-item" style="grid-column: span 3;">
-                <div class="stat-card bg-gradient-primary text-white rounded-xl shadow-lg">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <p class="text-sm font-medium opacity-80">总检测数</p>
-                                <h3 class="text-2xl font-bold mt-1" id="total-count">0</h3>
-                                <div class="flex items-center mt-2 text-xs">
-                                    <span class="text-success mr-1"><i class="bi bi-arrow-up"></i> 12%</span>
-                                    <span class="opacity-70">较昨日</span>
-                                </div>
-                            </div>
-                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
-                                <i class="bi bi-box-seen stat-icon"></i>
-                            </div>
-                        </div>
+    <div class="main-container">
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
+                    <div class="stat-label">总检测数</div>
+                    <div class="stat-value" id="total-count">0</div>
+                    <div class="stat-trend trend-up">
+                        <i class="bi bi-arrow-up"></i>
+                        <span>12% 较昨日</span>
                     </div>
                 </div>
             </div>
-            <div class="grid-item" style="grid-column: span 3;">
-                <div class="stat-card bg-gradient-danger text-white rounded-xl shadow-lg pulse-animation">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <p class="text-sm font-medium opacity-80">钓鱼邮件</p>
-                                <h3 class="text-2xl font-bold mt-1" id="phishing-count">0</h3>
-                                <div class="flex items-center mt-2 text-xs">
-                                    <span class="text-danger mr-1"><i class="bi bi-arrow-up"></i> 5%</span>
-                                    <span class="opacity-70">较昨日</span>
-                                </div>
-                            </div>
-                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
-                                <i class="bi bi-exclamation-triangle stat-icon"></i>
-                            </div>
-                        </div>
+            <div class="col-md-3">
+                <div class="stat-card danger">
+                    <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                    <div class="stat-label">钓鱼邮件</div>
+                    <div class="stat-value" id="phishing-count">0</div>
+                    <div class="stat-trend trend-up">
+                        <i class="bi bi-arrow-up"></i>
+                        <span>5% 较昨日</span>
                     </div>
                 </div>
             </div>
-            <div class="grid-item" style="grid-column: span 3;">
-                <div class="stat-card bg-gradient-success text-white rounded-xl shadow-lg">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <p class="text-sm font-medium opacity-80">正常邮件</p>
-                                <h3 class="text-2xl font-bold mt-1" id="normal-count">0</h3>
-                                <div class="flex items-center mt-2 text-xs">
-                                    <span class="text-success mr-1"><i class="bi bi-arrow-up"></i> 15%</span>
-                                    <span class="opacity-70">较昨日</span>
-                                </div>
-                            </div>
-                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
-                                <i class="bi bi-check-circle stat-icon"></i>
-                            </div>
-                        </div>
+            <div class="col-md-3">
+                <div class="stat-card success">
+                    <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+                    <div class="stat-label">正常邮件</div>
+                    <div class="stat-value" id="normal-count">0</div>
+                    <div class="stat-trend trend-up">
+                        <i class="bi bi-arrow-up"></i>
+                        <span>15% 较昨日</span>
                     </div>
                 </div>
             </div>
-            <div class="grid-item" style="grid-column: span 3;">
-                <div class="stat-card bg-gradient-info text-white rounded-xl shadow-lg">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <p class="text-sm font-medium opacity-80">今日新增</p>
-                                <h3 class="text-2xl font-bold mt-1" id="today-count">0</h3>
-                                <div class="flex items-center mt-2 text-xs">
-                                    <span class="text-success mr-1"><i class="bi bi-arrow-up"></i> 8%</span>
-                                    <span class="opacity-70">较昨日</span>
-                                </div>
-                            </div>
-                            <div class="bg-white bg-opacity-20 p-3 rounded-lg">
-                                <i class="bi bi-calendar-day stat-icon"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 平台监测资源统计 -->
-            <div class="grid-item" style="grid-column: span 12;">
-                <div class="card rounded-xl shadow-lg overflow-hidden">
-                    <div class="card-header bg-white border-bottom">
-                        <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-server text-primary mr-2"></i>平台监测资源</h5>
-                    </div>
-                    <div class="card-body p-4">
-                        <div class="grid-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-                            <div class="text-center">
-                                <div class="display-4 font-bold text-primary">0</div>
-                                <div class="text-sm text-gray-500">API 调用</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="display-4 font-bold text-success">1</div>
-                                <div class="text-sm text-gray-500">活跃检测</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="display-4 font-bold text-warning">1</div>
-                                <div class="text-sm text-gray-500">队列任务</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="display-4 font-bold text-danger">3</div>
-                                <div class="text-sm text-gray-500">威胁情报</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="display-4 font-bold text-info">0</div>
-                                <div class="text-sm text-gray-500">异常事件</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="display-4 font-bold text-secondary">100%</div>
-                                <div class="text-sm text-gray-500">系统状态</div>
-                            </div>
-                        </div>
+            <div class="col-md-3">
+                <div class="stat-card warning">
+                    <div class="stat-icon"><i class="bi bi-calendar-day"></i></div>
+                    <div class="stat-label">今日新增</div>
+                    <div class="stat-value" id="today-count">0</div>
+                    <div class="stat-trend trend-up">
+                        <i class="bi bi-arrow-up"></i>
+                        <span>8% 较昨日</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 主内容区域 - 采用网格布局 -->
-        <div class="grid-container" style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; margin-bottom: 1rem;">
-            <!-- 左侧邮件列表（主要内容） - 占用8列 -->
-            <div class="grid-item" style="grid-column: span 8;">
-                <!-- 邮件列表 -->
-                <div class="card rounded-xl shadow-lg overflow-hidden">
-                    <div class="card-header bg-white border-bottom">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-inbox text-primary mr-2"></i>邮件列表</h5>
-                            <div class="d-flex align-items-center space-x-3">
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showEmailSourceModal('fetch')">
-                                        <i class="bi bi-cloud-download"></i> 第三方获取
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showEmailSourceModal('manual')">
-                                        <i class="bi bi-pencil"></i> 手动输入
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showEmailSourceModal('upload')">
-                                        <i class="bi bi-upload"></i> 上传邮件
-                                    </button>
-                                </div>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="auto-monitor-toggle" onchange="toggleAutoMonitor(this.checked)">
-                                    <label class="form-check-label" for="auto-monitor-toggle">自动监控</label>
-                                </div>
+        <div class="card-cyber mb-4">
+            <div class="card-header-cyber">
+                <h5 class="card-title-cyber">
+                    <i class="bi bi-server"></i>
+                    平台监测资源
+                </h5>
+            </div>
+            <div class="card-body-cyber">
+                <div class="resource-grid">
+                    <div class="resource-item">
+                        <div class="resource-value">0</div>
+                        <div class="resource-label">API 调用</div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" style="color: var(--green);">1</div>
+                        <div class="resource-label">活跃检测</div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" style="color: var(--amber);">1</div>
+                        <div class="resource-label">队列任务</div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" style="color: var(--red);">3</div>
+                        <div class="resource-label">威胁情报</div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" style="color: var(--blue);">0</div>
+                        <div class="resource-label">异常事件</div>
+                    </div>
+                    <div class="resource-item">
+                        <div class="resource-value" style="color: var(--green);">100%</div>
+                        <div class="resource-label">系统状态</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card-cyber">
+                    <div class="card-header-cyber">
+                        <h5 class="card-title-cyber">
+                            <i class="bi bi-inbox"></i>
+                            邮件列表
+                        </h5>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="btn-group-cyber">
+                                <button class="btn-cyber" onclick="showEmailSourceModal('fetch')">
+                                    <i class="bi bi-cloud-download me-1"></i> 第三方获取
+                                </button>
+                                <button class="btn-cyber" onclick="showEmailSourceModal('manual')">
+                                    <i class="bi bi-pencil me-1"></i> 手动输入
+                                </button>
+                                <button class="btn-cyber" onclick="showEmailSourceModal('upload')">
+                                    <i class="bi bi-upload me-1"></i> 上传邮件
+                                </button>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">自动监控</span>
+                                <label class="switch-cyber">
+                                    <input type="checkbox" id="auto-monitor-toggle" onchange="toggleAutoMonitor(this.checked)">
+                                    <span class="switch-slider"></span>
+                                </label>
                             </div>
                         </div>
                     </div>
-                    <div class="card-body p-0">
+                    <div class="card-body-cyber p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="bg-light">
+                            <table class="table table-cyber mb-0">
+                                <thead>
                                     <tr>
                                         <th style="width: 40px;">
-                                            <input type="checkbox" class="form-check-input" id="select-all-checkbox" onchange="toggleSelectAll(this)">
+                                            <input type="checkbox" class="checkbox-cyber" id="select-all-checkbox" onchange="toggleSelectAll(this)">
                                         </th>
-                                        <th class="ps-4">邮件标题</th>
+                                        <th>邮件标题</th>
                                         <th>发件人</th>
                                         <th>判定结果</th>
                                         <th>判定评分</th>
@@ -810,174 +888,169 @@
                                     </tr>
                                 </thead>
                                 <tbody id="email-list-body">
-                                    <!-- 动态加载邮件列表 -->
                                 </tbody>
                             </table>
                         </div>
                         <div id="email-list-empty" class="text-center py-5" style="display: none;">
-                            <i class="bi bi-inbox" style="font-size: 3rem; color: #dee2e6;"></i>
-                            <p class="text-muted mt-3">暂无邮件数据</p>
+                            <i class="bi bi-inbox" style="font-size: 3rem; color: var(--text-muted);"></i>
+                            <p style="color: var(--text-secondary); margin-top: 1rem;">暂无邮件数据</p>
                         </div>
                     </div>
-                    <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center">
-                        <div>
-                            <button class="btn btn-sm btn-outline-danger" id="batch-delete-btn" onclick="batchDeleteEmails()" style="display: none;">
-                                <i class="bi bi-trash"></i> 批量删除 (<span id="selected-count">0</span>)
+                    <div class="card-footer" style="background: transparent; border-top: 1px solid var(--border-color); padding: 1rem 1.5rem;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="btn-cyber danger" id="batch-delete-btn" onclick="batchDeleteEmails()" style="display: none;">
+                                <i class="bi bi-trash me-1"></i> 批量删除 (<span id="selected-count">0</span>)
                             </button>
+                            <nav>
+                                <ul class="pagination pagination-cyber mb-0" id="email-pagination">
+                                </ul>
+                            </nav>
                         </div>
-                        <nav aria-label="Page navigation">
-                            <ul class="pagination justify-content-center mb-0" id="email-pagination">
-                                <!-- 动态生成分页 -->
-                            </ul>
-                        </nav>
                     </div>
                 </div>
             </div>
 
-            <!-- 右侧统计信息 - 占用4列 -->
-            <div class="grid-item" style="grid-column: span 4;">
-                <div class="space-y-3">
-                    <!-- 检测结果分布 -->
-                    <div class="card rounded-xl shadow-lg overflow-hidden">
-                        <div class="card-header bg-white border-bottom">
-                            <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-pie-chart text-primary mr-2"></i>检测结果分布</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <canvas id="distributionChart" height="160"></canvas>
+            <div class="col-lg-4">
+                <div class="card-cyber mb-4">
+                    <div class="card-header-cyber">
+                        <h5 class="card-title-cyber">
+                            <i class="bi bi-pie-chart"></i>
+                            检测结果分布
+                        </h5>
+                    </div>
+                    <div class="card-body-cyber">
+                        <div class="chart-container" style="height: 180px;">
+                            <canvas id="distributionChart"></canvas>
                         </div>
                     </div>
+                </div>
 
-                    <!-- 近 7 天检测趋势 -->
-                    <div class="card rounded-xl shadow-lg overflow-hidden">
-                        <div class="card-header bg-white border-bottom">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-graph-up text-primary mr-2"></i>检测趋势</h5>
-                                <div class="flex space-x-1">
-                                    <button class="btn btn-sm btn-outline-primary rounded-full">日</button>
-                                    <button class="btn btn-sm btn-primary rounded-full">周</button>
-                                    <button class="btn btn-sm btn-outline-primary rounded-full">月</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body p-4">
-                            <canvas id="trendChart" height="180"></canvas>
+                <div class="card-cyber mb-4">
+                    <div class="card-header-cyber">
+                        <h5 class="card-title-cyber">
+                            <i class="bi bi-graph-up"></i>
+                            检测趋势
+                        </h5>
+                        <div class="btn-group-cyber">
+                            <button class="btn-cyber" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">日</button>
+                            <button class="btn-cyber primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">周</button>
+                            <button class="btn-cyber" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">月</button>
                         </div>
                     </div>
-
-                    <!-- 系统状态 -->
-                    <div class="card rounded-xl shadow-lg overflow-hidden">
-                        <div class="card-header bg-white border-bottom">
-                            <h5 class="mb-0 font-semibold text-gray-700"><i class="bi bi-shield-check text-primary mr-2"></i>系统状态</h5>
+                    <div class="card-body-cyber">
+                        <div class="chart-container">
+                            <canvas id="trendChart"></canvas>
                         </div>
-                        <div class="card-body p-4">
-                            <div class="space-y-2">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-sm font-medium">API 连接</span>
-                                    <span class="status-badge status-normal">正常</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-sm font-medium">数据库</span>
-                                    <span class="status-badge status-normal">正常</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-sm font-medium">自动监控</span>
-                                    <span id="auto-monitor-status" class="status-badge status-warning">未开启</span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-sm font-medium">系统负载</span>
-                                    <span class="text-sm text-gray-700">低</span>
-                                </div>
-                            </div>
+                    </div>
+                </div>
+
+                <div class="card-cyber">
+                    <div class="card-header-cyber">
+                        <h5 class="card-title-cyber">
+                            <i class="bi bi-shield-check"></i>
+                            系统状态
+                        </h5>
+                    </div>
+                    <div class="card-body-cyber">
+                        <div class="status-indicator">
+                            <span class="status-dot online"></span>
+                            <span style="flex: 1;">API 连接</span>
+                            <span class="badge-cyber badge-success">正常</span>
+                        </div>
+                        <div class="status-indicator">
+                            <span class="status-dot online"></span>
+                            <span style="flex: 1;">数据库</span>
+                            <span class="badge-cyber badge-success">正常</span>
+                        </div>
+                        <div class="status-indicator">
+                            <span class="status-dot warning" id="auto-monitor-status-dot"></span>
+                            <span style="flex: 1;">自动监控</span>
+                            <span class="badge-cyber badge-warning" id="auto-monitor-status">未开启</span>
+                        </div>
+                        <div class="status-indicator">
+                            <span class="status-dot online"></span>
+                            <span style="flex: 1;">系统负载</span>
+                            <span style="color: var(--green);">低</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
-
     </div>
 
-    <!-- 悬浮操作按钮 -->
-    <div class="fixed bottom-6 right-6">
-        <button class="btn btn-primary rounded-full w-16 h-16 shadow-lg flex items-center justify-center pulse-fab" onclick="openDetectionModal()">
-            <i class="bi bi-plus text-xl"></i>
-        </button>
-    </div>
+    <button class="fab-button" onclick="openDetectionModal()">
+        <i class="bi bi-plus-lg"></i>
+    </button>
 
-    <!-- 检测表单模态框 -->
-    <div class="modal fade" id="detectionModal" tabindex="-1" aria-labelledby="detectionModalLabel" aria-hidden="true">
+    <div class="modal fade" id="detectionModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content rounded-xl shadow-xl">
-                <div class="modal-header bg-gradient-primary text-white">
-                    <h5 class="modal-title" id="detectionModalLabel">邮件检测</h5>
-                    <button type="button" class="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-content modal-content-cyber">
+                <div class="modal-header modal-header-cyber">
+                    <h5 class="modal-title modal-title-cyber">
+                        <i class="bi bi-search me-2"></i>邮件检测
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-5">
-                    <!-- 选项卡切换 -->
-                    <ul class="nav nav-tabs mb-4" role="tablist">
-                        <li class="nav-item" role="presentation">
+                <div class="modal-body modal-body-cyber">
+                    <ul class="nav nav-tabs nav-tabs-cyber" role="tablist">
+                        <li class="nav-item">
                             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#paste-tab" type="button">
-                                <i class="bi bi-clipboard"></i> 粘贴邮件内容
+                                <i class="bi bi-clipboard me-1"></i> 粘贴邮件内容
                             </button>
                         </li>
-                        <li class="nav-item" role="presentation">
+                        <li class="nav-item">
                             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#upload-tab" type="button">
-                                <i class="bi bi-file-earmark-arrow-up"></i> 上传邮件文件
+                                <i class="bi bi-file-earmark-arrow-up me-1"></i> 上传邮件文件
                             </button>
                         </li>
                     </ul>
 
                     <div class="tab-content">
-                        <!-- 粘贴邮件内容 -->
                         <div class="tab-pane fade show active" id="paste-tab">
                             <form id="emailForm">
                                 <div class="mb-4">
-                                    <label for="emailContent" class="form-label fw-medium">粘贴原始邮件内容:</label>
-                                    <textarea class="form-control" id="emailContent" rows="10"
-                                        placeholder="粘贴邮件原文或上传 .eml 文件...
+                                    <label class="form-label" style="color: var(--text-secondary); font-size: 0.9rem;">粘贴原始邮件内容:</label>
+                                    <textarea class="form-control form-control-cyber" id="emailContent" rows="10" placeholder="粘贴邮件原文或上传 .eml 文件...
 
 示例：
 From: sender@example.com
 To: recipient@example.com
 Subject: 重要通知
-Date: Wed, 1 Jan 2025 12:00:00 +0000
 
 请点击以下链接查看您的账户信息：
 https://example.com/account"></textarea>
-                                    <small class="text-muted d-block mt-2">支持格式：RFC822 邮件原文、.eml 文件、纯 URL</small>
+                                    <small style="color: var(--text-muted);">支持格式：RFC822 邮件原文、.eml 文件、纯 URL</small>
                                 </div>
-                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                    <button type="submit" class="btn btn-primary me-md-2">
-                                        <i class="bi bi-search"></i> 开始检测
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn-cyber primary">
+                                        <i class="bi bi-search me-1"></i> 开始检测
                                     </button>
                                 </div>
                             </form>
                         </div>
 
-                        <!-- 上传邮件文件 -->
                         <div class="tab-pane fade" id="upload-tab">
                             <form id="uploadForm" enctype="multipart/form-data">
                                 <div class="mb-4">
-                                    <label for="emailFile" class="form-label fw-medium">上传邮件文件:</label>
-                                    <div class="upload-area p-6 text-center" id="uploadArea"
-                                         onclick="document.getElementById('emailFile').click()">
-                                        <i class="bi bi-cloud-upload" style="font-size: 4rem; color: #9ca3af;"></i>
-                                        <p class="mt-3 mb-2">点击选择文件或拖拽文件到此处</p>
-                                        <small class="text-muted">支持 .eml 和 .msg 格式，最大 50MB</small>
+                                    <label class="form-label" style="color: var(--text-secondary); font-size: 0.9rem;">上传邮件文件:</label>
+                                    <div class="upload-area-cyber" id="uploadArea" onclick="document.getElementById('emailFile').click()">
+                                        <i class="bi bi-cloud-upload"></i>
+                                        <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">点击选择文件或拖拽文件到此处</p>
+                                        <small style="color: var(--text-muted);">支持 .eml 和 .msg 格式，最大 50MB</small>
                                         <input type="file" id="emailFile" name="file" accept=".eml,.msg" style="display: none;" onchange="handleFileSelect(this)">
                                     </div>
                                     <div id="fileInfo" class="mt-3" style="display: none;">
-                                        <div class="alert alert-info d-flex justify-content-between align-items-center">
-                                            <span><i class="bi bi-file-earmark-check"></i> 已选择：<strong id="fileName"></strong></span>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
-                                                <i class="bi bi-x-lg"></i> 清除
+                                        <div style="background: rgba(59, 130, 246, 0.05); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                                            <span><i class="bi bi-file-earmark-check me-2" style="color: var(--green);"></i>已选择：<strong id="fileName"></strong></span>
+                                            <button type="button" class="btn-cyber danger" style="padding: 0.25rem 0.5rem;" onclick="clearFile()">
+                                                <i class="bi bi-x-lg"></i>
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                    <button type="submit" class="btn btn-primary me-md-2" id="uploadBtn" disabled>
-                                        <i class="bi bi-search"></i> 开始检测
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn-cyber primary" id="uploadBtn" disabled>
+                                        <i class="bi bi-search me-1"></i> 开始检测
                                     </button>
                                 </div>
                             </form>
@@ -988,12 +1061,11 @@ https://example.com/account"></textarea>
         </div>
     </div>
 
-    <!-- 加载动画 -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-content">
-            <div class="spinner-border text-primary loading-spinner" role="status"></div>
-            <h4 class="loading-text" id="loadingText">正在分析邮件...</h4>
-            <p class="loading-subtext" id="loadingSubtext">正在解析邮件头...</p>
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">正在分析邮件...</div>
+            <div class="loading-subtext" id="loadingSubtext">正在解析邮件头...</div>
             <div class="loading-progress">
                 <div class="loading-progress-bar" id="loadingProgressBar"></div>
             </div>
@@ -1004,12 +1076,30 @@ https://example.com/account"></textarea>
         let trendChart = null;
         let distributionChart = null;
         let currentResult = null;
+        let currentPage = 1;
+        const emailsPerPage = 10;
+        let selectedIds = new Set();
+        let selectedFile = null;
+        let autoMonitorInterval = null;
+        let isProcessingEmails = false;
+        const AUTO_MONITOR_INTERVAL = 30000;
+        const processedEmailHashes = new Set();
 
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
+            loadEmailList(1);
+            
+            const autoMonitorEnabled = localStorage.getItem('autoMonitorEnabled') === 'true';
+            const autoMonitorToggle = document.getElementById('auto-monitor-toggle');
+            if (autoMonitorToggle) {
+                autoMonitorToggle.checked = autoMonitorEnabled;
+                if (autoMonitorEnabled) {
+                    startAutoMonitor();
+                    updateAutoMonitorStatus(true);
+                }
+            }
         });
 
-        // 数字滚动动画
         function animateNumber(elementId, targetValue, duration = 2000) {
             const element = document.getElementById(elementId);
             const startValue = 0;
@@ -1031,7 +1121,6 @@ https://example.com/account"></textarea>
                 const response = await fetch('/api/stats/overview');
                 const data = await response.json();
 
-                // 使用数字滚动动画
                 animateNumber('total-count', data.total);
                 animateNumber('phishing-count', data.phishing);
                 animateNumber('normal-count', data.normal);
@@ -1059,10 +1148,10 @@ https://example.com/account"></textarea>
                         fill: true,
                         tension: 0.4,
                         pointBackgroundColor: '#ef4444',
-                        pointBorderColor: '#fff',
+                        pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
-                        pointRadius: 5,
-                        pointHoverRadius: 7
+                        pointRadius: 4,
+                        pointHoverRadius: 6
                     }, {
                         label: '正常邮件',
                         data: data.trend.map(d => d.count - d.phish_count),
@@ -1071,64 +1160,39 @@ https://example.com/account"></textarea>
                         fill: true,
                         tension: 0.4,
                         pointBackgroundColor: '#10b981',
-                        pointBorderColor: '#fff',
+                        pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
-                        pointRadius: 5,
-                        pointHoverRadius: 7
+                        pointRadius: 4,
+                        pointHoverRadius: 6
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: {
                             position: 'top',
-                            labels: {
-                                font: {
-                                    size: 12
-                                },
-                                padding: 20
-                            }
+                            labels: { color: '#475569', font: { size: 11 }, padding: 15 }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#475569',
+                            borderColor: 'rgba(59, 130, 246, 0.2)',
+                            borderWidth: 1,
                             padding: 12,
-                            cornerRadius: 8,
-                            titleFont: {
-                                size: 14
-                            },
-                            bodyFont: {
-                                size: 13
-                            }
+                            cornerRadius: 8
                         }
                     },
                     scales: {
                         x: {
-                            grid: {
-                                display: true,
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            },
-                            ticks: {
-                                font: {
-                                    size: 11
-                                }
-                            }
+                            grid: { color: 'rgba(59, 130, 246, 0.1)' },
+                            ticks: { color: '#475569', font: { size: 10 } }
                         },
                         y: {
-                            grid: {
-                                display: true,
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            },
-                            ticks: {
-                                font: {
-                                    size: 11
-                                },
-                                beginAtZero: true
-                            }
+                            grid: { color: 'rgba(59, 130, 246, 0.1)' },
+                            ticks: { color: '#475569', font: { size: 10 } }
                         }
                     }
                 }
@@ -1154,20 +1218,16 @@ https://example.com/account"></textarea>
                     plugins: {
                         legend: {
                             position: 'bottom',
-                            labels: {
-                                font: {
-                                    size: 12
-                                },
-                                padding: 20
-                            }
+                            labels: { color: '#475569', font: { size: 11 }, padding: 15 }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#475569',
+                            borderColor: 'rgba(59, 130, 246, 0.2)',
+                            borderWidth: 1,
                             padding: 12,
-                            cornerRadius: 8,
-                            bodyFont: {
-                                size: 13
-                            }
+                            cornerRadius: 8
                         }
                     },
                     cutout: '70%'
@@ -1175,26 +1235,104 @@ https://example.com/account"></textarea>
             });
         }
 
-        // 打开检测模态框
         function openDetectionModal() {
             const modal = new bootstrap.Modal(document.getElementById('detectionModal'));
             modal.show();
         }
 
-        // 切换自动监控状态
         function toggleAutoMonitor(enabled) {
-            const statusElement = document.getElementById('auto-monitor-status');
             if (enabled) {
-                statusElement.className = 'status-badge status-normal';
-                statusElement.textContent = '运行中';
+                startAutoMonitor();
+                localStorage.setItem('autoMonitorEnabled', 'true');
+                showAlert('success', '邮件自动监控已开启，每30秒检查一次新邮件');
             } else {
-                statusElement.className = 'status-badge status-warning';
-                statusElement.textContent = '未开启';
+                stopAutoMonitor();
+                localStorage.setItem('autoMonitorEnabled', 'false');
+                showAlert('success', '邮件自动监控已关闭');
+            }
+            updateAutoMonitorStatus(enabled);
+        }
+
+        function updateAutoMonitorStatus(enabled) {
+            const statusDot = document.getElementById('auto-monitor-status-dot');
+            const statusBadge = document.getElementById('auto-monitor-status');
+            
+            if (enabled) {
+                statusDot.className = 'status-dot online';
+                statusBadge.className = 'badge-cyber badge-success';
+                statusBadge.textContent = '运行中';
+            } else {
+                statusDot.className = 'status-dot warning';
+                statusBadge.className = 'badge-cyber badge-warning';
+                statusBadge.textContent = '未开启';
             }
         }
 
-        // 文件上传相关函数
-        let selectedFile = null;
+        function startAutoMonitor() {
+            if (autoMonitorInterval) clearInterval(autoMonitorInterval);
+            autoFetchEmails();
+            autoMonitorInterval = setInterval(autoFetchEmails, AUTO_MONITOR_INTERVAL);
+        }
+
+        function stopAutoMonitor() {
+            if (autoMonitorInterval) {
+                clearInterval(autoMonitorInterval);
+                autoMonitorInterval = null;
+            }
+        }
+
+        async function autoFetchEmails() {
+            if (isProcessingEmails) return;
+            
+            try {
+                isProcessingEmails = true;
+                const response = await fetch('/api/email/fetch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.status === 'success' && result.emails && result.emails.length > 0) {
+                    const uniqueEmails = result.emails.filter(email => {
+                        const hash = email.hash || email.id;
+                        if (processedEmailHashes.has(hash)) return false;
+                        processedEmailHashes.add(hash);
+                        if (processedEmailHashes.size > 1000) {
+                            const first = processedEmailHashes.values().next().value;
+                            processedEmailHashes.delete(first);
+                        }
+                        return true;
+                    });
+                    
+                    if (uniqueEmails.length === 0) return;
+                    
+                    for (let email of uniqueEmails) {
+                        try {
+                            await fetch('/api/detection/analyze', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    email: email.raw, 
+                                    source: '自动监控',
+                                    email_uid: email.uid
+                                })
+                            });
+                        } catch (e) {
+                            console.error('分析邮件失败:', e);
+                        }
+                    }
+                    
+                    loadEmailList();
+                    loadStats();
+                    showAlert('success', `自动监控：发现并分析了 ${uniqueEmails.length} 封新邮件`);
+                }
+            } catch (error) {
+                console.error('自动获取邮件失败:', error);
+            } finally {
+                isProcessingEmails = false;
+            }
+        }
 
         function handleFileSelect(input) {
             const file = input.files[0];
@@ -1203,10 +1341,7 @@ https://example.com/account"></textarea>
                 document.getElementById('fileName').textContent = `${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
                 document.getElementById('fileInfo').style.display = 'block';
                 document.getElementById('uploadBtn').disabled = false;
-
-                // 添加高亮效果
-                document.getElementById('uploadArea').style.borderColor = '#28a745';
-                document.getElementById('uploadArea').style.backgroundColor = '#d4edda';
+                document.getElementById('uploadArea').style.borderColor = 'var(--green)';
             }
         }
 
@@ -1215,38 +1350,27 @@ https://example.com/account"></textarea>
             document.getElementById('emailFile').value = '';
             document.getElementById('fileInfo').style.display = 'none';
             document.getElementById('uploadBtn').disabled = true;
-
-            // 恢复样式
-            document.getElementById('uploadArea').style.borderColor = '#dee2e6';
-            document.getElementById('uploadArea').style.backgroundColor = 'transparent';
+            document.getElementById('uploadArea').style.borderColor = 'var(--border-color)';
         }
 
-        // 拖拽上传支持
         const uploadArea = document.getElementById('uploadArea');
-
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.style.borderColor = '#007bff';
-            uploadArea.style.backgroundColor = '#e7f1ff';
+            uploadArea.style.borderColor = 'var(--blue)';
         });
-
         uploadArea.addEventListener('dragleave', (e) => {
             e.preventDefault();
-            uploadArea.style.borderColor = '#dee2e6';
-            uploadArea.style.backgroundColor = 'transparent';
+            uploadArea.style.borderColor = 'var(--border-color)';
         });
-
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadArea.style.borderColor = '#dee2e6';
-            uploadArea.style.backgroundColor = 'transparent';
-
+            uploadArea.style.borderColor = 'var(--border-color)';
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 const file = files[0];
                 const validExt = file.name.toLowerCase().endsWith('.eml') || file.name.toLowerCase().endsWith('.msg');
                 if (!validExt) {
-                    alert('不支持的文件格式，请上传.eml 或.msg 文件');
+                    showAlert('danger', '不支持的文件格式，请上传 .eml 或 .msg 文件');
                     return;
                 }
                 selectedFile = file;
@@ -1256,14 +1380,6 @@ https://example.com/account"></textarea>
             }
         });
 
-        // 更新加载动画状态
-        function updateLoadingStatus(text, subtext, progress) {
-            document.getElementById('loadingText').textContent = text;
-            document.getElementById('loadingSubtext').textContent = subtext;
-            document.getElementById('loadingProgressBar').style.width = progress + '%';
-        }
-
-        // 显示加载动画
         function showLoading(text, subtext, progress = 0) {
             document.getElementById('loadingText').textContent = text;
             document.getElementById('loadingSubtext').textContent = subtext || '';
@@ -1271,46 +1387,37 @@ https://example.com/account"></textarea>
             document.getElementById('loadingOverlay').style.display = 'flex';
         }
 
-        // 隐藏加载动画
         function hideLoading() {
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
-        // 更新加载进度
         function updateLoading(text, subtext, progress) {
             document.getElementById('loadingText').textContent = text;
             document.getElementById('loadingSubtext').textContent = subtext;
             document.getElementById('loadingProgressBar').style.width = progress + '%';
         }
 
-        // 生成会话ID
         function generateSessionId() {
             return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
 
-        // 上传表单提交
         document.getElementById('uploadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-
             if (!selectedFile) {
-                alert('请选择要上传的邮件文件');
+                showAlert('danger', '请选择要上传的邮件文件');
                 return;
             }
 
-            document.getElementById('loadingOverlay').style.display = 'flex';
-            updateLoadingStatus('正在分析邮件...', '正在解析邮件头...', 0);
+            showLoading('正在分析邮件...', '正在解析邮件头...', 0);
 
             try {
                 const formData = new FormData();
                 formData.append('file', selectedFile);
 
-                // 模拟进度更新
                 let progress = 0;
                 const progressInterval = setInterval(() => {
                     progress += 10;
-                    if (progress <= 90) {
-                        updateLoadingStatus('正在分析邮件...', '正在分析特征...', progress);
-                    }
+                    if (progress <= 90) updateLoading('正在分析邮件...', '正在分析特征...', progress);
                 }, 200);
 
                 const response = await fetch('/api/detection/upload', {
@@ -1319,52 +1426,41 @@ https://example.com/account"></textarea>
                 });
 
                 clearInterval(progressInterval);
-                updateLoadingStatus('正在分析邮件...', '正在生成报告...', 100);
+                updateLoading('正在分析邮件...', '正在生成报告...', 100);
 
                 const result = await response.json();
 
                 if (response.ok) {
-                    // 生成会话ID并存储结果
                     const sessionId = generateSessionId();
                     localStorage.setItem(`phishing_report_${sessionId}`, JSON.stringify(result));
-                    
-                    // 跳转到报告页面
                     window.location.href = `/report.html?session=${sessionId}`;
                 } else {
-                    alert('分析失败：' + result.error);
+                    hideLoading();
+                    showAlert('danger', '分析失败：' + result.error);
                 }
             } catch (error) {
-                alert('请求错误：' + error.message);
-            } finally {
-                document.getElementById('loadingOverlay').style.display = 'none';
+                hideLoading();
+                showAlert('danger', '请求错误：' + error.message);
             }
         });
 
-        // 原有的邮件内容表单提交
         document.getElementById('emailForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-
             const emailContent = document.getElementById('emailContent').value.trim();
             if (!emailContent) {
-                alert('请输入邮件内容');
+                showAlert('danger', '请输入邮件内容');
                 return;
             }
 
-            document.getElementById('loadingOverlay').style.display = 'flex';
-            updateLoadingStatus('正在分析邮件...', '正在解析邮件头...', 0);
+            showLoading('正在分析邮件...', '正在解析邮件头...', 0);
 
             try {
-                // 模拟进度更新
                 let progress = 0;
                 const progressInterval = setInterval(() => {
                     progress += 10;
-                    if (progress <= 30) {
-                        updateLoadingStatus('正在分析邮件...', '正在解析邮件头...', progress);
-                    } else if (progress <= 60) {
-                        updateLoadingStatus('正在分析邮件...', '正在提取特征...', progress);
-                    } else if (progress <= 90) {
-                        updateLoadingStatus('正在分析邮件...', '正在比对威胁情报...', progress);
-                    }
+                    if (progress <= 30) updateLoading('正在分析邮件...', '正在解析邮件头...', progress);
+                    else if (progress <= 60) updateLoading('正在分析邮件...', '正在提取特征...', progress);
+                    else if (progress <= 90) updateLoading('正在分析邮件...', '正在比对威胁情报...', progress);
                 }, 200);
 
                 const response = await fetch('/api/detection/analyze', {
@@ -1374,692 +1470,30 @@ https://example.com/account"></textarea>
                 });
 
                 clearInterval(progressInterval);
-                updateLoadingStatus('正在分析邮件...', '正在生成报告...', 100);
+                updateLoading('正在分析邮件...', '正在生成报告...', 100);
 
                 const result = await response.json();
 
                 if (response.ok) {
-                    // 生成会话ID并存储结果
                     const sessionId = generateSessionId();
                     localStorage.setItem(`phishing_report_${sessionId}`, JSON.stringify(result));
-                    
-                    // 跳转到报告页面
                     window.location.href = `/report.html?session=${sessionId}`;
                 } else {
-                    alert('分析失败：' + result.error);
+                    hideLoading();
+                    showAlert('danger', '分析失败：' + result.error);
                 }
             } catch (error) {
-                alert('请求错误：' + error.message);
-            } finally {
-                document.getElementById('loadingOverlay').style.display = 'none';
+                hideLoading();
+                showAlert('danger', '请求错误：' + error.message);
             }
         });
 
-        function displayResults(result) {
-            const section = document.getElementById('resultSection');
-            const alertDiv = document.getElementById('resultAlert');
-            const isPhishing = result.is_phish;
-
-            document.getElementById('resultTitle').innerHTML = isPhishing
-                ? '<i class="bi bi-exclamation-triangle-fill"></i> 检测到钓鱼邮件!'
-                : '<i class="bi bi-check-circle-fill"></i> 这是一封正常的邮件';
-
-            document.getElementById('resultTitle').className = isPhishing ? 'text-danger fw-bold' : 'text-success fw-bold';
-
-            const confidence = result.confidence * 100;
-            document.getElementById('confidenceValue').textContent = confidence.toFixed(2) + '%';
-
-            const bar = document.getElementById('confidenceBar');
-            bar.style.width = confidence + '%';
-            document.getElementById('confidenceText').textContent = confidence.toFixed(0) + '%';
-            bar.className = `progress-bar ${isPhishing ? 'bg-danger' : 'bg-success'}`;
-
-            // 更新邮件信息
-            document.getElementById('resultFromName').textContent = result.parsed.from_display_name || '-';
-            document.getElementById('resultFromEmail').textContent = result.parsed.from_email || '-';
-            document.getElementById('resultTo').textContent = result.parsed.to || '-';
-            document.getElementById('resultSubject').textContent = result.parsed.subject || '-';
-            document.getElementById('resultUrlCount').textContent = result.parsed.url_count || 0;
-            document.getElementById('resultAttachmentCount').innerHTML =
-                result.parsed.attachment_count > 0
-                    ? `<span class="badge bg-warning">${result.parsed.attachment_count}</span>`
-                    : '0';
-
-            // 显示认证状态
-            displayAuthStatus(result.headers);
-
-            // 显示风险指标
-            displayRiskIndicators(result.traceback?.risk_indicators || [], result.features);
-
-            // 显示附件分析
-            displayAttachments(result.attachments || []);
-
-            // 显示 URL 分析
-            displayURLAnalysis(result.traceback?.url_analysis || [], result.html_links || []);
-
-            // 显示特征分析
-            displayFeatureAnalysis(result.features);
-
-            // 显示溯源信息
-            displayTracebackInfo(result.traceback);
-
-            section.style.display = 'block';
-            section.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function displayAuthStatus(headers) {
-            const container = document.getElementById('authStatus');
-            if (!headers) {
-                container.innerHTML = '<span class="text-muted">无认证信息</span>';
-                return;
-            }
-
-            const spf = headers.spf_result || 'unknown';
-            const dkim = headers.dkim_result || 'unknown';
-            const dmarc = headers.dmarc_result || 'unknown';
-
-            const getStatusBadge = (status) => {
-                if (status === 'pass') return '<span class="feature-badge feature-success">通过</span>';
-                if (status === 'fail') return '<span class="feature-badge feature-danger">失败</span>';
-                if (status === 'none') return '<span class="feature-badge feature-warning">未设置</span>';
-                return '<span class="feature-badge feature-warning">未知</span>';
-            };
-
-            container.innerHTML = `
-                <div class="mb-2">
-                    <strong>SPF:</strong> ${getStatusBadge(spf)}
-                    <small class="text-muted ms-2">验证发件人 IP 是否被授权</small>
-                </div>
-                <div class="mb-2">
-                    <strong>DKIM:</strong> ${getStatusBadge(dkim)}
-                    <small class="text-muted ms-2">验证邮件内容是否被篡改</small>
-                </div>
-                <div class="mb-2">
-                    <strong>DMARC:</strong> ${getStatusBadge(dmarc)}
-                    <small class="text-muted ms-2">综合认证策略</small>
-                </div>
-            `;
-        }
-
-        function displayRiskIndicators(indicators, features) {
-            const container = document.getElementById('riskIndicators');
-
-            // 根据特征生成额外风险指标
-            let dynamicIndicators = [...indicators];
-
-            // 检查附件风险
-            if (features?.has_executable_attachment) {
-                dynamicIndicators.push({
-                    type: 'EXECUTABLE_ATTACHMENT',
-                    description: '邮件包含可执行文件附件（.exe, .bat, .scr 等）',
-                    severity: 'high'
-                });
-            }
-            if (features?.has_double_extension) {
-                dynamicIndicators.push({
-                    type: 'DOUBLE_EXTENSION',
-                    description: '发现双重扩展名文件（如.pdf.exe），高度可疑',
-                    severity: 'high'
-                });
-            }
-
-            // 检查 URL 风险
-            if (features?.ip_address_count > 0) {
-                dynamicIndicators.push({
-                    type: 'IP_ADDRESS_URL',
-                    description: `发现 ${features.ip_address_count} 个使用 IP 地址的 URL`,
-                    severity: 'high'
-                });
-            }
-            if (features?.short_url_count > 0) {
-                dynamicIndicators.push({
-                    type: 'SHORT_URL',
-                    description: `发现 ${features.short_url_count} 个短链接`,
-                    severity: 'medium'
-                });
-            }
-            if (features?.has_hidden_links) {
-                dynamicIndicators.push({
-                    type: 'HIDDEN_LINKS',
-                    description: 'HTML 邮件中包含隐藏链接',
-                    severity: 'high'
-                });
-            }
-            if (features?.has_form) {
-                dynamicIndicators.push({
-                    type: 'FORM_IN_EMAIL',
-                    description: '邮件中包含表单（可能用于窃取凭证）',
-                    severity: 'high'
-                });
-            }
-
-            if (dynamicIndicators.length === 0) {
-                container.innerHTML = '<div class="alert alert-success"><i class="bi bi-shield-check"></i> 未发现明显风险指标</div>';
-                return;
-            }
-
-            // 去重
-            const seen = new Set();
-            const uniqueIndicators = dynamicIndicators.filter(ind => {
-                if (seen.has(ind.description)) return false;
-                seen.add(ind.description);
-                return true;
-            });
-
-            let html = '<h6 class="mb-3"><i class="bi bi-bug"></i>风险指标</h6>';
-            uniqueIndicators.forEach(ind => {
-                const severityClass = ind.severity === 'high' ? 'risk-high' :
-                                     ind.severity === 'medium' ? 'risk-medium' : 'risk-low';
-                html += `<div class="risk-indicator ${severityClass}">
-                    <strong>[${(ind.severity || '').toUpperCase()}]</strong> ${ind.description}
-                </div>`;
-            });
-            container.innerHTML = html;
-        }
-
-        function displayAttachments(attachments) {
-            const container = document.getElementById('attachmentsSection');
-
-            if (!attachments || attachments.length === 0) {
-                container.innerHTML = '<div class="alert alert-secondary"><i class="bi bi-file-earmark"></i> 未发现附件</div>';
-                return;
-            }
-
-            let html = '<h6 class="mb-3"><i class="bi bi-paperclip"></i>附件分析</h6>';
-
-            attachments.forEach((att, idx) => {
-                const isSuspicious = att.is_suspicious_type;
-                const ext = att.filename.split('.').pop()?.toLowerCase() || '';
-
-                // 根据文件类型选择图标
-                let icon = 'bi-file-earmark';
-                if (['exe', 'bat', 'cmd', 'scr', 'msi'].includes(ext)) icon = 'bi-file-earmark-lock';
-                else if (['doc', 'docm', 'xls', 'xlsm'].includes(ext)) icon = 'bi-file-earmark-word';
-                else if (['pdf'].includes(ext)) icon = 'bi-file-earmark-pdf';
-                else if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) icon = 'bi-file-earmark-image';
-                else if (['zip', 'rar', '7z'].includes(ext)) icon = 'bi-file-earmark-zip';
-
-                html += `<div class="attachment-card ${isSuspicious ? 'border-danger' : ''}">
-                    <div class="d-flex align-items-start">
-                        <i class="bi ${icon} attachment-icon ${isSuspicious ? 'text-danger' : 'text-secondary'}"></i>
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <strong>${att.filename}</strong>
-                                ${isSuspicious ? '<span class="badge bg-danger">可疑</span>' : '<span class="badge bg-success">安全</span>'}
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-md-3"><small><strong>类型:</strong> ${att.content_type}</small></div>
-                                <div class="col-md-2"><small><strong>大小:</strong> ${(att.size / 1024).toFixed(2)} KB</small></div>
-                                <div class="col-md-7"><small><strong>MD5:</strong> <code>${att.md5 || 'N/A'}</code></small></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            });
-
-            container.innerHTML = html;
-        }
-
-        function displayURLAnalysis(urlAnalysis, htmlLinks) {
-            const container = document.getElementById('urlAnalysisSection');
-
-            const allUrls = [...(urlAnalysis || [])];
-
-            if (allUrls.length === 0) {
-                container.innerHTML = '<div class="alert alert-secondary"><i class="bi bi-link-45deg"></i> 未发现 URL</div>';
-                return;
-            }
-
-            let html = '<h6 class="mb-3"><i class="bi bi-link-45deg"></i>URL 分析</h6>';
-
-            allUrls.forEach((urlInfo, idx) => {
-                const url = urlInfo.url || urlInfo;
-                const risks = urlInfo.risks || [];
-                const domainInfo = urlInfo.domain_info || {};
-
-                // 判断风险等级
-                let riskClass = 'border-success';
-                let riskBadge = '<span class="badge bg-success">安全</span>';
-                if (risks.length > 0) {
-                    const hasHighRisk = risks.some(r => r.severity === 'high');
-                    riskClass = hasHighRisk ? 'border-danger' : 'border-warning';
-                    riskBadge = hasHighRisk ? '<span class="badge bg-danger">高风险</span>' : '<span class="badge bg-warning text-dark">中等风险</span>';
-                }
-
-                html += `<div class="url-card ${riskClass}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <code>${url}</code>
-                        ${riskBadge}
-                    </div>`;
-
-                // 域名信息
-                if (domainInfo && domainInfo.domain) {
-                    html += `<div class="row">
-                        <div class="col-md-3"><small><strong>域名:</strong> ${domainInfo.domain}</small></div>
-                        <div class="col-md-3"><small><strong>域名年龄:</strong> ${domainInfo.age_days || 0} 天</small></div>
-                        <div class="col-md-3"><small><strong>注册商:</strong> ${domainInfo.registrar || '未知'}</small></div>
-                        <div class="col-md-3"><small><strong>HTTPS:</strong> ${urlInfo.url?.startsWith('https') ? '是' : '否'}</small></div>
-                    </div>`;
-                }
-
-                // 跳转链
-                if (urlInfo.redirect_chain && urlInfo.redirect_chain.length > 1) {
-                    html += `<div class="mt-2"><small><strong>跳转路径:</strong> ${urlInfo.redirect_chain.join(' → ')}</small></div>`;
-                }
-
-                // 风险提示
-                if (risks.length > 0) {
-                    html += '<div class="mt-2">';
-                    risks.forEach(risk => {
-                        const badgeClass = risk.severity === 'high' ? 'bg-danger' : 'bg-warning';
-                        html += `<span class="badge ${badgeClass} me-1">${risk.description}</span>`;
-                    });
-                    html += '</div>';
-                }
-
-                html += '</div>';
-            });
-
-            // 显示 HTML 中的表单
-            if (htmlLinks && htmlLinks.length > 0) {
-                const forms = htmlLinks.filter(l => l.type === 'form' || (l.action && l.method));
-                if (forms.length > 0) {
-                    html += '<div class="alert alert-warning mt-3"><i class="bi bi-exclamation-triangle"></i> <strong>警告:</strong> 邮件中包含表单，可能用于窃取敏感信息</div>';
-                }
-            }
-
-            container.innerHTML = html;
-        }
-
-        function displayFeatureAnalysis(features) {
-            const container = document.getElementById('featureAnalysisSection');
-            if (!features) return;
-
-            let html = '<h6 class="mb-3"><i class="bi bi-bar-chart"></i>特征分析</h6>';
-            html += '<div class="row">';
-
-            // 邮件头特征
-            html += '<div class="col-md-4"><div class="card"><div class="card-header bg-light"><strong>邮件头特征</strong></div><div class="card-body">';
-            html += `<div class="d-flex justify-content-between"><span>可疑发件人域名:</span> ${features.is_suspicious_from_domain ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>Received 跳数:</span> <span>${features.received_hops_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>SPF 失败:</span> ${features.spf_fail ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>显示名不匹配:</span> ${features.from_display_name_mismatch ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
-            html += '</div></div></div>';
-
-            // URL 特征
-            html += '<div class="col-md-4"><div class="card"><div class="card-header bg-light"><strong>URL 特征</strong></div><div class="card-body">';
-            html += `<div class="d-flex justify-content-between"><span>URL 总数:</span> <span>${features.url_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>短链接:</span> ${features.short_url_count > 0 ? `<span class="badge bg-warning">${features.short_url_count}</span>` : '<span class="badge bg-success">0</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>IP 地址 URL:</span> ${features.ip_address_count > 0 ? `<span class="badge bg-danger">${features.ip_address_count}</span>` : '<span class="badge bg-success">0</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>平均域名年龄:</span> <span>${(features.avg_domain_age_days / 365).toFixed(1)} 年</span></div>`;
-            html += '</div></div></div>';
-
-            // 文本特征
-            html += '<div class="col-md-4"><div class="card"><div class="card-header bg-light"><strong>文本特征</strong></div><div class="card-body">';
-            html += `<div class="d-flex justify-content-between"><span>紧急关键词:</span> <span>${features.urgent_keywords_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>金融关键词:</span> <span>${features.financial_keywords_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>感叹号:</span> <span>${features.exclamation_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>紧迫感评分:</span> <span>${((features.urgency_score || 0) * 100).toFixed(0)}%</span></div>`;
-            html += '</div></div></div>';
-
-            // 附件特征
-            html += '</div><div class="row mt-3"><div class="col-md-6"><div class="card"><div class="card-header bg-light"><strong>附件特征</strong></div><div class="card-body">';
-            html += `<div class="d-flex justify-content-between"><span>附件数量:</span> <span>${features.attachment_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>可疑附件:</span> ${features.has_suspicious_attachment ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>可执行文件:</span> ${features.has_executable_attachment ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>双重扩展名:</span> ${features.has_double_extension ? '<span class="badge bg-danger">是</span>' : '<span class="badge bg-success">否</span>'}</div>`;
-            html += '</div></div></div>';
-
-            // HTML 特征
-            html += '<div class="col-md-6"><div class="card"><div class="card-header bg-light"><strong>HTML 特征</strong></div><div class="card-body">';
-            html += `<div class="d-flex justify-content-between"><span>HTML 正文:</span> ${features.has_html_body ? '<span class="badge bg-info">有</span>' : '<span class="badge bg-secondary">无</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>HTML 链接数:</span> <span>${features.html_link_count || 0}</span></div>`;
-            html += `<div class="d-flex justify-content-between"><span>隐藏链接:</span> ${features.has_hidden_links ? '<span class="badge bg-danger">有</span>' : '<span class="badge bg-success">无</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>表单:</span> ${features.has_form ? '<span class="badge bg-warning">有</span>' : '<span class="badge bg-success">无</span>'}</div>`;
-            html += `<div class="d-flex justify-content-between"><span>IFrame:</span> ${features.has_iframe ? '<span class="badge bg-warning">有</span>' : '<span class="badge bg-success">无</span>'}</div>`;
-            html += '</div></div></div></div>';
-
-            container.innerHTML = html;
-        }
-
-        function displayTracebackInfo(traceback) {
-            const container = document.getElementById('tracebackInfo');
-            const emailSource = traceback?.email_source || {};
-
-            let html = '<hr><h6 class="mb-3"><i class="bi bi-map"></i>溯源信息</h6>';
-
-            if (emailSource.source_ip || emailSource.hops?.length > 0) {
-                html += '<div class="card mb-3"><div class="card-body">';
-                html += '<h6 class="card-title">邮件来源</h6>';
-                html += `<p class="mb-1"><strong>源 IP:</strong> ${emailSource.source_ip || '未知'}</p>`;
-
-                if (emailSource.full_path) {
-                    html += `<p class="mb-1"><strong>传输路径:</strong> <code>${emailSource.full_path}</code></p>`;
-                }
-
-                const geo = emailSource.geolocation || {};
-                if (geo.country && geo.country !== 'Unknown') {
-                    html += `<p class="mb-1"><strong>地理位置:</strong> ${geo.country} ${geo.regionName || ''} ${geo.city || ''}</p>`;
-                    html += `<p class="mb-0"><strong>ISP:</strong> ${geo.isp || '未知'}</p>`;
-                }
-
-                const blacklist = emailSource.blacklist_check || {};
-                if (blacklist.is_blacklisted) {
-                    html += `<p class="text-danger mb-0"><i class="bi bi-exclamation-triangle"></i> <strong>黑名单:</strong> 被标记于 ${blacklist.blacklists?.join(', ') || '未知'}</p>`;
-                } else {
-                    html += `<p class="text-success mb-0"><i class="bi bi-check-circle"></i> <strong>黑名单:</strong> 未被标记</p>`;
-                }
-                html += '</div></div>';
-            }
-
-            container.innerHTML = html;
-        }
-
-        function exportReport() {
-            if (!currentResult) return;
-
-            const report = {
-                detection_time: new Date().toISOString(),
-                result: currentResult
-            };
-
-            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `phishing_report_${new Date().getTime()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        async function shutdownSystem() {
-            if (!confirm('确定要关闭系统吗？关闭后需要重新启动服务才能再次访问。')) {
-                return;
-            }
-            alert('系统关闭功能已禁用，请手动停止服务。');
-        }
-
-        // ========== 邮件详情相关函数 ==========
-
-        // 打开邮件详情面板
-        function toggleRawEmail() {
-            const section = document.getElementById('rawEmailSection');
-            if (section.style.display === 'none') {
-                section.style.display = 'block';
-                renderRawEmailContent();
-                // 平滑滚动到详情区域
-                setTimeout(() => {
-                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 100);
-            } else {
-                section.style.display = 'none';
-            }
-        }
-
-        // 关闭邮件详情面板
-        function closeRawEmail() {
-            document.getElementById('rawEmailSection').style.display = 'none';
-        }
-
-        // 复制邮件头信息
-        function copyHeaders() {
-            const headers = currentResult?.headers || {};
-            let text = '';
-            for (const [key, value] of Object.entries(headers)) {
-                if (value && value !== '') {
-                    text += `${key}: ${value}\n`;
-                }
-            }
-            navigator.clipboard.writeText(text).then(() => {
-                alert('邮件头已复制到剪贴板！');
-            }).catch(() => alert('复制失败'));
-        }
-
-        // 复制完整原始邮件
-        function copyFullEmail() {
-            const email = currentResult?.raw_email || '';
-            navigator.clipboard.writeText(email).then(() => {
-                alert('原始邮件已复制到剪贴板！');
-            }).catch(() => alert('复制失败'));
-        }
-
-        // 渲染邮件详情内容
-        function renderRawEmailContent() {
-            if (!currentResult) {
-                alert('暂无检测结果');
-                return;
-            }
-
-            const result = currentResult;
-
-            // 1. 邮件正文
-            const body = result.parsed?.body || '(无纯文本正文)';
-            document.getElementById('textContent').textContent = body;
-
-            // 2. URL 列表
-            const urls = result.parsed?.urls || [];
-            document.getElementById('urlCountBadge').textContent = urls.length;
-            let urlHtml = '<ul class="list-group">';
-            if (urls.length > 0) {
-                urls.forEach((url, idx) => {
-                    const isHttps = url.startsWith('https://');
-                    const bgClass = isHttps ? 'bg-success' : 'bg-danger';
-                    const icon = isHttps ? 'bi-shield-check' : 'bi-exclamation-triangle';
-                    urlHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div><i class="bi ${icon} me-2"></i>${escapeHtml(url)}</div>
-                        <span class="badge ${bgClass}">${isHttps ? 'HTTPS' : 'HTTP'}</span>
-                    </li>`;
-                });
-            } else {
-                urlHtml += '<li class="list-group-item text-muted">(未发现 URL)</li>';
-            }
-            urlHtml += '</ul>';
-            document.getElementById('urlList').innerHTML = urlHtml;
-
-            // 3. 附件列表
-            const attachments = result.attachments || [];
-            document.getElementById('attCountBadge').textContent = attachments.length;
-            let attHtml = '<ul class="list-group">';
-            if (attachments.length > 0) {
-                attachments.forEach(att => {
-                    const suspicious = att.is_suspicious_type;
-                    attHtml += `<li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${escapeHtml(att.filename || '未命名')}</strong>
-                                <small class="text-muted d-block">${att.content_type || '未知类型'} · ${(att.size / 1024).toFixed(1)} KB</small>
-                            </div>
-                            <span class="badge ${suspicious ? 'bg-danger' : 'bg-secondary'}">${suspicious ? '可疑' : '普通'}</span>
-                        </div>
-                    </li>`;
-                });
-            } else {
-                attHtml += '<li class="list-group-item text-muted">(无附件)</li>';
-            }
-            attHtml += '</ul>';
-            document.getElementById('attachmentList').innerHTML = attHtml;
-
-            // 4. 邮件头信息（JSON 格式）
-            const headers = result.headers || {};
-            document.getElementById('headersContent').textContent = JSON.stringify(headers, null, 2);
-
-            // 5. 原始完整邮件
-            const fullEmail = result.raw_email || '(无法获取原始邮件)';
-            document.getElementById('fullRawEmail').value = fullEmail;
-        }
-
-        // HTML 转义函数（防止 XSS）
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // ========== API 配置管理相关函数 ==========
-
-        // 显示 API 配置模态框
-        function showApiConfig() {
-            const modal = new bootstrap.Modal(document.getElementById('apiConfigModal'));
-            loadApiConfig();
-            modal.show();
-        }
-
-        // 加载 API 配置
-        async function loadApiConfig() {
-            try {
-                const response = await fetch('/api/config');
-                const config = await response.json();
-                
-                // 填充表单
-                document.getElementById('vt-api-key').value = config.virustotal?.api_key || '';
-                document.getElementById('vt-api-url').value = config.virustotal?.api_url || 'https://www.virustotal.com/vtapi/v2/url/report';
-                document.getElementById('ip-api-url').value = config.ipapi?.api_url || 'http://ip-api.com/json/';
-                
-                // 填充邮箱配置
-                document.getElementById('email-address').value = config.email?.email || '';
-                document.getElementById('email-password').value = config.email?.password || '';
-                document.getElementById('email-server').value = config.email?.server || '';
-                document.getElementById('email-protocol').value = config.email?.protocol || 'imap';
-                document.getElementById('email-port').value = config.email?.port || '';
-                document.getElementById('email-enabled').checked = config.email?.enabled || false;
-            } catch (error) {
-                console.error('加载 API 配置失败:', error);
-                alert('加载配置失败');
-            }
-        }
-
-        // 测试 API 连接
-        async function testApiConnection() {
-            const testBtn = document.getElementById('test-api-btn');
-            const resultDiv = document.getElementById('api-test-result');
-            
-            testBtn.disabled = true;
-            testBtn.innerHTML = '<i class="bi bi-spinner bi-spin"></i> 测试中...';
-            resultDiv.innerHTML = '';
-            
-            try {
-                const response = await fetch('/api/config/test');
-                const result = await response.json();
-                
-                if (response.ok && result.status === 'success') {
-                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + result.message + '</div>';
-                } else {
-                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (result.message || '测试失败') + '</div>';
-                }
-            } catch (error) {
-                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 测试失败: ' + error.message + '</div>';
-            } finally {
-                testBtn.disabled = false;
-                testBtn.innerHTML = '<i class="bi bi-play-fill"></i> 测试连接';
-            }
-        }
-
-        // 测试邮箱连接
-        async function testEmailConnection() {
-            const testBtn = document.getElementById('test-email-btn');
-            const resultDiv = document.getElementById('email-test-result');
-            
-            testBtn.disabled = true;
-            testBtn.innerHTML = '<i class="bi bi-spinner bi-spin"></i> 测试中...';
-            resultDiv.innerHTML = '';
-            
-            try {
-                const response = await fetch('/api/config/test-email');
-                
-                // 检查响应状态
-                if (!response.ok) {
-                    // 尝试解析错误响应
-                    try {
-                        const errorResult = await response.json();
-                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (errorResult.message || '测试失败') + '</div>';
-                    } catch {
-                        // 如果无法解析JSON，显示通用错误
-                        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 测试失败: 服务器响应错误</div>';
-                    }
-                    return;
-                }
-                
-                // 解析成功响应
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + result.message + '</div>';
-                } else {
-                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (result.message || '测试失败') + '</div>';
-                }
-            } catch (error) {
-                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 测试失败: ' + error.message + '</div>';
-            } finally {
-                testBtn.disabled = false;
-                testBtn.innerHTML = '<i class="bi bi-play-fill"></i> 测试邮箱连接';
-            }
-        }
-
-        // 保存 API 配置
-        async function saveApiConfig() {
-            const saveBtn = document.getElementById('save-api-btn');
-            const resultDiv = document.getElementById('api-save-result');
-            
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="bi bi-spinner bi-spin"></i> 保存中...';
-            resultDiv.innerHTML = '';
-            
-            const config = {
-                virustotal: {
-                    api_key: document.getElementById('vt-api-key').value,
-                    api_url: document.getElementById('vt-api-url').value
-                },
-                ipapi: {
-                    api_url: document.getElementById('ip-api-url').value
-                },
-                email: {
-                    email: document.getElementById('email-address').value,
-                    password: document.getElementById('email-password').value,
-                    server: document.getElementById('email-server').value,
-                    protocol: document.getElementById('email-protocol').value,
-                    port: document.getElementById('email-port').value ? parseInt(document.getElementById('email-port').value) : null,
-                    enabled: document.getElementById('email-enabled').checked
-                }
-            };
-            
-            try {
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.status === 'success') {
-                    resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> ' + result.message + '</div>';
-                } else {
-                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> ' + (result.message || '保存失败') + '</div>';
-                }
-            } catch (error) {
-                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle"></i> 保存失败: ' + error.message + '</div>';
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i class="bi bi-save"></i> 保存配置';
-            }
-        }
-
-        // 当前页码
-        let currentPage = 1;
-        const emailsPerPage = 10;
-        let selectedIds = new Set();  // 存储选中的报告ID
-
-        // 显示邮件来源选择模态框
         function showEmailSourceModal(sourceType) {
             if (sourceType === 'fetch') {
-                // 第三方获取 - 从配置的邮箱获取
                 fetchEmailsFromServer();
             } else if (sourceType === 'manual') {
-                // 手动输入 - 打开检测模态框
                 openDetectionModal();
             } else if (sourceType === 'upload') {
-                // 上传邮件 - 切换到上传选项卡
                 openDetectionModal();
                 setTimeout(() => {
                     const uploadTab = document.querySelector('button[data-bs-target="#upload-tab"]');
@@ -2068,7 +1502,6 @@ https://example.com/account"></textarea>
             }
         }
 
-        // 从服务器获取邮件
         async function fetchEmailsFromServer() {
             showLoading('正在获取邮件...', '连接邮件服务器中...');
             
@@ -2082,14 +1515,12 @@ https://example.com/account"></textarea>
                 
                 if (response.ok && result.status === 'success') {
                     hideLoading();
-                    showLoading('获取成功', `成功获取 ${result.emails.length} 封邮件`, '正在分析...');
                     
-                    // 逐个分析邮件
                     for (let i = 0; i < result.emails.length; i++) {
                         const email = result.emails[i];
                         updateLoading(`正在分析邮件 ${i + 1}/${result.emails.length}`, `处理：${email.subject || '无标题'}`, ((i + 1) / result.emails.length) * 100);
                         
-                        const analyzeResponse = await fetch('/api/detection/analyze', {
+                        await fetch('/api/detection/analyze', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
@@ -2098,15 +1529,11 @@ https://example.com/account"></textarea>
                                 email_uid: email.uid
                             })
                         });
-                        
-                        if (!analyzeResponse.ok) {
-                            console.error('分析邮件失败:', email.subject);
-                        }
                     }
                     
                     hideLoading();
-                    // 刷新邮件列表
                     loadEmailList();
+                    loadStats();
                     showAlert('success', `成功获取并分析 ${result.emails.length} 封邮件`);
                 } else {
                     hideLoading();
@@ -2118,7 +1545,6 @@ https://example.com/account"></textarea>
             }
         }
 
-        // 加载邮件列表
         async function loadEmailList(page = 1) {
             try {
                 const response = await fetch(`/api/alerts?page=${page}&per_page=${emailsPerPage}`);
@@ -2133,7 +1559,6 @@ https://example.com/account"></textarea>
             }
         }
 
-        // 渲染邮件列表
         function renderEmailList(alerts) {
             const tbody = document.getElementById('email-list-body');
             const emptyDiv = document.getElementById('email-list-empty');
@@ -2158,42 +1583,41 @@ https://example.com/account"></textarea>
                 const isSelected = selectedIds.has(alert.id);
                 
                 html += `
-                    <tr class="align-middle" data-id="${alert.id}">
+                    <tr data-id="${alert.id}">
                         <td onclick="event.stopPropagation();">
-                            <input type="checkbox" class="form-check-input email-checkbox" 
+                            <input type="checkbox" class="checkbox-cyber email-checkbox" 
                                    value="${alert.id}" 
                                    ${isSelected ? 'checked' : ''} 
                                    onchange="toggleSelectEmail(${alert.id}, this.checked)">
                         </td>
-                        <td class="ps-4" onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
-                            <div class="fw-semibold text-truncate" style="max-width: 250px;" title="${escapeHtml(subject)}">${escapeHtml(subject)}</div>
+                        <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
+                            <div style="font-weight: 600; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(subject)}">${escapeHtml(subject)}</div>
                         </td>
                         <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
-                            <div class="text-truncate" style="max-width: 150px;" title="${escapeHtml(fromEmail)}">${escapeHtml(fromEmail)}</div>
+                            <div style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(fromEmail)}">${escapeHtml(fromEmail)}</div>
                         </td>
                         <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
-                            <span class="badge ${labelClass}">${labelText}</span>
+                            <span class="badge-cyber ${labelClass}">${labelText}</span>
                         </td>
                         <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
-                            <div class="progress" style="width: 100px; height: 20px;">
-                                <div class="progress-bar ${scoreClass}" role="progressbar" style="width: ${alert.confidence * 100}%">
-                                    ${(alert.confidence * 100).toFixed(0)}%
-                                </div>
+                            <div class="progress-cyber" style="width: 100px;">
+                                <div class="progress-bar-cyber ${scoreClass}" style="width: ${alert.confidence * 100}%"></div>
                             </div>
+                            <small style="color: var(--text-secondary); font-size: 0.75rem;">${(alert.confidence * 100).toFixed(0)}%</small>
                         </td>
                         <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
-                            <span class="badge bg-secondary">${escapeHtml(source)}</span>
+                            <span class="badge-cyber badge-info">${escapeHtml(source)}</span>
                         </td>
                         <td onclick="viewEmailDetail(${alert.id})" style="cursor: pointer;">
-                            <small class="text-muted">${detectionTime}</small>
+                            <small style="color: var(--text-secondary);">${detectionTime}</small>
                         </td>
                         <td>
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); viewEmailDetail(${alert.id})">
-                                    <i class="bi bi-eye"></i> 查看
+                            <div class="btn-group-cyber">
+                                <button class="btn-cyber" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;" onclick="event.stopPropagation(); viewEmailDetail(${alert.id})">
+                                    <i class="bi bi-eye"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteEmail(${alert.id})">
-                                    <i class="bi bi-trash"></i> 删除
+                                <button class="btn-cyber danger" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;" onclick="event.stopPropagation(); deleteEmail(${alert.id})">
+                                    <i class="bi bi-trash"></i>
                                 </button>
                             </div>
                         </td>
@@ -2204,7 +1628,6 @@ https://example.com/account"></textarea>
             tbody.innerHTML = html;
         }
 
-        // 渲染分页
         function renderPagination(current, total, totalItems) {
             const pagination = document.getElementById('email-pagination');
             
@@ -2215,7 +1638,6 @@ https://example.com/account"></textarea>
             
             let html = '';
             
-            // 上一页
             if (current > 1) {
                 html += `<li class="page-item">
                     <a class="page-link" href="#" onclick="loadEmailList(${current - 1}); return false;">
@@ -2224,7 +1646,6 @@ https://example.com/account"></textarea>
                 </li>`;
             }
             
-            // 页码
             for (let i = 1; i <= total; i++) {
                 if (i === 1 || i === total || (i >= current - 2 && i <= current + 2)) {
                     html += `<li class="page-item ${i === current ? 'active' : ''}">
@@ -2235,7 +1656,6 @@ https://example.com/account"></textarea>
                 }
             }
             
-            // 下一页
             if (current < total) {
                 html += `<li class="page-item">
                     <a class="page-link" href="#" onclick="loadEmailList(${current + 1}); return false;">
@@ -2247,54 +1667,36 @@ https://example.com/account"></textarea>
             pagination.innerHTML = html;
         }
 
-        // 获取标签样式
         function getLabelClass(label) {
-            if (label === 'PHISHING') return 'bg-danger';
-            if (label === 'SUSPICIOUS') return 'bg-warning';
-            return 'bg-success';
+            if (label === 'PHISHING') return 'badge-danger';
+            if (label === 'SUSPICIOUS') return 'badge-warning';
+            return 'badge-success';
         }
 
-        // 获取标签文本
         function getLabelText(label) {
             if (label === 'PHISHING') return '钓鱼';
             if (label === 'SUSPICIOUS') return '可疑';
             return '正常';
         }
 
-        // 获取评分样式
         function getScoreClass(score) {
-            if (score >= 0.7) return 'bg-danger';
-            if (score >= 0.4) return 'bg-warning';
-            return 'bg-success';
+            if (score >= 0.7) return 'danger';
+            if (score >= 0.4) return 'warning';
+            return 'success';
         }
 
-        // 格式化检测时间
         function formatDetectionTime(isoString) {
             if (!isoString) return '';
             const date = new Date(isoString);
             const now = new Date();
             const diff = now - date;
             
-            // 小于 1 小时
-            if (diff < 3600000) {
-                const minutes = Math.floor(diff / 60000);
-                return `${minutes}分钟前`;
-            }
-            // 小于 24 小时
-            if (diff < 86400000) {
-                const hours = Math.floor(diff / 3600000);
-                return `${hours}小时前`;
-            }
-            // 小于 7 天
-            if (diff < 604800000) {
-                const days = Math.floor(diff / 86400000);
-                return `${days}天前`;
-            }
-            // 其他显示具体日期
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+            if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`;
             return date.toLocaleDateString('zh-CN');
         }
 
-        // HTML 转义
         function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
@@ -2302,48 +1704,37 @@ https://example.com/account"></textarea>
             return div.innerHTML;
         }
 
-        // 查看邮件详情
         async function viewEmailDetail(alertId) {
             showLoading('加载邮件详情...', '正在获取报告数据...');
             
             try {
-                // 从服务器获取完整的报告数据
                 const response = await fetch(`/api/alerts/${alertId}`);
                 const result = await response.json();
                 
                 if (response.ok) {
-                    // 存储完整的报告数据
                     const sessionId = 'alert_' + alertId;
                     localStorage.setItem('phishing_report_' + sessionId, JSON.stringify(result));
                     window.location.href = `/report.html?session=${sessionId}`;
                 } else {
+                    hideLoading();
                     showAlert('danger', '获取邮件详情失败: ' + (result.error || '未知错误'));
                 }
             } catch (error) {
-                showAlert('danger', '加载失败：' + error.message);
-            } finally {
                 hideLoading();
+                showAlert('danger', '加载失败：' + error.message);
             }
         }
 
-        // 删除邮件报告
         async function deleteEmail(alertId) {
-            if (!confirm('确定要删除这份报告吗？此操作不可恢复。')) {
-                return;
-            }
+            if (!confirm('确定要删除这份报告吗？此操作不可恢复。')) return;
             
             try {
-                const response = await fetch(`/api/alerts/${alertId}`, {
-                    method: 'DELETE'
-                });
-                
+                const response = await fetch(`/api/alerts/${alertId}`, { method: 'DELETE' });
                 const result = await response.json();
                 
                 if (response.ok && result.status === 'success') {
                     showAlert('success', '报告已删除');
-                    // 刷新列表
                     loadEmailList(currentPage);
-                    // 刷新统计数据
                     loadStats();
                 } else {
                     showAlert('danger', '删除失败: ' + (result.error || '未知错误'));
@@ -2353,54 +1744,42 @@ https://example.com/account"></textarea>
             }
         }
 
-        // 切换单个邮件选择状态
         function toggleSelectEmail(id, checked) {
-            if (checked) {
-                selectedIds.add(id);
-            } else {
-                selectedIds.delete(id);
-            }
+            if (checked) selectedIds.add(id);
+            else selectedIds.delete(id);
             updateBatchDeleteButton();
         }
 
-        // 切换全选状态
         function toggleSelectAll(checkbox) {
             const checkboxes = document.querySelectorAll('.email-checkbox');
             checkboxes.forEach(cb => {
                 const id = parseInt(cb.value);
                 cb.checked = checkbox.checked;
-                if (checkbox.checked) {
-                    selectedIds.add(id);
-                } else {
-                    selectedIds.delete(id);
-                }
+                if (checkbox.checked) selectedIds.add(id);
+                else selectedIds.delete(id);
             });
             updateBatchDeleteButton();
         }
 
-        // 更新批量删除按钮显示状态
         function updateBatchDeleteButton() {
             const btn = document.getElementById('batch-delete-btn');
             const countSpan = document.getElementById('selected-count');
             
             if (selectedIds.size > 0) {
-                btn.style.display = 'inline-block';
+                btn.style.display = 'inline-flex';
                 countSpan.textContent = selectedIds.size;
             } else {
                 btn.style.display = 'none';
             }
         }
 
-        // 批量删除邮件报告
         async function batchDeleteEmails() {
             if (selectedIds.size === 0) {
                 showAlert('warning', '请先选择要删除的报告');
                 return;
             }
             
-            if (!confirm(`确定要删除选中的 ${selectedIds.size} 份报告吗？此操作不可恢复。`)) {
-                return;
-            }
+            if (!confirm(`确定要删除选中的 ${selectedIds.size} 份报告吗？此操作不可恢复。`)) return;
             
             try {
                 const response = await fetch('/api/alerts/batch', {
@@ -2413,13 +1792,10 @@ https://example.com/account"></textarea>
                 
                 if (response.ok && result.status === 'success') {
                     showAlert('success', `成功删除 ${result.deleted_count} 份报告`);
-                    // 清空选中状态
                     selectedIds.clear();
                     document.getElementById('select-all-checkbox').checked = false;
                     updateBatchDeleteButton();
-                    // 刷新列表
                     loadEmailList(currentPage);
-                    // 刷新统计数据
                     loadStats();
                 } else {
                     showAlert('danger', '批量删除失败: ' + (result.error || '未知错误'));
@@ -2429,160 +1805,28 @@ https://example.com/account"></textarea>
             }
         }
 
-        // 显示提示框
         function showAlert(type, message) {
-            const alertHtml = `
-                <div class="position-fixed top-0 end-0 p-3" style="z-index: 1100">
-                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                        ${message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert-cyber ${type}`;
+            alertDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : 'exclamation-triangle'}" 
+                       style="color: var(--${type === 'success' ? 'green' : type === 'danger' ? 'red' : 'amber'}); font-size: 1.25rem;"></i>
+                    <span style="color: var(--text-primary);">${message}</span>
                 </div>
             `;
+            document.body.appendChild(alertDiv);
             
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = alertHtml;
-            document.body.appendChild(tempDiv.firstChild);
-            
-            // 3 秒后自动移除
             setTimeout(() => {
-                const alert = document.querySelector('.alert-dismissible');
-                if (alert) {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                    setTimeout(() => alert.remove(), 150);
-                }
+                alertDiv.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => alertDiv.remove(), 300);
             }, 3000);
         }
 
-        // 自动监控相关变量
-        let autoMonitorInterval = null;
-        let isProcessingEmails = false;  // 防重复处理标志
-        const AUTO_MONITOR_INTERVAL = 30000; // 30秒
-        const processedEmailHashes = new Set();  // 内存中去重缓存
-
-        // 切换自动监控
-        function toggleAutoMonitor(enabled) {
-            if (enabled) {
-                startAutoMonitor();
-                localStorage.setItem('autoMonitorEnabled', 'true');
-                showAlert('success', '邮件自动监控已开启，每30秒检查一次新邮件');
-            } else {
-                stopAutoMonitor();
-                localStorage.setItem('autoMonitorEnabled', 'false');
-                showAlert('info', '邮件自动监控已关闭');
-            }
+        async function shutdownSystem() {
+            if (!confirm('确定要关闭系统吗？关闭后需要重新启动服务才能再次访问。')) return;
+            showAlert('warning', '系统关闭功能已禁用，请手动停止服务。');
         }
-
-        // 启动自动监控
-        function startAutoMonitor() {
-            // 清除之前的定时器
-            if (autoMonitorInterval) {
-                clearInterval(autoMonitorInterval);
-            }
-            
-            // 立即执行一次
-            autoFetchEmails();
-            
-            // 设置定时器
-            autoMonitorInterval = setInterval(autoFetchEmails, AUTO_MONITOR_INTERVAL);
-        }
-
-        // 停止自动监控
-        function stopAutoMonitor() {
-            if (autoMonitorInterval) {
-                clearInterval(autoMonitorInterval);
-                autoMonitorInterval = null;
-            }
-        }
-
-        // 自动获取邮件
-        async function autoFetchEmails() {
-            // 如果正在处理中，跳过本次执行
-            if (isProcessingEmails) {
-                console.log('邮件处理中，跳过本次自动获取');
-                return;
-            }
-            
-            try {
-                isProcessingEmails = true;
-                
-                const response = await fetch('/api/email/fetch', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok && result.status === 'success' && result.emails && result.emails.length > 0) {
-                    // 再次检查是否已处理（双重保险）
-                    const uniqueEmails = result.emails.filter(email => {
-                        const hash = email.hash || email.id;
-                        if (processedEmailHashes.has(hash)) {
-                            return false;
-                        }
-                        processedEmailHashes.add(hash);
-                        // 限制缓存大小
-                        if (processedEmailHashes.size > 1000) {
-                            const first = processedEmailHashes.values().next().value;
-                            processedEmailHashes.delete(first);
-                        }
-                        return true;
-                    });
-                    
-                    if (uniqueEmails.length === 0) {
-                        console.log('所有邮件已在处理中或已处理');
-                        return;
-                    }
-                    
-                    // 分析新邮件
-                    for (let email of uniqueEmails) {
-                        try {
-                            await fetch('/api/detection/analyze', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    email: email.raw, 
-                                    source: '自动监控',
-                                    email_uid: email.uid
-                                })
-                            });
-                        } catch (e) {
-                            console.error('分析邮件失败:', e);
-                        }
-                    }
-                    
-                    // 刷新邮件列表
-                    loadEmailList();
-                    loadStats();
-                    
-                    // 显示通知
-                    showAlert('success', `自动监控：发现并分析了 ${uniqueEmails.length} 封新邮件`);
-                }
-            } catch (error) {
-                console.error('自动获取邮件失败:', error);
-            } finally {
-                isProcessingEmails = false;
-            }
-        }
-
-        // 页面加载时加载邮件列表
-        document.addEventListener('DOMContentLoaded', function() {
-            loadEmailList(1);
-            
-            // 恢复自动监控状态
-            const autoMonitorEnabled = localStorage.getItem('autoMonitorEnabled') === 'true';
-            const autoMonitorToggle = document.getElementById('auto-monitor-toggle');
-            if (autoMonitorToggle) {
-                autoMonitorToggle.checked = autoMonitorEnabled;
-                if (autoMonitorEnabled) {
-                    startAutoMonitor();
-                }
-            }
-        });
     </script>
-
-    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

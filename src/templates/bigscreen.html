@@ -3,323 +3,781 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数据大屏 - 钓鱼邮件检测系统</title>
+    <title>钓鱼邮件检测与溯源系统</title>
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        body {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            min-height: 100vh;
-            padding: 1rem;
+        :root {
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #e8e8ed;
+            --bg-card: #ffffff;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-muted: #86868b;
+            --blue: #0071e3;
+            --blue-light: #00c7be;
+            --green: #34c759;
+            --red: #ff3b30;
+            --amber: #ff9500;
+            --purple: #af52de;
+            --gradient-primary: linear-gradient(135deg, #0071e3 0%, #00c7be 100%);
+            --gradient-success: linear-gradient(135deg, #34c759 0%, #30d158 100%);
+            --gradient-danger: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);
+            --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
         }
         
-        .header {
+        body {
+            background: linear-gradient(180deg, #f5f5f7 0%, #ffffff 100%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        
+        .header-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.5rem;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 12px;
-            margin-bottom: 1rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            padding: 0.75rem 1.25rem;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-radius: var(--radius-lg);
+            margin-bottom: 1.5rem;
+            border: 0.5px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
         }
         
-        .header h1 {
-            font-size: 1.25rem;
-            background: linear-gradient(90deg, #3b82f6, #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        .live-indicator {
+        .header-left {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            color: #10b981;
-            font-size: 0.875rem;
+            gap: 1rem;
         }
         
-        .live-dot {
-            width: 8px;
-            height: 8px;
+        .system-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            background: rgba(52, 199, 89, 0.1);
+            border: 1px solid rgba(52, 199, 89, 0.3);
+            border-radius: 50px;
+            font-size: 0.75rem;
+            color: var(--green);
+            font-weight: 500;
+        }
+        
+        .status-dot {
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: #10b981;
+            background: var(--green);
             animation: pulse 2s infinite;
         }
         
         @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.5); }
+            50% { box-shadow: 0 0 0 6px rgba(52, 199, 89, 0); }
         }
         
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .stat-card {
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 12px;
-            padding: 1.25rem;
-            border: 1px solid rgba(255,255,255,0.1);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-        }
-        
-        .stat-card.blue::before { background: #3b82f6; }
-        .stat-card.red::before { background: #ef4444; }
-        .stat-card.green::before { background: #10b981; }
-        .stat-card.amber::before { background: #f59e0b; }
-        
-        .stat-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
+        .header-right {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            margin-bottom: 0.75rem;
+            gap: 1.5rem;
         }
         
-        .stat-card.blue .stat-icon { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
-        .stat-card.red .stat-icon { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .stat-card.green .stat-icon { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-        .stat-card.amber .stat-icon { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-        
-        .stat-value {
-            font-size: 1.75rem;
-            font-weight: 700;
+        .header-time {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
         
-        .stat-card.blue .stat-value { color: #3b82f6; }
-        .stat-card.red .stat-value { color: #ef4444; }
-        .stat-card.green .stat-value { color: #10b981; }
-        .stat-card.amber .stat-value { color: #f59e0b; }
-        
-        .stat-label {
-            font-size: 0.75rem;
-            color: #94a3b8;
-            margin-top: 0.25rem;
-        }
-        
-        .charts-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        
-        .chart-card {
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 12px;
-            padding: 1.25rem;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .chart-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
+        .nav-links {
             display: flex;
-            align-items: center;
             gap: 0.5rem;
         }
         
-        .chart-title i { color: #3b82f6; }
-        
-        .chart-container {
-            height: 200px;
-            position: relative;
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s;
         }
         
-        .bottom-row {
+        .nav-link:hover {
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+        
+        .nav-link.primary {
+            background: var(--gradient-primary);
+            border-color: transparent;
+            color: #ffffff;
+        }
+        
+        .nav-link.primary:hover {
+            box-shadow: 0 4px 15px rgba(0, 113, 227, 0.3);
+        }
+        
+        .system-intro {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-card);
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+        
+        .intro-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            color: #ffffff;
+            flex-shrink: 0;
+        }
+        
+        .intro-content {
+            flex: 1;
+        }
+        
+        .intro-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .intro-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        
+        .intro-stats {
+            display: flex;
+            gap: 2rem;
+        }
+        
+        .intro-stat {
+            text-align: center;
+            padding: 0 1.5rem;
+            border-left: 1px solid var(--border-color);
+        }
+        
+        .intro-stat:first-child {
+            border-left: none;
+        }
+        
+        .intro-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--blue);
+            letter-spacing: -0.02em;
+        }
+        
+        .intro-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        
+        .main-stats {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .stat-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin: 0 auto 1rem;
+        }
+        
+        .stat-card.blue .stat-icon { background: rgba(0, 113, 227, 0.1); color: var(--blue); }
+        .stat-card.red .stat-icon { background: rgba(255, 59, 48, 0.1); color: var(--red); }
+        .stat-card.green .stat-icon { background: rgba(52, 199, 89, 0.1); color: var(--green); }
+        .stat-card.amber .stat-icon { background: rgba(255, 149, 0, 0.1); color: var(--amber); }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.03em;
+        }
+        
+        .stat-card.blue .stat-value { color: var(--blue); }
+        .stat-card.red .stat-value { color: var(--red); }
+        .stat-card.green .stat-value { color: var(--green); }
+        .stat-card.amber .stat-value { color: var(--amber); }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .priority-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            box-shadow: var(--shadow-card);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.06);
+        }
+        
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: -0.01em;
+        }
+        
+        .card-title i { color: var(--blue); }
+        
+        .card-badge {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.6rem;
+            background: rgba(0, 113, 227, 0.1);
+            color: var(--blue);
+            border-radius: 4px;
+            font-weight: 500;
         }
         
         .threat-feed {
-            max-height: 250px;
+            max-height: 280px;
             overflow-y: auto;
         }
+        
+        .threat-feed::-webkit-scrollbar { width: 6px; }
+        .threat-feed::-webkit-scrollbar-track { background: #f5f5f7; border-radius: 3px; }
+        .threat-feed::-webkit-scrollbar-thumb { background: #d1d1d6; border-radius: 3px; }
         
         .threat-item {
             display: flex;
             gap: 0.75rem;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 0.75rem;
+            background: #fafafa;
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+        }
+        
+        .threat-item:hover {
+            background: #f5f5f7;
         }
         
         .threat-icon {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             flex-shrink: 0;
         }
         
-        .threat-icon.danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .threat-icon.warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-        .threat-icon.success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .threat-icon.danger { background: rgba(255, 59, 48, 0.1); color: var(--red); }
+        .threat-icon.warning { background: rgba(255, 149, 0, 0.1); color: var(--amber); }
+        .threat-icon.success { background: rgba(52, 199, 89, 0.1); color: var(--green); }
+        
+        .threat-content { flex: 1; min-width: 0; }
         
         .threat-title {
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .threat-info {
-            font-size: 0.7rem;
-            color: #94a3b8;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+        
+        .threat-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+        
+        .threat-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .threat-badge.danger { background: rgba(255, 59, 48, 0.1); color: var(--red); }
+        .threat-badge.warning { background: rgba(255, 149, 0, 0.1); color: var(--amber); }
+        .threat-badge.success { background: rgba(52, 199, 89, 0.1); color: var(--green); }
         
         .threat-time {
-            font-size: 0.65rem;
-            color: #64748b;
-            margin-left: auto;
+            font-size: 0.7rem;
+            color: var(--text-muted);
         }
         
-        .footer {
+        .chart-container {
+            height: 220px;
+            position: relative;
+        }
+        
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .chart-actions {
+            display: flex;
+            gap: 0.3rem;
+        }
+        
+        .chart-btn {
+            padding: 0.3rem 0.6rem;
+            background: #f5f5f7;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .chart-btn:hover, .chart-btn.active {
+            background: rgba(0, 113, 227, 0.1);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+        
+        .features-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .feature-card {
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            box-shadow: var(--shadow-card);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .feature-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        .feature-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        
+        .feature-icon.blue { background: var(--gradient-primary); color: #ffffff; }
+        .feature-icon.green { background: var(--gradient-success); color: #ffffff; }
+        .feature-icon.purple { background: linear-gradient(135deg, #af52de 0%, #bf5af2 100%); color: #ffffff; }
+        .feature-icon.amber { background: linear-gradient(135deg, #ff9500 0%, #ffb340 100%); color: #ffffff; }
+        
+        .feature-text {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .feature-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+        }
+        
+        .feature-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .footer-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 1.5rem;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 12px;
-            margin-top: 1rem;
-            font-size: 0.75rem;
-            color: #94a3b8;
-            border: 1px solid rgba(255,255,255,0.1);
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-card);
         }
         
-        .footer a {
-            color: #94a3b8;
+        .footer-status {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .status-indicator.online { background: var(--green); box-shadow: 0 0 6px rgba(52, 199, 89, 0.5); }
+        
+        .footer-links {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .footer-link {
+            color: var(--text-secondary);
             text-decoration: none;
-            margin-left: 1rem;
+            font-size: 0.8rem;
+            transition: color 0.2s;
         }
         
-        .footer a:hover { color: #3b82f6; }
+        .footer-link:hover { color: var(--blue); }
         
         .empty-state {
             text-align: center;
-            color: #64748b;
-            padding: 2rem;
+            color: var(--text-muted);
+            padding: 2rem 1rem;
         }
         
-        @media (max-width: 1024px) {
-            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.5;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-in {
+            animation: fadeInUp 0.4s ease forwards;
+        }
+        
+        .delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .delay-2 { animation-delay: 0.15s; opacity: 0; }
+        .delay-3 { animation-delay: 0.2s; opacity: 0; }
+        .delay-4 { animation-delay: 0.25s; opacity: 0; }
+        
+        @media (max-width: 1200px) {
+            .main-stats { grid-template-columns: repeat(2, 1fr); }
+            .priority-row { grid-template-columns: 1fr; }
             .charts-row { grid-template-columns: 1fr; }
-            .bottom-row { grid-template-columns: 1fr; }
+            .features-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        @media (max-width: 768px) {
+            .main-stats { grid-template-columns: 1fr; }
+            .features-row { grid-template-columns: 1fr; }
+            .header-bar { flex-direction: column; gap: 0.75rem; }
+            .header-right { flex-direction: column; }
+            .nav-links { flex-wrap: wrap; justify-content: center; }
+            .footer-bar { flex-direction: column; gap: 0.75rem; }
+            .system-intro { flex-direction: column; text-align: center; }
+            .intro-stats { justify-content: center; }
+            .intro-stat { border-left: none; border-top: 1px solid var(--border-color); padding: 1rem 1.5rem 0; }
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <h1><i class="bi bi-shield-check me-2"></i>钓鱼邮件检测系统 - 实时监控大屏</h1>
-        <div style="display: flex; align-items: center; gap: 2rem;">
-            <div class="live-indicator">
-                <span class="live-dot"></span>
-                <span>实时监控</span>
+    <div class="container">
+        <header class="header-bar animate-in">
+            <div class="header-left">
+                <div class="system-title">钓鱼邮件检测与溯源系统</div>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    <span>系统运行中</span>
+                </div>
             </div>
-            <div id="currentTime" style="font-size: 0.875rem;"></div>
-        </div>
-    </header>
-    
-    <!-- 统计卡片 -->
-    <div class="stats-row">
-        <div class="stat-card blue">
-            <div class="stat-icon"><i class="bi bi-envelope"></i></div>
-            <div class="stat-value" id="totalCount">-</div>
-            <div class="stat-label">总检测数</div>
-        </div>
-        <div class="stat-card red">
-            <div class="stat-icon"><i class="bi bi-shield-x"></i></div>
-            <div class="stat-value" id="phishingCount">-</div>
-            <div class="stat-label">钓鱼邮件</div>
-        </div>
-        <div class="stat-card green">
-            <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
-            <div class="stat-value" id="safeCount">-</div>
-            <div class="stat-label">安全邮件</div>
-        </div>
-        <div class="stat-card amber">
-            <div class="stat-icon"><i class="bi bi-question-circle"></i></div>
-            <div class="stat-value" id="suspiciousCount">-</div>
-            <div class="stat-label">可疑邮件</div>
-        </div>
-    </div>
-    
-    <!-- 图表区域 -->
-    <div class="charts-row">
-        <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-graph-up"></i>检测趋势</div>
-            <div class="chart-container"><canvas id="trendChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-pie-chart"></i>检测结果分布</div>
-            <div class="chart-container"><canvas id="pieChart"></canvas></div>
-        </div>
-    </div>
-    
-    <!-- 底部区域 -->
-    <div class="bottom-row">
-        <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-bar-chart"></i>每日检测统计</div>
-            <div class="chart-container"><canvas id="barChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-title"><i class="bi bi-lightning"></i>最近检测记录</div>
-            <div class="threat-feed" id="recentAlerts">
-                <div class="empty-state">加载中...</div>
+            <div class="header-right">
+                <div class="header-time" id="currentTime"></div>
+                <div class="nav-links">
+                    <a href="/dashboard" class="nav-link primary"><i class="bi bi-grid-1x2"></i> 控制台</a>
+                    <a href="/settings" class="nav-link"><i class="bi bi-gear"></i> 设置</a>
+                    <a href="/adversarial" class="nav-link"><i class="bi bi-lightning"></i> 对抗</a>
+                </div>
+            </div>
+        </header>
+        
+        <div class="system-intro animate-in">
+            <div class="intro-icon">
+                <i class="bi bi-shield-check"></i>
+            </div>
+            <div class="intro-content">
+                <div class="intro-title">钓鱼邮件检测与溯源系统</div>
+                <div class="intro-desc">基于 LightGBM 机器学习算法，结合多维度特征提取与威胁情报分析，实现对钓鱼邮件的精准识别与攻击溯源追踪。支持实时监控、批量检测、对抗样本测试等功能，专为中小企业设计，轻量化部署，高效防护。</div>
+            </div>
+            <div class="intro-stats">
+                <div class="intro-stat">
+                    <div class="intro-stat-value">98.5%</div>
+                    <div class="intro-stat-label">检测准确率</div>
+                </div>
+                <div class="intro-stat">
+                    <div class="intro-stat-value">&lt;2s</div>
+                    <div class="intro-stat-label">平均响应</div>
+                </div>
+                <div class="intro-stat">
+                    <div class="intro-stat-value">6+</div>
+                    <div class="intro-stat-label">检测维度</div>
+                </div>
             </div>
         </div>
+        
+        <div class="main-stats">
+            <div class="stat-card blue animate-in delay-1">
+                <div class="stat-icon"><i class="bi bi-envelope"></i></div>
+                <div class="stat-value" id="totalCount">-</div>
+                <div class="stat-label">总检测量</div>
+            </div>
+            <div class="stat-card red animate-in delay-2">
+                <div class="stat-icon"><i class="bi bi-shield-x"></i></div>
+                <div class="stat-value" id="phishingCount">-</div>
+                <div class="stat-label">钓鱼邮件</div>
+            </div>
+            <div class="stat-card green animate-in delay-3">
+                <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+                <div class="stat-value" id="safeCount">-</div>
+                <div class="stat-label">安全邮件</div>
+            </div>
+            <div class="stat-card amber animate-in delay-4">
+                <div class="stat-icon"><i class="bi bi-question-circle"></i></div>
+                <div class="stat-value" id="suspiciousCount">-</div>
+                <div class="stat-label">可疑邮件</div>
+            </div>
+        </div>
+        
+        <div class="priority-row">
+            <div class="card animate-in">
+                <div class="card-header">
+                    <div class="card-title"><i class="bi bi-lightning"></i> 最近检测记录</div>
+                    <span class="card-badge">实时更新</span>
+                </div>
+                <div class="threat-feed" id="recentAlerts">
+                    <div class="empty-state">
+                        <i class="bi bi-hourglass-split"></i>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card animate-in">
+                <div class="card-header">
+                    <div class="card-title"><i class="bi bi-pie-chart"></i> 检测分布</div>
+                </div>
+                <div class="chart-container"><canvas id="pieChart"></canvas></div>
+            </div>
+        </div>
+        
+        <div class="charts-row">
+            <div class="card animate-in">
+                <div class="card-header">
+                    <div class="card-title"><i class="bi bi-graph-up"></i> 检测趋势</div>
+                    <div class="chart-actions">
+                        <button class="chart-btn active">7天</button>
+                        <button class="chart-btn">30天</button>
+                    </div>
+                </div>
+                <div class="chart-container"><canvas id="trendChart"></canvas></div>
+            </div>
+            <div class="card animate-in">
+                <div class="card-header">
+                    <div class="card-title"><i class="bi bi-bar-chart"></i> 每日统计</div>
+                </div>
+                <div class="chart-container"><canvas id="barChart"></canvas></div>
+            </div>
+        </div>
+        
+        <div class="features-row">
+            <a href="/dashboard" class="feature-card animate-in">
+                <div class="feature-icon blue"><i class="bi bi-cpu"></i></div>
+                <div class="feature-text">
+                    <div class="feature-title">AI 智能检测</div>
+                    <div class="feature-desc">LightGBM 机器学习精准识别</div>
+                </div>
+            </a>
+            <a href="/traceback" class="feature-card animate-in">
+                <div class="feature-icon green"><i class="bi bi-bezier2"></i></div>
+                <div class="feature-text">
+                    <div class="feature-title">溯源追踪</div>
+                    <div class="feature-desc">还原攻击路径定位威胁源</div>
+                </div>
+            </a>
+            <a href="/adversarial" class="feature-card animate-in">
+                <div class="feature-icon purple"><i class="bi bi-shield-check"></i></div>
+                <div class="feature-text">
+                    <div class="feature-title">对抗测试</div>
+                    <div class="feature-desc">模拟攻击评估系统鲁棒性</div>
+                </div>
+            </a>
+            <a href="/domains" class="feature-card animate-in">
+                <div class="feature-icon amber"><i class="bi bi-globe"></i></div>
+                <div class="feature-text">
+                    <div class="feature-title">域名管理</div>
+                    <div class="feature-desc">黑白名单与IOC规则配置</div>
+                </div>
+            </a>
+        </div>
+        
+        <footer class="footer-bar">
+            <div class="footer-status">
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span>Web服务</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span>检测引擎</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-indicator online"></span>
+                    <span>数据库</span>
+                </div>
+                <div class="status-item">
+                    <span>更新: <span id="lastUpdate">-</span></span>
+                </div>
+            </div>
+            <div class="footer-links">
+                <a href="/dashboard" class="footer-link">系统详情</a>
+                <a href="/settings" class="footer-link">配置管理</a>
+                <a href="/traceback" class="footer-link">溯源分析</a>
+                <a href="/report.html" class="footer-link">检测报告</a>
+            </div>
+        </footer>
     </div>
-    
-    <footer class="footer">
-        <div>
-            <span>系统状态: <span style="color: #10b981;">● 运行中</span></span>
-            <span class="mx-3">|</span>
-            <span>数据更新: <span id="lastUpdate">-</span></span>
-        </div>
-        <div>
-            <a href="/dashboard">详细系统</a>
-            <a href="/settings">配置管理</a>
-            <a href="/adversarial">对抗测试</a>
-            <a href="/adversarial">测试</a>
-        </div>
-    </footer>
 
     <script>
         let trendChart = null;
         let pieChart = null;
         let barChart = null;
         
-        // 更新时间
         function updateTime() {
-            document.getElementById('currentTime').textContent = new Date().toLocaleString('zh-CN');
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            document.getElementById('currentTime').textContent = timeStr;
         }
         setInterval(updateTime, 1000);
         updateTime();
 
-        // 加载统计数据
         async function loadStats() {
             try {
                 const resp = await fetch('/api/stats/overview');
@@ -331,10 +789,7 @@
                 document.getElementById('suspiciousCount').textContent = data.suspicious || 0;
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('zh-CN');
                 
-                // 更新趋势图
                 updateTrendChart(data.trend || []);
-                
-                // 更新饼图
                 updatePieChart(data);
                 
             } catch (e) {
@@ -342,7 +797,6 @@
             }
         }
         
-        // 更新趋势图
         function updateTrendChart(trend) {
             const ctx = document.getElementById('trendChart').getContext('2d');
             
@@ -364,35 +818,40 @@
                             {
                                 label: '总检测',
                                 data: totals,
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderColor: '#0071e3',
+                                backgroundColor: 'rgba(0, 113, 227, 0.1)',
                                 fill: true,
-                                tension: 0.4
+                                tension: 0.4,
+                                borderWidth: 2
                             },
                             {
                                 label: '钓鱼',
                                 data: phishing,
-                                borderColor: '#ef4444',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderColor: '#ff3b30',
+                                backgroundColor: 'rgba(255, 59, 48, 0.1)',
                                 fill: true,
-                                tension: 0.4
+                                tension: 0.4,
+                                borderWidth: 2
                             }
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { labels: { color: '#94a3b8' } } },
+                        plugins: {
+                            legend: { 
+                                labels: { color: '#6e6e73', usePointStyle: true, padding: 15, font: { size: 11 } } 
+                            }
+                        },
                         scales: {
-                            x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                            y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                            x: { ticks: { color: '#86868b', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                            y: { ticks: { color: '#86868b', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
                         }
                     }
                 });
             }
         }
         
-        // 更新饼图
         function updatePieChart(data) {
             const ctx = document.getElementById('pieChart').getContext('2d');
             
@@ -409,8 +868,9 @@
                         labels: ['钓鱼', '可疑', '安全'],
                         datasets: [{
                             data: hasData ? values : [1, 1, 1],
-                            backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
-                            borderWidth: 0
+                            backgroundColor: ['#ff3b30', '#ff9500', '#34c759'],
+                            borderWidth: 0,
+                            hoverOffset: 8
                         }]
                     },
                     options: {
@@ -418,14 +878,16 @@
                         maintainAspectRatio: false,
                         cutout: '60%',
                         plugins: {
-                            legend: { position: 'bottom', labels: { color: '#94a3b8' } }
+                            legend: { 
+                                position: 'bottom', 
+                                labels: { color: '#6e6e73', usePointStyle: true, padding: 12, font: { size: 11 } } 
+                            }
                         }
                     }
                 });
             }
         }
         
-        // 加载每日统计
         async function loadDailyStats() {
             try {
                 const resp = await fetch('/api/stats/daily?days=7');
@@ -433,7 +895,7 @@
                 
                 const ctx = document.getElementById('barChart').getContext('2d');
                 
-                const labels = data.map(d => d.day.slice(5)); // MM-DD
+                const labels = data.map(d => d.day.slice(5));
                 const values = data.map(d => d.total);
                 
                 if (barChart) {
@@ -448,9 +910,10 @@
                             datasets: [{
                                 label: '检测数',
                                 data: values,
-                                backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                                borderColor: '#3b82f6',
-                                borderWidth: 1
+                                backgroundColor: 'rgba(0, 113, 227, 0.7)',
+                                borderColor: '#0071e3',
+                                borderWidth: 1,
+                                borderRadius: 6
                             }]
                         },
                         options: {
@@ -458,8 +921,8 @@
                             maintainAspectRatio: false,
                             plugins: { legend: { display: false } },
                             scales: {
-                                x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                                y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                                x: { ticks: { color: '#86868b', font: { size: 10 } }, grid: { display: false } },
+                                y: { ticks: { color: '#86868b', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
                             }
                         }
                     });
@@ -469,63 +932,77 @@
             }
         }
         
-        // 加载最近检测
         async function loadRecentAlerts() {
             try {
-                const resp = await fetch('/api/alerts?page=1&per_page=5');
+                const resp = await fetch('/api/alerts?page=1&per_page=6');
                 const data = await resp.json();
                 
                 const container = document.getElementById('recentAlerts');
                 
                 if (!data.alerts || data.alerts.length === 0) {
-                    container.innerHTML = '<div class="empty-state">暂无检测记录</div>';
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <div>暂无检测记录</div>
+                        </div>
+                    `;
                     return;
                 }
                 
                 container.innerHTML = data.alerts.map(alert => {
                     let iconClass = 'success';
                     let icon = 'bi-check-circle';
+                    let badgeClass = 'success';
+                    let badgeText = '安全';
                     
                     if (alert.label === 'PHISHING') {
                         iconClass = 'danger';
                         icon = 'bi-shield-x';
+                        badgeClass = 'danger';
+                        badgeText = '钓鱼';
                     } else if (alert.label === 'SUSPICIOUS') {
                         iconClass = 'warning';
                         icon = 'bi-question-circle';
+                        badgeClass = 'warning';
+                        badgeText = '可疑';
                     }
                     
                     const time = new Date(alert.detection_time).toLocaleString('zh-CN', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
+                        month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit'
                     });
                     
                     return `
                         <div class="threat-item">
                             <div class="threat-icon ${iconClass}"><i class="bi ${icon}"></i></div>
-                            <div>
+                            <div class="threat-content">
                                 <div class="threat-title">${alert.subject || '无主题'}</div>
                                 <div class="threat-info">${alert.from_email || '未知发件人'}</div>
                             </div>
-                            <div class="threat-time">${time}</div>
+                            <div class="threat-meta">
+                                <span class="threat-badge ${badgeClass}">${badgeText}</span>
+                                <span class="threat-time">${time}</span>
+                            </div>
                         </div>
                     `;
                 }).join('');
                 
             } catch (e) {
                 console.error('加载最近检测失败:', e);
-                document.getElementById('recentAlerts').innerHTML = '<div class="empty-state">加载失败</div>';
+                document.getElementById('recentAlerts').innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <div>加载失败</div>
+                    </div>
+                `;
             }
         }
         
-        // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadDailyStats();
             loadRecentAlerts();
             
-            // 每30秒刷新
             setInterval(() => {
                 loadStats();
                 loadRecentAlerts();

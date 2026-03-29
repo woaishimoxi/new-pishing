@@ -62,7 +62,9 @@ class DatabaseRepository:
                     url_data TEXT,
                     header_data TEXT,
                     source TEXT,
-                    email_hash TEXT
+                    email_hash TEXT,
+                    body TEXT,
+                    html_body TEXT
                 )
             ''')
         else:
@@ -72,6 +74,10 @@ class DatabaseRepository:
                 cursor.execute('ALTER TABLE alerts ADD COLUMN email_hash TEXT')
             if 'raw_email' not in columns:
                 cursor.execute('ALTER TABLE alerts ADD COLUMN raw_email TEXT')
+            if 'body' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN body TEXT')
+            if 'html_body' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN html_body TEXT')
         
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS processed_uids (

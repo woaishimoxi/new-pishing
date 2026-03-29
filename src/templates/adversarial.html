@@ -6,147 +6,384 @@
     <title>对抗样本测试 - 钓鱼邮件检测系统</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <style>
         :root {
-            --primary: #3b82f6;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --purple: #8b5cf6;
-            --cyan: #06b6d4;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text2: #64748b;
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #e8e8ed;
+            --bg-card: #ffffff;
+            --bg-input: #f5f5f7;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --border-hover: rgba(0, 113, 227, 0.3);
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-muted: #86868b;
+            --blue: #0071e3;
+            --blue-light: #00c7be;
+            --green: #34c759;
+            --red: #ff3b30;
+            --amber: #ff9500;
+            --purple: #af52de;
+            --gradient-primary: linear-gradient(135deg, #0071e3 0%, #00c7be 100%);
+            --gradient-success: linear-gradient(135deg, #34c759 0%, #30d158 100%);
+            --gradient-danger: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);
+            --gradient-purple: linear-gradient(135deg, #af52de 0%, #bf5af2 100%);
+            --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.12);
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
         }
-        
-        body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-        
-        .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-        .nav-brand { font-weight: 600; color: var(--text); text-decoration: none; }
-        .nav-brand i { color: var(--primary); }
-        
-        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
-        
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .card-header { padding: 1rem; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
-        .card-header i { color: var(--primary); }
-        .card-body { padding: 1rem; }
-        
+
+        * { box-sizing: border-box; }
+
+        body { 
+            background: linear-gradient(180deg, #f5f5f7 0%, #ffffff 100%);
+            background-attachment: fixed;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            color: var(--text-primary);
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .nav { 
+            background: rgba(255, 255, 255, 0.72); 
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 0.5px solid rgba(0, 0, 0, 0.1); 
+            padding: 0.75rem 1.5rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-brand { 
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 600; 
+            color: var(--text-primary); 
+            text-decoration: none;
+            letter-spacing: 1px;
+        }
+
+        .nav-brand:hover { 
+            color: var(--blue);
+        }
+
+        .nav-brand i { 
+            color: var(--blue);
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+        .page-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            letter-spacing: 2px;
+        }
+
+        .page-title i {
+            color: var(--red);
+        }
+
+        .page-desc {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .card { 
+            background: var(--bg-card); 
+            border: 1px solid var(--border-color); 
+            border-radius: var(--radius-lg); 
+            margin-bottom: 1rem; 
+            box-shadow: var(--shadow-card);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        .card-header { 
+            padding: 1.125rem 1.25rem; 
+            border-bottom: 1px solid var(--border-color); 
+            font-weight: 600; 
+            display: flex; 
+            align-items: center; 
+            gap: 0.5rem;
+            background: rgba(59, 130, 246, 0.03);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+        }
+
+        .card-header i { color: var(--blue); }
+        .card-body { padding: 1.25rem; }
+
         .attack-type-btn {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 1rem;
-            border: 1px solid var(--border);
-            background: var(--card);
-            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: white;
+            border-radius: var(--radius-md);
             cursor: pointer;
             transition: all 0.2s;
             margin: 0.25rem;
             font-size: 0.85rem;
+            color: var(--text-secondary);
         }
-        
-        .attack-type-btn:hover { border-color: var(--primary); background: rgba(59, 130, 246, 0.05); }
-        .attack-type-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .attack-type-btn:hover { 
+            border-color: var(--blue); 
+            background: rgba(37, 99, 235, 0.05); 
+            color: var(--blue);
+        }
+
+        .attack-type-btn.active { 
+            background: var(--gradient-primary); 
+            color: white; 
+            border-color: transparent;
+            font-weight: 600;
+        }
+
         .attack-type-btn .icon { font-size: 1.1rem; }
-        
+
         .difficulty-badge {
             padding: 0.125rem 0.5rem;
             border-radius: 4px;
             font-size: 0.65rem;
             font-weight: 600;
         }
-        .difficulty-easy { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .difficulty-medium { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-        .difficulty-hard { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-        
+
+        .difficulty-easy { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+        .difficulty-medium { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+        .difficulty-hard { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+
         .result-card {
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             padding: 1rem;
             text-align: center;
             transition: all 0.3s;
+            border: 2px solid;
         }
-        
-        .result-safe { background: rgba(16, 185, 129, 0.1); border: 2px solid var(--success); }
-        .result-phishing { background: rgba(239, 68, 68, 0.1); border: 2px solid var(--danger); }
-        .result-suspicious { background: rgba(245, 158, 11, 0.1); border: 2px solid var(--warning); }
-        .result-unknown { background: #f8fafc; border: 2px solid var(--border); }
-        
+
+        .result-safe { 
+            background: rgba(16, 185, 129, 0.1); 
+            border-color: var(--green);
+        }
+
+        .result-phishing { 
+            background: rgba(239, 68, 68, 0.1); 
+            border-color: var(--red);
+        }
+
+        .result-suspicious { 
+            background: rgba(245, 158, 11, 0.1); 
+            border-color: var(--amber);
+        }
+
+        .result-unknown { 
+            background: rgba(148, 163, 184, 0.1); 
+            border-color: var(--text-muted);
+        }
+
         .diff-view {
-            font-family: monospace;
+            font-family: 'Consolas', 'Monaco', 'Fira Code', monospace;
             font-size: 0.8rem;
             background: #1e293b;
-            color: #e2e8f0;
+            color: #93c5fd;
             padding: 1rem;
-            border-radius: 8px;
+            border-radius: var(--radius-md);
             max-height: 200px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
+            border: 1px solid var(--border-color);
         }
-        
+
         .diff-char-normal { color: #94a3b8; }
-        .diff-char-attacked { background: rgba(239, 68, 68, 0.3); color: #ef4444; }
-        
+        .diff-char-attacked { background: rgba(239, 68, 68, 0.3); color: #fca5a5; }
+
         .robustness-meter {
             height: 12px;
-            background: #e2e8f0;
+            background: rgba(148, 163, 184, 0.2);
             border-radius: 6px;
             overflow: hidden;
             margin: 0.5rem 0;
         }
-        
+
         .robustness-fill {
             height: 100%;
             border-radius: 6px;
             transition: width 0.5s ease;
         }
-        
+
         .log-container {
             max-height: 300px;
             overflow-y: auto;
             font-size: 0.8rem;
         }
-        
+
         .log-item {
             padding: 0.5rem;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             gap: 0.5rem;
         }
-        
-        .log-time { color: var(--text2); min-width: 60px; }
-        
+
+        .log-time { color: var(--text-muted); min-width: 60px; }
+
         .preset-btn {
             padding: 0.375rem 0.75rem;
-            border: 1px solid var(--border);
-            background: var(--card);
+            border: 1px solid var(--border-color);
+            background: white;
             border-radius: 6px;
             font-size: 0.75rem;
             cursor: pointer;
             transition: all 0.2s;
+            color: var(--text-secondary);
         }
-        
-        .preset-btn:hover { border-color: var(--primary); }
-        
+
+        .preset-btn:hover { 
+            border-color: var(--blue); 
+            color: var(--blue);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
         .stat-mini {
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
             padding: 0.25rem 0.5rem;
-            background: var(--bg);
+            background: rgba(148, 163, 184, 0.1);
             border-radius: 4px;
             font-size: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-control {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .form-control:focus {
+            background: #ffffff;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            color: var(--text-primary);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-range::-webkit-slider-thumb {
+            background: var(--blue);
+        }
+
+        .form-range::-webkit-slider-runnable-track {
+            background: rgba(148, 163, 184, 0.3);
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            border: none;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+            transform: translateY(-2px);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            border: none;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            transform: translateY(-2px);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--gradient-danger);
+            border: none;
+            color: white;
+            box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            transform: translateY(-2px);
+            color: white;
+        }
+
+        .form-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gradient-primary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--blue);
         }
     </style>
 </head>
 <body>
     <nav class="nav">
-        <a class="nav-brand" href="/"><i class="bi bi-shield-check me-1"></i>钓鱼邮件检测系统</a>
+        <a class="nav-brand" href="/"><i class="bi bi-shield-check me-2"></i>PHISHING DETECTOR</a>
         <div style="display: flex; gap: 0.5rem;">
             <a href="/bigscreen" class="preset-btn">数据大屏</a>
             <a href="/" class="preset-btn">首页</a>
@@ -155,14 +392,12 @@
     
     <div class="container">
         <div class="mb-3">
-            <h5 style="font-weight: 600;"><i class="bi bi-bug me-2" style="color: var(--danger);"></i>对抗样本测试</h5>
-            <p style="color: var(--text2); font-size: 0.875rem;">测试系统对恶意变形邮件的检测鲁棒性，验证模型抗攻击能力</p>
+            <h5 class="page-title"><i class="bi bi-bug me-2"></i>对抗样本测试</h5>
+            <p class="page-desc">测试系统对恶意变形邮件的检测鲁棒性，验证模型抗攻击能力</p>
         </div>
         
         <div class="row">
-            <!-- 左侧：攻击配置 -->
             <div class="col-lg-5">
-                <!-- 原始邮件 -->
                 <div class="card">
                     <div class="card-header"><i class="bi bi-envelope"></i>原始邮件内容</div>
                     <div class="card-body">
@@ -175,12 +410,11 @@
                     </div>
                 </div>
                 
-                <!-- 攻击方式选择 -->
                 <div class="card">
                     <div class="card-header"><i class="bi bi-lightning"></i>攻击方式</div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">文本变形攻击</label>
+                            <label class="form-label">文本变形攻击</label>
                             <div>
                                 <button class="attack-type-btn active" data-type="homoglyph" onclick="selectAttackType(this)">
                                     <span class="icon">🔄</span>同形字替换
@@ -198,7 +432,7 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">结构变形攻击</label>
+                            <label class="form-label">结构变形攻击</label>
                             <div>
                                 <button class="attack-type-btn" data-type="synonym" onclick="selectAttackType(this)">
                                     <span class="icon">📝</span>同义词替换
@@ -216,7 +450,7 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">高级攻击</label>
+                            <label class="form-label">高级攻击</label>
                             <div>
                                 <button class="attack-type-btn" data-type="url_encode" onclick="selectAttackType(this)">
                                     <span class="icon">🔗</span>URL编码
@@ -234,11 +468,11 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label style="font-size: 0.8rem; font-weight: 600;">
-                                攻击强度: <span id="intensityValue">30</span>%
+                            <label class="form-label">
+                                攻击强度: <span id="intensityValue" style="color: var(--blue);">30</span>%
                             </label>
                             <input type="range" class="form-range" id="attackIntensity" min="10" max="100" value="30" style="width: 100%;">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text2);">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted);">
                                 <span>轻微变形</span>
                                 <span>重度变形</span>
                             </div>
@@ -255,17 +489,16 @@
                     </div>
                 </div>
                 
-                <!-- 对抗样本预览 -->
                 <div class="card" id="attackedCard" style="display: none;">
                     <div class="card-header"><i class="bi bi-file-diff"></i>对抗样本预览</div>
                     <div class="card-body">
                         <div class="mb-2">
-                            <span style="font-size: 0.8rem; color: var(--text2);">变形后内容:</span>
+                            <span style="font-size: 0.8rem; color: var(--text-secondary);">变形后内容:</span>
                         </div>
                         <div class="diff-view" id="attackedPreview"></div>
                         
                         <div class="mt-3 mb-2">
-                            <span style="font-size: 0.8rem; color: var(--text2);">变形详情:</span>
+                            <span style="font-size: 0.8rem; color: var(--text-secondary);">变形详情:</span>
                         </div>
                         <div id="attackDetails" style="font-size: 0.8rem;"></div>
                         
@@ -276,49 +509,45 @@
                 </div>
             </div>
             
-            <!-- 右侧：结果分析 -->
             <div class="col-lg-7">
-                <!-- 检测结果对比 -->
                 <div class="card">
                     <div class="card-header"><i class="bi bi-clipboard-data"></i>检测结果对比</div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="result-card result-unknown" id="originalResult">
-                                    <div style="font-size: 0.75rem; color: var(--text2); margin-bottom: 0.5rem;">原始邮件</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">原始邮件</div>
                                     <div style="font-size: 2rem;">-</div>
                                     <div style="font-size: 1rem; font-weight: 600;">未检测</div>
-                                    <div style="font-size: 0.75rem; color: var(--text2);">置信度: -</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">置信度: -</div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="result-card result-unknown" id="attackedResult">
-                                    <div style="font-size: 0.75rem; color: var(--text2); margin-bottom: 0.5rem;">对抗样本</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">对抗样本</div>
                                     <div style="font-size: 2rem;">-</div>
                                     <div style="font-size: 1rem; font-weight: 600;">未检测</div>
-                                    <div style="font-size: 0.75rem; color: var(--text2);">置信度: -</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">置信度: -</div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- 鲁棒性评估 -->
-                        <div class="mt-3 p-3 rounded" id="robustnessSection" style="background: var(--bg); display: none;">
+                        <div class="mt-3 p-3 rounded" id="robustnessSection" style="background: rgba(37, 99, 235, 0.05); border: 1px solid var(--border-color); display: none;">
                             <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">
-                                <i class="bi bi-shield-check me-1"></i>鲁棒性评估
+                                <i class="bi bi-shield-check me-1" style="color: var(--blue);"></i>鲁棒性评估
                             </div>
                             <div class="robustness-meter">
-                                <div class="robustness-fill" id="robustnessBar" style="width: 0%; background: var(--success);"></div>
+                                <div class="robustness-fill" id="robustnessBar" style="width: 0%; background: var(--green);"></div>
                             </div>
                             <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
                                 <span id="robustnessLabel">-</span>
                                 <span id="robustnessScore">-</span>
                             </div>
-                            <p style="font-size: 0.8rem; color: var(--text2); margin-top: 0.5rem;" id="robustnessAnalysis"></p>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;" id="robustnessAnalysis"></p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- 批量测试结果 -->
                 <div class="card" id="batchResultCard" style="display: none;">
                     <div class="card-header"><i class="bi bi-bar-chart"></i>批量测试结果</div>
                     <div class="card-body">
@@ -335,7 +564,6 @@
                     </div>
                 </div>
                 
-                <!-- 测试日志 -->
                 <div class="card">
                     <div class="card-header">
                         <span><i class="bi bi-clock-history"></i>测试日志</span>
@@ -343,7 +571,7 @@
                     </div>
                     <div class="card-body">
                         <div class="log-container" id="logContainer">
-                            <div style="text-align: center; color: var(--text2); padding: 2rem;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                 <i class="bi bi-inbox" style="font-size: 1.5rem;"></i>
                                 <p style="margin-top: 0.5rem; font-size: 0.8rem;">暂无测试记录</p>
                             </div>
@@ -351,13 +579,12 @@
                     </div>
                 </div>
                 
-                <!-- 攻击技术说明 -->
                 <div class="card">
                     <div class="card-header"><i class="bi bi-info-circle"></i>攻击技术说明</div>
                     <div class="card-body">
                         <div id="attackDescription">
                             <p style="font-size: 0.85rem;"><strong>同形字替换:</strong> 使用视觉相似的Unicode字符替换原文字符，如用拉丁字母a替换西里尔字母а。</p>
-                            <p style="font-size: 0.85rem; color: var(--text2); margin-top: 0.5rem;">选择其他攻击类型查看详细说明...</p>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">选择其他攻击类型查看详细说明...</p>
                         </div>
                     </div>
                 </div>
@@ -370,7 +597,6 @@
         let testResults = { original: null, attacked: null };
         let batchResults = [];
         
-        // 攻击类型说明
         const attackDescriptions = {
             homoglyph: '<p style="font-size: 0.85rem;"><strong>同形字替换:</strong> 使用视觉相似的Unicode字符替换原文字符，如用拉丁字母a替换西里尔字母а，用数字0替换字母O。这是最经典的对抗攻击方式。</p>',
             zerowidth: '<p style="font-size: 0.85rem;"><strong>零宽字符插入:</strong> 在文本中插入不可见的Unicode字符（如零宽空格、零宽连接符），这些字符不会显示但会改变文本内容。</p>',
@@ -383,7 +609,6 @@
             random: '<p style="font-size: 0.85rem;"><strong>随机组合:</strong> 随机选择多种攻击方式进行组合，模拟真实攻击者的复杂攻击策略。</p>'
         };
         
-        // 同形字映射表
         const homoglyphMap = {
             'a': ['а', 'ɑ', 'α', 'ａ'],
             'e': ['е', 'ё', 'ε', 'ｅ'],
@@ -416,10 +641,8 @@
             '即': ['几', '机']
         };
         
-        // 零宽字符
         const zeroWidthChars = ['\u200B', '\u200C', '\u200D', '\uFEFF', '\u2060', '\u180E'];
         
-        // Unicode同义字符
         const unicodeSynonyms = {
             'a': ['а', 'ɑ', 'α', 'а', 'ạ', 'à', 'á', 'â', 'ã', 'ä'],
             'e': ['е', 'ё', 'ε', 'е', 'ẹ', 'è', 'é', 'ê', 'ë'],
@@ -431,7 +654,6 @@
             'c': ['с', 'ϲ', 'ç', 'ć', 'č']
         };
         
-        // 同义词映射
         const synonymMap = {
             '密码': ['口令', '密钥', '通行证'],
             '账户': ['账号', '户头'],
@@ -452,22 +674,17 @@
             'unusual': ['suspicious', 'strange', 'abnormal']
         };
         
-        // 选择攻击类型
         function selectAttackType(btn) {
             document.querySelectorAll('.attack-type-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentAttackType = btn.dataset.type;
-            
-            // 更新说明
             document.getElementById('attackDescription').innerHTML = attackDescriptions[currentAttackType] || '<p>未知攻击类型</p>';
         }
         
-        // 强度滑块
         document.getElementById('attackIntensity').addEventListener('input', function() {
             document.getElementById('intensityValue').textContent = this.value;
         });
         
-        // 加载预设样本
         function loadPreset(type) {
             const presets = {
                 phishing: '尊敬的用户，您的银行账户存在异常登录，请立即点击 http://secure-bank-verify.com 登录验证，否则账户将在24小时内被冻结。请勿将此信息告知他人。',
@@ -477,13 +694,11 @@
             addLog('加载预设', `${type === 'phishing' ? '钓鱼' : '正常'}样本`);
         }
         
-        // 清空输入
         function clearInput() {
             document.getElementById('originalEmail').value = '';
             document.getElementById('attackedCard').style.display = 'none';
         }
         
-        // 生成对抗样本
         function generateAttack() {
             const original = document.getElementById('originalEmail').value;
             if (!original.trim()) {
@@ -495,53 +710,30 @@
             let result = { text: '', changes: [], count: 0 };
             
             switch (currentAttackType) {
-                case 'homoglyph':
-                    result = applyHomoglyphAttack(original, intensity);
-                    break;
-                case 'zerowidth':
-                    result = applyZeroWidthAttack(original, intensity);
-                    break;
-                case 'unicode':
-                    result = applyUnicodeAttack(original, intensity);
-                    break;
-                case 'synonym':
-                    result = applySynonymAttack(original, intensity);
-                    break;
-                case 'spaces':
-                    result = applySpaceAttack(original, intensity);
-                    break;
-                case 'encoding':
-                    result = applyEncodingAttack(original, intensity);
-                    break;
-                case 'url_encode':
-                    result = applyUrlEncodeAttack(original, intensity);
-                    break;
-                case 'html_entities':
-                    result = applyHtmlEntitiesAttack(original, intensity);
-                    break;
-                case 'random':
-                    result = applyRandomAttack(original, intensity);
-                    break;
+                case 'homoglyph': result = applyHomoglyphAttack(original, intensity); break;
+                case 'zerowidth': result = applyZeroWidthAttack(original, intensity); break;
+                case 'unicode': result = applyUnicodeAttack(original, intensity); break;
+                case 'synonym': result = applySynonymAttack(original, intensity); break;
+                case 'spaces': result = applySpaceAttack(original, intensity); break;
+                case 'encoding': result = applyEncodingAttack(original, intensity); break;
+                case 'url_encode': result = applyUrlEncodeAttack(original, intensity); break;
+                case 'html_entities': result = applyHtmlEntitiesAttack(original, intensity); break;
+                case 'random': result = applyRandomAttack(original, intensity); break;
             }
             
-            // 显示结果
             document.getElementById('attackedCard').style.display = 'block';
             document.getElementById('attackedPreview').innerHTML = highlightChanges(original, result.text);
             
-            // 显示变化详情
             let detailsHtml = `<div style="margin-bottom: 0.5rem;"><strong>共 ${result.count} 处变形:</strong></div>`;
             result.changes.forEach(c => {
-                detailsHtml += `<div class="mb-1"><code>${c.from}</code> → <code>${c.to}</code></div>`;
+                detailsHtml += `<div class="mb-1"><code style="color: var(--blue);">${c.from}</code> → <code style="color: var(--red);">${c.to}</code></div>`;
             });
             document.getElementById('attackDetails').innerHTML = detailsHtml;
             
-            // 保存结果供检测使用
             window._attackedText = result.text;
-            
             addLog('生成对抗样本', `${currentAttackType} - ${result.count}处变形`);
         }
         
-        // 高亮变化
         function highlightChanges(original, attacked) {
             let result = '';
             for (let i = 0; i < attacked.length; i++) {
@@ -560,7 +752,6 @@
             return div.innerHTML;
         }
         
-        // 同形字攻击
         function applyHomoglyphAttack(text, intensity) {
             let result = '';
             let changes = [];
@@ -582,7 +773,6 @@
             return { text: result, changes, count };
         }
         
-        // 零宽字符攻击
         function applyZeroWidthAttack(text, intensity) {
             let result = '';
             let count = 0;
@@ -603,7 +793,6 @@
             };
         }
         
-        // Unicode攻击
         function applyUnicodeAttack(text, intensity) {
             let result = '';
             let changes = [];
@@ -625,7 +814,6 @@
             return { text: result, changes, count };
         }
         
-        // 同义词攻击
         function applySynonymAttack(text, intensity) {
             let result = text;
             let changes = [];
@@ -644,7 +832,6 @@
             return { text: result, changes, count };
         }
         
-        // 空格攻击
         function applySpaceAttack(text, intensity) {
             let result = '';
             let changes = [];
@@ -666,7 +853,6 @@
             return { text: result, changes, count };
         }
         
-        // 编码攻击
         function applyEncodingAttack(text, intensity) {
             let result = text;
             let changes = [];
@@ -686,7 +872,6 @@
             return { text: result, changes, count };
         }
         
-        // URL编码攻击
         function applyUrlEncodeAttack(text, intensity) {
             let result = text;
             let changes = [];
@@ -712,7 +897,6 @@
             return { text: result, changes, count };
         }
         
-        // HTML实体攻击
         function applyHtmlEntitiesAttack(text, intensity) {
             let result = '';
             let changes = [];
@@ -736,7 +920,6 @@
             return { text: result, changes, count };
         }
         
-        // 随机攻击
         function applyRandomAttack(text, intensity) {
             const attacks = ['homoglyph', 'zerowidth', 'unicode', 'synonym', 'spaces'];
             let result = text;
@@ -766,7 +949,6 @@
             return { text: result, changes: allChanges, count: totalCount };
         }
         
-        // 检测邮件
         async function detectEmail(email, label) {
             try {
                 const response = await fetch('/api/detection/analyze', {
@@ -785,7 +967,6 @@
             }
         }
         
-        // 更新结果卡片
         function updateResultCard(id, result, label) {
             const el = document.getElementById(id);
             let cls = 'result-unknown', icon = '-', text = '未知';
@@ -800,16 +981,15 @@
             
             el.className = `result-card ${cls}`;
             el.innerHTML = `
-                <div style="font-size: 0.75rem; color: var(--text2); margin-bottom: 0.5rem;">${label}</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${label}</div>
                 <div style="font-size: 2rem;">${icon}</div>
                 <div style="font-size: 1rem; font-weight: 600;">${text}</div>
-                <div style="font-size: 0.75rem; color: var(--text2);">置信度: ${(result.confidence * 100).toFixed(1)}%</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">置信度: ${(result.confidence * 100).toFixed(1)}%</div>
             `;
             
             addLog(`检测${label}`, `${result.label} (${(result.confidence*100).toFixed(1)}%)`);
         }
         
-        // 测试原始邮件
         async function testOriginal() {
             const email = document.getElementById('originalEmail').value;
             testResults.original = await detectEmail(email, '原始');
@@ -817,7 +997,6 @@
             evaluateRobustness();
         }
         
-        // 测试对抗样本
         async function testAttacked() {
             if (!window._attackedText) {
                 alert('请先生成对抗样本');
@@ -828,7 +1007,6 @@
             evaluateRobustness();
         }
         
-        // 评估鲁棒性
         function evaluateRobustness() {
             const section = document.getElementById('robustnessSection');
             if (!testResults.original || !testResults.attacked) {
@@ -850,22 +1028,22 @@
                 robustness = 100;
                 label = '鲁棒性优秀';
                 analysis = '系统成功识别了经过变形攻击的邮件，检测结果完全一致。';
-                color = 'var(--success)';
+                color = 'var(--green)';
             } else if ((orig === 'PHISHING' && att === 'SUSPICIOUS') || (orig === 'SUSPICIOUS' && att === 'PHISHING')) {
                 robustness = 70;
                 label = '鲁棒性良好';
                 analysis = '虽然检测结果有差异，但系统仍然识别出了风险。';
-                color = 'var(--warning)';
+                color = 'var(--amber)';
             } else if (orig === 'PHISHING' && att === 'SAFE') {
                 robustness = 30;
                 label = '检测到逃逸攻击';
                 analysis = '对抗样本成功绕过了检测，建议增加对抗样本训练数据。';
-                color = 'var(--danger)';
+                color = 'var(--red)';
             } else {
                 robustness = 50;
                 label = '结果有差异';
                 analysis = '检测结果存在差异，需要进一步分析。';
-                color = 'var(--warning)';
+                color = 'var(--amber)';
             }
             
             document.getElementById('robustnessBar').style.width = robustness + '%';
@@ -878,7 +1056,6 @@
             addLog('鲁棒性评估', `${label} (${robustness}%)`);
         }
         
-        // 批量测试
         async function batchTest() {
             const original = document.getElementById('originalEmail').value;
             if (!original.trim()) {
@@ -915,39 +1092,35 @@
                 addLog(`测试 ${attack}`, detection.label);
             }
             
-            // 显示批量结果
             displayBatchResults();
         }
         
-        // 显示批量测试结果
         function displayBatchResults() {
             const card = document.getElementById('batchResultCard');
             card.style.display = 'block';
             
-            // 统计
             const success = batchResults.filter(r => r.label === testResults.original?.label).length;
             const failed = batchResults.length - success;
             const robustness = (success / batchResults.length * 100).toFixed(0);
             
             document.getElementById('batchStats').innerHTML = `
                 <div class="mb-3">
-                    <div style="font-size: 0.8rem; color: var(--text2);">鲁棒性评分</div>
-                    <div style="font-size: 2rem; font-weight: 700; color: ${robustness >= 80 ? 'var(--success)' : robustness >= 50 ? 'var(--warning)' : 'var(--danger)'};">${robustness}%</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">鲁棒性评分</div>
+                    <div style="font-size: 2rem; font-weight: 700; color: ${robustness >= 80 ? 'var(--green)' : robustness >= 50 ? 'var(--amber)' : 'var(--red)'};">${robustness}%</div>
                 </div>
                 <div class="mb-2">
-                    <span class="stat-mini"><span style="color: var(--success);">●</span> 通过: ${success}</span>
-                    <span class="stat-mini"><span style="color: var(--danger);">●</span> 失败: ${failed}</span>
+                    <span class="stat-mini"><span style="color: var(--green);">●</span> 通过: ${success}</span>
+                    <span class="stat-mini"><span style="color: var(--red);">●</span> 失败: ${failed}</span>
                 </div>
                 <div style="font-size: 0.8rem;">
                     ${batchResults.map(r => `
                         <div class="mb-1">
-                            <span class="stat-mini">${r.attack}: <strong style="color: ${r.label === testResults.original?.label ? 'var(--success)' : 'var(--danger)'}">${r.label}</strong></span>
+                            <span class="stat-mini">${r.attack}: <strong style="color: ${r.label === testResults.original?.label ? 'var(--green)' : 'var(--red)'}">${r.label}</strong></span>
                         </div>
                     `).join('')}
                 </div>
             `;
             
-            // 图表
             const ctx = document.getElementById('robustnessChart').getContext('2d');
             new Chart(ctx, {
                 type: 'radar',
@@ -956,8 +1129,8 @@
                     datasets: [{
                         label: '鲁棒性',
                         data: batchResults.map(r => r.label === testResults.original?.label ? 100 : 0),
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                        borderColor: '#2563eb',
                         pointBackgroundColor: batchResults.map(r => r.label === testResults.original?.label ? '#10b981' : '#ef4444')
                     }]
                 },
@@ -970,14 +1143,14 @@
                             beginAtZero: true,
                             max: 100,
                             ticks: { display: false },
-                            grid: { color: '#e2e8f0' }
+                            grid: { color: 'rgba(37, 99, 235, 0.1)' },
+                            angleLines: { color: 'rgba(37, 99, 235, 0.1)' }
                         }
                     }
                 }
             });
         }
         
-        // 日志
         function addLog(action, detail) {
             const container = document.getElementById('logContainer');
             const empty = container.querySelector('div[style*="text-align"]');
@@ -987,21 +1160,20 @@
             item.className = 'log-item';
             item.innerHTML = `
                 <span class="log-time">${new Date().toLocaleTimeString()}</span>
-                <span><strong>${action}</strong>: ${detail}</span>
+                <span><strong style="color: var(--blue);">${action}</strong>: ${detail}</span>
             `;
             container.insertBefore(item, container.firstChild);
         }
         
         function clearLog() {
             document.getElementById('logContainer').innerHTML = `
-                <div style="text-align: center; color: var(--text2); padding: 2rem;">
+                <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
                     <i class="bi bi-inbox" style="font-size: 1.5rem;"></i>
                     <p style="margin-top: 0.5rem; font-size: 0.8rem;">暂无测试记录</p>
                 </div>
             `;
         }
         
-        // 页面加载时自动测试原始邮件
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(testOriginal, 1000);
         });

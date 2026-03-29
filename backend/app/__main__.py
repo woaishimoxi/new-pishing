@@ -114,22 +114,6 @@ def register_template_routes(app: Flask) -> None:
     def dashboard():
         return render_template('dashboard.html')
     
-    @app.route('/detection')
-    def detection():
-        return render_template('detection.html')
-    
-    @app.route('/alerts')
-    def alerts():
-        return render_template('alerts.html')
-    
-    @app.route('/config')
-    def config_page():
-        return render_template('config.html')
-    
-    @app.route('/history')
-    def history():
-        return render_template('history.html')
-    
     @app.route('/domains')
     def domains_page():
         return render_template('domains.html')
