@@ -108,6 +108,10 @@ def register_template_routes(app: Flask) -> None:
     
     @app.route('/')
     def index():
+        return render_template('bigscreen.html')
+    
+    @app.route('/dashboard')
+    def dashboard():
         return render_template('dashboard.html')
     
     @app.route('/dashboard')
