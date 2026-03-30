@@ -313,7 +313,8 @@ class DetectionService:
         url_weight = float(self.config.detection.get('url_weight', 0.4) if hasattr(self.config.detection, 'get') else 0.4)
         
         # 获取规则评分
-        _, rule_score = self._demo_predict(features, email_data)
+        rule_result = self._demo_predict(features, email_data)
+        rule_score = rule_result[1] if rule_result else 0.0
         
         # 三维度融合：模型 + URL + 规则
         if url_risk_level == 'HIGH':
