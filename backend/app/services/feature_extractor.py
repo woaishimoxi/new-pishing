@@ -453,6 +453,14 @@ class FeatureExtractionService:
                 features['has_suspicious_attachment'] = 1
                 attachment_risk += 5.0
             
+            # Check for dangerous extensions anywhere in the filename
+            dangerous_extensions = ['.php', '.php3', '.php4', '.php5', '.phtml', '.jsp', '.asp', '.aspx', '.sh', '.py', '.pl', '.cgi']
+            for ext in dangerous_extensions:
+                if ext in filename:
+                    features['has_executable_attachment'] = 1
+                    attachment_risk += 10.0
+                    break  # No need to check other dangerous extensions
+            
             ext = '.' + filename.rsplit('.', 1)[-1] if '.' in filename else ''
             if ext in ['.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.js', '.ps1', '.msi', '.hta']:
                 features['has_executable_attachment'] = 1
@@ -464,9 +472,27 @@ class FeatureExtractionService:
             
             parts = filename.split('.')
             if len(parts) > 2:
-                if parts[-2] in ['.pdf', '.doc', '.xls', '.jpg', '.png', '.txt', '.zip']:
-                    features['has_double_extension'] = 1
-                    attachment_risk += 7.0
+                # Check if the second-to-last part is a common safe extension
+                # but the last part might be hiding something dangerous
+                second_last = '.' + parts[-2]
+                last = '.' + parts[-1]
+                
+                # Common safe extensions that attackers might use to mask dangerous files
+                safe_extensions = ['.txt', '.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip']
+                
+                if second_last in safe_extensions:
+                    # Check if the actual extension (last part) is dangerous
+                    if last in ['.php', '.php3', '.php4', '.php5', '.phtml', '.jsp', '.asp', '.aspx', '.sh', '.py', '.pl', '.cgi']:
+                        features['has_executable_attachment'] = 1
+                        attachment_risk += 10.0
+                    # Also check if it's in our standard high-risk list
+                    if last in ['.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.js', '.ps1', '.msi', '.hta']:
+                        features['has_executable_attachment'] = 1
+                        attachment_risk += 10.0
+                    # Standard double extension check - only flag if extensions are different
+                    if second_last in ['.pdf', '.doc', '.xls', '.jpg', '.png', '.txt', '.zip'] and second_last != last:
+                        features['has_double_extension'] = 1
+                        attachment_risk += 7.0
         
         features['total_attachment_size'] = total_size
         features['sandbox_detected'] = 1 if sandbox_detected else 0

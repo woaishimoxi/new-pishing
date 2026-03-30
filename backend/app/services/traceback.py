@@ -459,16 +459,34 @@ class TracebackService:
         """Extract source IP and path from Received chain"""
         path = []
         source_ip = "Unknown"
-        ip_pattern = r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]'
+        first_ip_found = None
+        
+        # Pattern to match both IPv4 and IPv6 addresses in brackets
+        ip_pattern = r'\[([^\]]+)\]'
         
         for i, line in enumerate(reversed(received_chain)):
             ip_match = re.search(ip_pattern, line)
             if ip_match:
-                ip = ip_match.group(1)
-                if not self._is_private_ip(ip):
-                    path.append(ip)
-                    if i == len(received_chain) - 1:
-                        source_ip = ip
+                potential_ip = ip_match.group(1)
+                # Validate if it's a valid IP address (IPv4 or IPv6)
+                if self._is_valid_ip_address(potential_ip):
+                    # Remember the first IP we find (for fallback)
+                    if first_ip_found is None:
+                        first_ip_found = potential_ip
+                    
+                    # If it's not private, add to path and consider as source
+                    if not self._is_private_ip(potential_ip):
+                        path.append(potential_ip)
+                        # The first non-private IP we find (going bottom-up) is the source
+                        if source_ip == "Unknown":
+                            source_ip = potential_ip
+        
+        # If we didn't find any non-private IP, use the first IP we found as fallback
+        if source_ip == "Unknown" and first_ip_found is not None:
+            source_ip = first_ip_found
+            # Also add it to the path for consistency
+            if first_ip_found not in path:
+                path.append(first_ip_found)
         
         return {
             "source_ip": source_ip,
@@ -476,26 +494,59 @@ class TracebackService:
             "hops": list(reversed(path))
         }
     
+    def _is_valid_ip_address(self, ip: str) -> bool:
+        """Validate if string is a valid IP address (IPv4 or IPv6)"""
+        # IPv4 pattern
+        ipv4_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        # IPv6 pattern (simplified, covers common formats)
+        ipv6_pattern = r'^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$'
+        ipv6_pattern_compressed = r'^([0-9a-fA-F]{1,4}:)*::([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4}$'
+        
+        if re.match(ipv4_pattern, ip):
+            # Additional validation for IPv4 octets
+            parts = ip.split('.')
+            return all(0 <= int(part) <= 255 for part in parts)
+        elif re.match(ipv6_pattern, ip) or re.match(ipv6_pattern_compressed, ip):
+            return True
+        elif ':' in ip and ip.count(':') >= 2:  # Basic IPv6 check
+            return True
+            
+        return False
+    
     def _is_private_ip(self, ip: str) -> bool:
-        """Check if IP is private"""
-        parts = ip.split('.')
-        if len(parts) != 4:
-            return False
-        try:
-            first = int(parts[0])
-            second = int(parts[1])
-            if first == 10:
+        """Check if IP is private (IPv4 or IPv6)"""
+        # IPv4 private addresses
+        if '.' in ip:
+            parts = ip.split('.')
+            if len(parts) == 4:
+                try:
+                    first = int(parts[0])
+                    second = int(parts[1])
+                    if first == 10:
+                        return True
+                    if first == 172 and 16 <= second <= 31:
+                        return True
+                    if first == 192 and second == 168:
+                        return True
+                    if first == 127:
+                        return True
+                    if first == 0:
+                        return True
+                except ValueError:
+                    pass
+        
+        # IPv6 private/link-local addresses
+        elif ':' in ip:
+            # Check for link-local (fe80::/10)
+            if ip.lower().startswith('fe80:'):
                 return True
-            if first == 172 and 16 <= second <= 31:
+            # Check for unique local (fc00::/7)
+            if ip.lower().startswith('fc00:') or ip.lower().startswith('fd00:'):
                 return True
-            if first == 192 and second == 168:
+            # Check for loopback (::1)
+            if ip == '::1':
                 return True
-            if first == 127:
-                return True
-            if first == 0:
-                return True
-        except ValueError:
-            pass
+        
         return False
     
     def _get_ip_geolocation(self, ip: str, ip_api_url: str) -> Dict:

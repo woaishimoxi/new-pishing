@@ -285,6 +285,11 @@ class EmailParserService:
             
             is_suspicious = self._check_suspicious_file_type(filename, content_type)
             
+            # Check attachment content for dangerous patterns
+            content_risk = self._check_attachment_content(payload)
+            if content_risk:
+                is_suspicious = True
+            
             return {
                 'filename': filename,
                 'content_type': content_type,
@@ -301,16 +306,82 @@ class EmailParserService:
     
     def _check_suspicious_file_type(self, filename: str, content_type: str) -> bool:
         """Check if file type is suspicious"""
-        ext = '.' + filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+        filename_lower = filename.lower()
         
+        # Check for dangerous extensions anywhere in the filename
+        dangerous_extensions = ['.php', '.php3', '.php4', '.php5', '.phtml', '.jsp', '.asp', '.aspx', '.sh', '.py', '.pl', '.cgi']
+        for ext in dangerous_extensions:
+            if ext in filename_lower:
+                return True
+        
+        # Check standard high-risk extensions
+        ext = '.' + filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
         if ext in self.HIGH_RISK_EXTENSIONS:
             return True
         
-        parts = filename.lower().split('.')
+        # Check for double extensions that mask dangerous files
+        parts = filename_lower.split('.')
         if len(parts) > 2:
-            if parts[-2] in ['.pdf', '.doc', '.xls', '.jpg', '.png', '.txt', '.zip']:
-                return True
+            # Check if the second-to-last part is a common safe extension
+            # but the last part might be hiding something dangerous
+            second_last = '.' + parts[-2]
+            last = '.' + parts[-1]
+            
+            # Common safe extensions that attackers might use to mask dangerous files
+            safe_extensions = ['.txt', '.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip']
+            
+            if second_last in safe_extensions:
+                # Check if the actual extension (last part) is dangerous
+                if last in ['.php', '.php3', '.php4', '.php5', '.phtml', '.jsp', '.asp', '.aspx', '.sh', '.py', '.pl', '.cgi']:
+                    return True
+                # Also check if it's in our standard high-risk list
+                if last in self.HIGH_RISK_EXTENSIONS:
+                    return True
         
+        # Check content type for PHP files
+        if 'php' in content_type.lower() or 'application/x-php' in content_type.lower():
+            return True
+            
+        return False
+
+    def _check_attachment_content(self, payload) -> bool:
+        """Check attachment content for dangerous patterns"""
+        if not payload:
+            return False
+            
+        try:
+            # Decode payload if it's bytes
+            if isinstance(payload, bytes):
+                content = payload.decode('utf-8', errors='ignore')
+            else:
+                content = str(payload)
+            
+            content_lower = content.lower()
+            
+            # Check for dangerous PHP patterns
+            dangerous_patterns = [
+                'eval(', 'base64_decode', 'system(', 'exec(', 'shell_exec(',
+                'passthru(', 'assert(', 'create_function', 'iframe',
+                'document.write', 'window.location', '<script>',
+                '<?php', '<?=', '?>'
+            ]
+            
+            for pattern in dangerous_patterns:
+                if pattern in content_lower:
+                    return True
+                    
+            # Check for suspicious variable names that might indicate obfuscated code
+            suspicious_vars = ['_', '$a', '$b', '$c', '$d', '$e', '$f']
+            for var in suspicious_vars:
+                if var + '=' in content_lower:
+                    # If we see multiple suspicious variable assignments, likely obfuscated
+                    if content_lower.count(var + '=') > 2:
+                        return True
+                        
+        except Exception:
+            # If we can't decode the content, we can't check it
+            pass
+            
         return False
     
     def _extract_urls(self, body: str) -> List[str]:
