@@ -182,7 +182,8 @@ class TracebackAnalyzer:
         
         # 解析每条Received记录
         hops = []
-        ip_pattern = r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]'
+        # 同时支持IPv4和IPv6的正则表达式
+        ip_pattern = r'\[([^\]]+)\]'
         
         for i, received in enumerate(reversed(received_chain)):
             hop = {
@@ -193,11 +194,12 @@ class TracebackAnalyzer:
                 'time': None
             }
             
-            # 提取IP
+            # 提取IP（支持IPv4和IPv6）
             ip_match = re.search(ip_pattern, received)
             if ip_match:
                 ip = ip_match.group(1)
-                if not self._is_private_ip(ip):
+                # 验证是否为有效的IP地址
+                if self._is_valid_ip(ip) and not self._is_private_ip(ip):
                     hop['ip'] = ip
             
             # 提取服务器名
@@ -237,6 +239,23 @@ class TracebackAnalyzer:
         ])
         
         return chain
+    
+    def _is_valid_ip(self, ip: str) -> bool:
+        """验证是否为有效的IP地址（支持IPv4和IPv6）"""
+        # IPv4 pattern
+        if '.' in ip:
+            ipv4_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+            if re.match(ipv4_pattern, ip):
+                parts = ip.split('.')
+                return all(0 <= int(p) <= 255 for p in parts)
+            return False
+        
+        # IPv6 pattern (simplified)
+        if ':' in ip:
+            # Basic IPv6 validation - contains colons and reasonable length
+            return 2 <= ip.count(':') <= 7 and len(ip) <= 39
+        
+        return False
     
     # ==================== 维度3: 攻击特性（社会工程学）====================
     def _analyze_social_engineering(self, parsed_email: Dict) -> Dict:
@@ -448,25 +467,35 @@ class TracebackAnalyzer:
         return re.findall(email_pattern, (field or '').lower())
     
     def _is_private_ip(self, ip: str) -> bool:
-        """检查是否为私有IP"""
-        parts = ip.split('.')
-        if len(parts) != 4:
-            return False
+        """检查是否为私有IP（支持IPv4和IPv6）"""
+        # IPv4私有地址
+        if '.' in ip:
+            parts = ip.split('.')
+            if len(parts) == 4:
+                try:
+                    first = int(parts[0])
+                    second = int(parts[1])
+                    
+                    if first == 10:
+                        return True
+                    if first == 172 and 16 <= second <= 31:
+                        return True
+                    if first == 192 and second == 168:
+                        return True
+                    if first == 127:
+                        return True
+                except ValueError:
+                    pass
         
-        try:
-            first = int(parts[0])
-            second = int(parts[1])
-            
-            if first == 10:
-                return True
-            if first == 172 and 16 <= second <= 31:
-                return True
-            if first == 192 and second == 168:
-                return True
-            if first == 127:
-                return True
-        except ValueError:
-            pass
+        # IPv6私有/链路本地地址
+        elif ':' in ip:
+            ip_lower = ip.lower()
+            if ip_lower.startswith('fe80:'):
+                return True  # 链路本地
+            if ip_lower.startswith('fc00:') or ip_lower.startswith('fd00:'):
+                return True  # 唯一本地
+            if ip_lower == '::1':
+                return True  # 回环
         
         return False
     
