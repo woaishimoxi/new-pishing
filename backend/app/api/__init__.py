@@ -11,6 +11,7 @@ from .domains import domains_bp
 from .settings import settings_bp
 from .attachment import attachment_bp
 from .docs import api_docs, api
+from .monitor import monitor_bp
 
 __all__ = [
     'detection_bp',
@@ -23,5 +24,6 @@ __all__ = [
     'settings_bp',
     'attachment_bp',
     'api_docs',
-    'api'
+    'api',
+    'monitor_bp'
 ]

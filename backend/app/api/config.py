@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from app.core import get_logger, get_config
 from app.services import EmailFetcherService
-from app.services.url_analyzer import URLAnalyzerService
 
 config_bp = Blueprint('config', __name__)
 logger = get_logger(__name__)
@@ -19,9 +18,11 @@ config = get_config()
 def get_api_config():
     """Get API configuration"""
     return jsonify({
-        'virustotal': {
-            'api_key': config.api.virustotal_api_key,
-            'api_url': config.api.virustotal_api_url
+        'threatbook': {
+            'api_key': config.api.threatbook_api_key,
+            'api_url': config.api.threatbook_api_url,
+            'sandbox_enabled': getattr(config.api, 'sandbox_enabled', True),
+            'ioc_enabled': getattr(config.api, 'ioc_remote_enabled', True)
         },
         'ipapi': {
             'api_url': config.api.ip_api_url
@@ -43,12 +44,16 @@ def update_api_config():
     try:
         new_config = request.get_json()
         
-        if 'virustotal' in new_config:
-            vt = new_config['virustotal']
-            if 'api_key' in vt:
-                config.api.virustotal_api_key = vt['api_key']
-            if 'api_url' in vt:
-                config.api.virustotal_api_url = vt['api_url']
+        if 'threatbook' in new_config:
+            tb = new_config['threatbook']
+            if 'api_key' in tb:
+                config.api.threatbook_api_key = tb['api_key']
+            if 'api_url' in tb:
+                config.api.threatbook_api_url = tb['api_url']
+            if 'sandbox_enabled' in tb:
+                config.api.sandbox_enabled = tb['sandbox_enabled']
+            if 'ioc_enabled' in tb:
+                config.api.ioc_remote_enabled = tb['ioc_enabled']
         
         if 'ipapi' in new_config and 'api_url' in new_config['ipapi']:
             config.api.ip_api_url = new_config['ipapi']['api_url']
@@ -79,21 +84,90 @@ def update_api_config():
 
 @config_bp.route('/test', methods=['GET'])
 def test_api_connection():
-    """Test VirusTotal API connection"""
+    """Test ThreatBook API connection"""
     try:
         from app.services.feature_extractor import FeatureExtractionService
         feature_extractor = FeatureExtractionService()
-        result = feature_extractor._query_virustotal(
-            'https://www.google.com',
-            config.api.virustotal_api_key,
-            config.api.virustotal_api_url
-        )
+        result = feature_extractor._query_threatbook('https://www.google.com')
         
         if result >= 0:
-            return jsonify({'status': 'success', 'message': 'VirusTotal API 连接成功'})
+            return jsonify({'status': 'success', 'message': '微步在线 API 连接成功'})
         else:
-            return jsonify({'status': 'error', 'message': 'VirusTotal API 连接失败'}), 400
+            return jsonify({'status': 'error', 'message': '微步在线 API 连接失败'}), 400
             
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'测试失败: {str(e)}'}), 500
+
+
+@config_bp.route('/test-ai', methods=['POST'])
+def test_ai_connection():
+    """Test AI API connection"""
+    import requests
+    
+    try:
+        data = request.get_json()
+        provider = data.get('provider', 'zhipu')
+        api_key = data.get('api_key', '')
+        api_url = data.get('api_url', '')
+        model = data.get('model', 'glm-4-flash')
+        
+        if not api_key:
+            return jsonify({'status': 'error', 'message': '请填写API Key'}), 400
+        
+        if not api_url:
+            if provider == 'zhipu':
+                api_url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+            elif provider == 'moonshot':
+                api_url = 'https://api.moonshot.cn/v1/chat/completions'
+            elif provider == 'deepseek':
+                api_url = 'https://api.deepseek.com/v1/chat/completions'
+            elif provider == 'openai':
+                api_url = 'https://api.openai.com/v1/chat/completions'
+            else:
+                api_url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+        
+        test_message = "你好，这是一个测试消息，请回复'测试成功'。"
+        
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'model': model,
+            'messages': [
+                {'role': 'user', 'content': test_message}
+            ],
+            'max_tokens': 50,
+            'temperature': 0.1
+        }
+        
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if 'choices' in result or 'result' in result:
+                return jsonify({'status': 'success', 'message': 'AI连接测试成功'})
+            else:
+                return jsonify({'status': 'error', 'message': f'AI返回格式异常: {result}'}), 400
+        elif response.status_code == 401:
+            return jsonify({'status': 'error', 'message': 'API Key无效或已过期'}), 400
+        elif response.status_code == 429:
+            return jsonify({'status': 'error', 'message': 'API调用频率超限，请稍后重试'}), 400
+        else:
+            error_msg = f'API返回错误 (状态码: {response.status_code})'
+            try:
+                error_data = response.json()
+                if 'error' in error_data:
+                    error_msg = error_data['error'].get('message', error_msg)
+            except:
+                pass
+            return jsonify({'status': 'error', 'message': error_msg}), 400
+            
+    except requests.exceptions.Timeout:
+        return jsonify({'status': 'error', 'message': 'AI连接超时，请检查网络'}), 500
+    except requests.exceptions.ConnectionError:
+        return jsonify({'status': 'error', 'message': '无法连接到AI服务，请检查网络或API地址'}), 500
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'测试失败: {str(e)}'}), 500
 
@@ -102,7 +176,6 @@ def test_api_connection():
 def test_email_connection():
     """Test email server connection"""
     try:
-        # 从文件读取最新配置
         import json
         from pathlib import Path
         
@@ -114,7 +187,6 @@ def test_email_connection():
                 data = json.load(f)
                 email_config = data.get('email', {})
         
-        # 使用文件配置或内存配置
         email_address = email_config.get('email') or config.email.address
         email_password = email_config.get('password') or config.email.password
         email_server = email_config.get('server') or config.email.server

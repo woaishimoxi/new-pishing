@@ -40,11 +40,20 @@ class DatabaseConfig:
 @dataclass
 class APIConfig:
     """External API configuration"""
-    virustotal_api_key: str = ""
-    virustotal_api_url: str = "https://www.virustotal.com/vtapi/v2/url/report"
-    ip_api_url: str = "http://ip-api.com/json/"
+    threatbook_api_key: str = ""
+    threatbook_api_url: str = "https://api.threatbook.cn/v3"
+    ip_api_url: str = "https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8"
+    sandbox_enabled: bool = True
+    ioc_remote_enabled: bool = True
     request_timeout: int = 10
     max_retries: int = 3
+    
+    # AI配置
+    ai_provider: str = "alibaba"
+    ai_api_key: str = ""
+    ai_api_url: str = ""
+    ai_model: str = "qwen-turbo"
+    ai_enabled: bool = False
 
 
 @dataclass
@@ -107,7 +116,7 @@ class LoggingConfig:
 @dataclass
 class SecurityConfig:
     """Security configuration"""
-    secret_key: str = "dev-secret-key-change-in-production"
+    secret_key: str = ""  # 将在初始化时生成
     session_timeout: int = 3600
     max_content_length: int = 50 * 1024 * 1024
     allowed_extensions: List[str] = field(default_factory=lambda: ["eml", "msg"])
@@ -131,19 +140,34 @@ class Config:
     def __init__(
         self,
         env: Environment = Environment.DEVELOPMENT,
-        config_dir: str = "config",
+        config_dir: str = None,  # 修改为None，自动检测路径
         data_dir: str = "data",
         models_dir: str = "models",
         logs_dir: str = "logs"
     ):
         if self._initialized:
             return
-            
+        
+        # 自动检测项目根目录
+        if config_dir is None:
+            # 从当前文件位置向上查找项目根目录
+            current_file = Path(__file__).resolve()
+            # backend/app/core/config.py -> 项目根目录
+            project_root = current_file.parent.parent.parent.parent
+            config_dir = project_root / "config"
+        
         self.env = env
         self.config_dir = Path(config_dir)
         self.data_dir = Path(data_dir)
         self.models_dir = Path(models_dir)
         self.logs_dir = Path(logs_dir)
+        
+        # 确保路径是绝对路径
+        if not self.config_dir.is_absolute():
+            # 如果是相对路径，基于项目根目录解析
+            current_file = Path(__file__).resolve()
+            project_root = current_file.parent.parent.parent.parent
+            self.config_dir = project_root / self.config_dir
         
         self.database = DatabaseConfig()
         self.api = APIConfig()
@@ -151,7 +175,11 @@ class Config:
         self.detection = DetectionConfig()
         self.whitelist = WhitelistConfig()
         self.logging = LoggingConfig()
+        
+        # 生成安全的secret_key（优先使用环境变量）
+        import secrets
         self.security = SecurityConfig()
+        self.security.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
         
         self._load_from_env()
         self._load_from_files()
@@ -169,8 +197,8 @@ class Config:
         self.database.user = os.getenv("DB_USER", self.database.user)
         self.database.password = os.getenv("DB_PASSWORD", self.database.password)
         
-        self.api.virustotal_api_key = os.getenv("VT_API_KEY", self.api.virustotal_api_key)
-        self.api.virustotal_api_url = os.getenv("VT_API_URL", self.api.virustotal_api_url)
+        self.api.threatbook_api_key = os.getenv("THREATBOOK_API_KEY", self.api.threatbook_api_key)
+        self.api.threatbook_api_url = os.getenv("THREATBOOK_API_URL", self.api.threatbook_api_url)
         self.api.ip_api_url = os.getenv("IP_API_URL", self.api.ip_api_url)
         
         self.email.address = os.getenv("EMAIL_ADDRESS", self.email.address)
@@ -198,12 +226,16 @@ class Config:
                 with open(config_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 
-                if 'virustotal' in data:
-                    vt = data['virustotal']
-                    if vt.get('api_key'):
-                        self.api.virustotal_api_key = vt['api_key']
-                    if vt.get('api_url'):
-                        self.api.virustotal_api_url = vt['api_url']
+                if 'threatbook' in data:
+                    tb = data['threatbook']
+                    if tb.get('api_key'):
+                        self.api.threatbook_api_key = tb['api_key']
+                    if tb.get('api_url'):
+                        self.api.threatbook_api_url = tb['api_url']
+                    if 'sandbox_enabled' in tb:
+                        self.api.sandbox_enabled = tb['sandbox_enabled']
+                    if 'ioc_enabled' in tb:
+                        self.api.ioc_remote_enabled = tb['ioc_enabled']
                 
                 if 'ipapi' in data and data['ipapi'].get('api_url'):
                     self.api.ip_api_url = data['ipapi']['api_url']
@@ -222,6 +254,20 @@ class Config:
                         self.email.port = email['port']
                     if 'enabled' in email:
                         self.email.enabled = email['enabled']
+                
+                # 加载AI配置
+                if 'ai' in data:
+                    ai = data['ai']
+                    if ai.get('provider'):
+                        self.api.ai_provider = ai['provider']
+                    if ai.get('api_key'):
+                        self.api.ai_api_key = ai['api_key']
+                    if ai.get('api_url'):
+                        self.api.ai_api_url = ai['api_url']
+                    if ai.get('model'):
+                        self.api.ai_model = ai['model']
+                    if 'enabled' in ai:
+                        self.api.ai_enabled = ai['enabled']
                         
             except Exception as e:
                 print(f"Warning: Failed to load API config: {e}")
@@ -257,10 +303,19 @@ class Config:
         """Save API configuration to file"""
         config_file = self.config_dir / "api_config.json"
         try:
+            # 读取现有配置（保留其他配置项）
+            existing_data = {}
+            if config_file.exists():
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+            
+            # 更新配置
             data = {
-                'virustotal': {
-                    'api_key': self.api.virustotal_api_key,
-                    'api_url': self.api.virustotal_api_url
+                'threatbook': {
+                    'api_key': self.api.threatbook_api_key,
+                    'api_url': self.api.threatbook_api_url,
+                    'sandbox_enabled': self.api.sandbox_enabled,
+                    'ioc_enabled': self.api.ioc_remote_enabled
                 },
                 'ipapi': {
                     'api_url': self.api.ip_api_url
@@ -272,8 +327,16 @@ class Config:
                     'protocol': self.email.protocol,
                     'port': self.email.port,
                     'enabled': self.email.enabled
+                },
+                'ai': {
+                    'provider': self.api.ai_provider,
+                    'api_key': self.api.ai_api_key,
+                    'api_url': self.api.ai_api_url,
+                    'model': self.api.ai_model,
+                    'enabled': self.api.ai_enabled
                 }
             }
+            
             with open(config_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return True
@@ -305,8 +368,8 @@ class Config:
                 'name': self.database.name
             },
             'api': {
-                'virustotal_api_key': '***' if self.api.virustotal_api_key else '',
-                'virustotal_api_url': self.api.virustotal_api_url,
+                'threatbook_api_key': '***' if self.api.threatbook_api_key else '',
+                'threatbook_api_url': self.api.threatbook_api_url,
                 'ip_api_url': self.api.ip_api_url
             },
             'email': {

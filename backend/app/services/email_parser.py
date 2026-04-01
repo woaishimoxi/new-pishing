@@ -156,8 +156,8 @@ class EmailParserService:
                             url = link.get('url')
                             if url and url not in urls:
                                 urls.append(url)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.logger.warning(f"HTML parsing failed: {e}")
             
             for attachment in attachments:
                 content = attachment.get('content')
@@ -172,8 +172,8 @@ class EmailParserService:
                         for url in attachment_urls:
                             if url not in urls:
                                 urls.append(url)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.logger.warning(f"Attachment URL extraction failed: {e}")
             
             headers = self._extract_headers(msg)
             

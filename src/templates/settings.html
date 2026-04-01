@@ -466,10 +466,35 @@
                     <div class="card-body-custom">
                         <div class="mb-4">
                             <label class="form-label">
-                                <i class="bi bi-shield-check me-1" style="color: var(--blue);"></i>VirusTotal API
+                                <i class="bi bi-shield-check me-1" style="color: var(--blue);"></i>微步在线 API
                             </label>
-                            <input type="text" class="form-control form-control-custom" id="vt-api-key" placeholder="输入VirusTotal API Key">
-                            <div class="form-text">用于URL威胁检测增强</div>
+                            <input type="text" class="form-control form-control-custom" id="threatbook-api-key" placeholder="输入微步在线 API Key">
+                            <div class="form-text">用于URL威胁检测、附件沙箱分析、IOC威胁情报查询</div>
+                            <div class="form-text">
+                                <a href="https://x.threatbook.cn/node/v4/intro" target="_blank" style="color: var(--blue);">获取API Key →</a>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="bi bi-cloud-check me-1" style="color: var(--purple);"></i>沙箱分析配置
+                            </label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="sandbox-enabled" checked>
+                                <label class="form-check-label" for="sandbox-enabled">启用微步云沙箱分析附件</label>
+                            </div>
+                            <div class="form-text">自动将可疑附件提交到微步云沙箱进行深度分析</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="bi bi-database me-1" style="color: var(--amber);"></i>IOC威胁情报
+                            </label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="ioc-remote-enabled" checked>
+                                <label class="form-check-label" for="ioc-remote-enabled">启用微步远程IOC查询</label>
+                            </div>
+                            <div class="form-text">结合本地IOC库与微步在线威胁情报进行关联分析</div>
                         </div>
                         
                         <div class="mb-4">
@@ -504,8 +529,8 @@
                         </button>
                         
                         <div class="d-flex gap-2 mt-2">
-                            <button class="btn btn-outline-custom btn-custom flex-fill" onclick="testVirusTotal()">
-                                <i class="bi bi-plug me-1"></i>测试VT
+                            <button class="btn btn-outline-custom btn-custom flex-fill" onclick="testThreatBook()">
+                                <i class="bi bi-plug me-1"></i>测试微步API
                             </button>
                             <button class="btn btn-outline-custom btn-custom flex-fill" onclick="testEmail()">
                                 <i class="bi bi-plug me-1"></i>测试邮箱
@@ -747,7 +772,9 @@
         }
 
         function renderAPIPreview(config) {
-            document.getElementById('vt-api-key').value = config.virustotal?.api_key || '';
+            document.getElementById('threatbook-api-key').value = config.threatbook?.api_key || '';
+            document.getElementById('sandbox-enabled').checked = config.threatbook?.sandbox_enabled !== false;
+            document.getElementById('ioc-remote-enabled').checked = config.threatbook?.ioc_enabled !== false;
             document.getElementById('email-address').value = config.email?.email || '';
             document.getElementById('email-password').value = config.email?.password || '';
             document.getElementById('email-server').value = config.email?.server || '';
@@ -755,7 +782,7 @@
             document.getElementById('email-port').value = config.email?.port || 993;
             
             if (config.ai) {
-                document.getElementById('ai-provider').value = config.ai.provider || 'openai';
+                document.getElementById('ai-provider').value = config.ai.provider || 'zhipu';
                 document.getElementById('ai-api-key').value = config.ai.api_key || '';
                 document.getElementById('ai-api-url').value = config.ai.api_url || '';
                 document.getElementById('ai-model').value = config.ai.model || '';
@@ -766,12 +793,14 @@
 
         async function saveApiConfig() {
             const config = {
-                virustotal: {
-                    api_key: document.getElementById('vt-api-key').value,
-                    api_url: 'https://www.virustotal.com/vtapi/v2/url/report'
+                threatbook: {
+                    api_key: document.getElementById('threatbook-api-key').value,
+                    api_url: 'https://api.threatbook.cn/v3',
+                    sandbox_enabled: document.getElementById('sandbox-enabled').checked,
+                    ioc_enabled: document.getElementById('ioc-remote-enabled').checked
                 },
                 ipapi: {
-                    api_url: 'http://ip-api.com/json/'
+                    api_url: 'https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8'
                 },
                 email: {
                     email: document.getElementById('email-address').value,
@@ -802,15 +831,17 @@
             }
         }
 
-        async function testVirusTotal() {
+        async function testThreatBook() {
             try {
                 const config = {
-                    virustotal: {
-                        api_key: document.getElementById('vt-api-key').value,
-                        api_url: 'https://www.virustotal.com/vtapi/v2/url/report'
+                    threatbook: {
+                        api_key: document.getElementById('threatbook-api-key').value,
+                        api_url: 'https://api.threatbook.cn/v3',
+                        sandbox_enabled: document.getElementById('sandbox-enabled').checked,
+                        ioc_enabled: document.getElementById('ioc-remote-enabled').checked
                     },
                     ipapi: {
-                        api_url: 'http://ip-api.com/json/'
+                        api_url: 'https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8'
                     },
                     email: {
                         email: document.getElementById('email-address').value,
@@ -822,8 +853,8 @@
                     }
                 };
                 
-                if (!config.virustotal.api_key) {
-                    showToast('请先填写VirusTotal API Key', 'error');
+                if (!config.threatbook.api_key) {
+                    showToast('请先填写微步在线 API Key', 'error');
                     return;
                 }
                 
@@ -836,7 +867,7 @@
                 const resp = await fetch('/api/config/test');
                 const data = await resp.json();
                 if (data.status === 'success') {
-                    showToast('VirusTotal连接成功');
+                    showToast('微步在线API连接成功');
                 } else {
                     showToast(data.message || '连接失败', 'error');
                 }
@@ -848,12 +879,14 @@
         async function testEmail() {
             try {
                 const config = {
-                    virustotal: {
-                        api_key: document.getElementById('vt-api-key').value,
-                        api_url: 'https://www.virustotal.com/vtapi/v2/url/report'
+                    threatbook: {
+                        api_key: document.getElementById('threatbook-api-key').value,
+                        api_url: 'https://api.threatbook.cn/v3',
+                        sandbox_enabled: document.getElementById('sandbox-enabled').checked,
+                        ioc_enabled: document.getElementById('ioc-remote-enabled').checked
                     },
                     ipapi: {
-                        api_url: 'http://ip-api.com/json/'
+                        api_url: 'https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8'
                     },
                     email: {
                         email: document.getElementById('email-address').value,
@@ -949,11 +982,46 @@
 
         async function testAI() {
             const apiKey = document.getElementById('ai-api-key').value;
+            const provider = document.getElementById('ai-provider').value;
+            const apiUrl = document.getElementById('ai-api-url').value;
+            const modelInput = document.getElementById('ai-model').value;
+            const defaultModel = AI_PROVIDERS[provider]?.model || 'glm-4';
+            
             if (!apiKey) {
                 showToast('请先填写API Key', 'error');
                 return;
             }
-            showToast('AI测试功能预留，请配置后在报告页面使用', 'warning');
+            
+            const testBtn = event.target;
+            const originalText = testBtn.innerHTML;
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>测试中...';
+            
+            try {
+                const response = await fetch('/api/config/test-ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: provider,
+                        api_key: apiKey,
+                        api_url: apiUrl || AI_PROVIDERS[provider]?.url || '',
+                        model: modelInput || defaultModel
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showToast('AI连接测试成功');
+                } else {
+                    showToast(data.message || 'AI连接测试失败', 'error');
+                }
+            } catch (e) {
+                showToast('测试失败: ' + e.message, 'error');
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = originalText;
+            }
         }
 
         function renderWhitelist(domains) {

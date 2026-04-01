@@ -134,15 +134,17 @@ def _sync_api_config(content: Dict):
         from app.core.config import get_config
         config = get_config()
         
-        # 更新VirusTotal配置
-        if 'virustotal' in content:
-            vt = content['virustotal']
-            if 'api_key' in vt:
-                config.api.virustotal_api_key = vt['api_key']
-            if 'api_url' in vt:
-                config.api.virustotal_api_url = vt['api_url']
+        if 'threatbook' in content:
+            tb = content['threatbook']
+            if 'api_key' in tb:
+                config.api.threatbook_api_key = tb['api_key']
+            if 'api_url' in tb:
+                config.api.threatbook_api_url = tb['api_url']
+            if 'sandbox_enabled' in tb:
+                config.api.sandbox_enabled = tb['sandbox_enabled']
+            if 'ioc_enabled' in tb:
+                config.api.ioc_remote_enabled = tb['ioc_enabled']
         
-        # 更新邮箱配置
         if 'email' in content:
             email = content['email']
             if 'email' in email:
@@ -432,7 +434,7 @@ def remove_from_ioc():
 def _get_file_description(filename):
     """获取配置文件描述"""
     descriptions = {
-        'api_config.json': 'API配置（VirusTotal、邮箱服务器）',
+        'api_config.json': 'API配置（微步在线、邮箱服务器）',
         'whitelist.json': '白名单（可信域名列表）',
         'blacklist.json': '黑名单（恶意域名/IP列表）',
         'ioc_database.json': 'IOC威胁情报库（恶意模式、钓鱼关键词）'

@@ -13,8 +13,8 @@ from app.services import (
     DetectionService,
     FeatureExtractionService,
     TracebackService,
-    URLAnalyzerService,
-    SandboxAnalyzerService
+    SandboxAnalyzerService,
+    URLAnalyzerService
 )
 from app.models.database import DatabaseRepository
 
@@ -97,20 +97,34 @@ def upload_email():
 
 
 def process_email(raw_email: str, source: str = '手动输入', email_uid: str = ''):
-    """Process email and return detection result"""
+    """
+    处理邮件并返回检测结果
+    
+    数据流向：
+    1. 邮件解析 -> 提取头信息、正文、URL、附件
+    2. 附件沙箱分析 -> 调用微步沙箱API
+    3. URL分析 -> 检测可疑URL、品牌仿冒
+    4. 特征提取 -> 计算多维度特征
+    5. AI语义分析 -> 调用AI大模型分析邮件内容
+    6. 钓鱼检测 -> 融合轻量模型+规则引擎+AI分析
+    7. 溯源分析 -> 生成溯源报告
+    8. 保存结果 -> 存入数据库
+    """
     parser = EmailParserService()
     detector = DetectionService()
     feature_extractor = FeatureExtractionService()
     traceback = TracebackService()
+    sandbox_analyzer = SandboxAnalyzerService()
     url_analyzer = URLAnalyzerService()
-    sandbox_analyzer = SandboxAnalyzerService()  # 添加沙箱分析器
     
+    # 1. 解析邮件
     parsed = parser.parse(raw_email)
     
+    # 截断存储的原始邮件（防止数据库过大）
     max_raw_size = 500 * 1024
     raw_email_stored = raw_email[:max_raw_size] if len(raw_email) > max_raw_size else raw_email
     
-    # 附件沙箱分析
+    # 2. 附件沙箱分析
     sandbox_results = []
     attachments = parsed.get('attachments', [])
     
@@ -123,57 +137,79 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
             'sandbox_report': None
         }
         
-        # 检查是否需要分析
         if sandbox_analyzer.should_analyze(
             att.get('filename', ''),
             att.get('content_type', ''),
             att.get('size', 0)
         ):
             try:
-                # 如果有VirusTotal API Key，进行沙箱分析
-                if config.api.virustotal_api_key:
-                    sandbox_result = sandbox_analyzer.analyze_attachment(
-                        att, 
-                        config.api.virustotal_api_key
+                if config.api.threatbook_api_key:
+                    from app.services.threatbook import threatbook_service
+                    sandbox_result = threatbook_service.analyze_file(
+                        att.get('content', b''),
+                        att.get('filename', '')
                     )
-                    att_result['sandbox_detected'] = sandbox_result.get('sandbox_detected', False)
-                    att_result['sandbox_report'] = sandbox_result.get('sandbox_report')
+                    att_result['sandbox_detected'] = sandbox_result.get('threat_level') in ['malicious', 'suspicious']
+                    att_result['sandbox_report'] = sandbox_result
             except Exception as e:
-                logger.warning(f"Sandbox analysis failed for {att.get('filename')}: {e}")
+                logger.warning(f"沙箱分析失败 {att.get('filename')}: {e}")
         
         sandbox_results.append(att_result)
     
-    # 更新parsed中的沙箱结果
     parsed['sandbox_results'] = sandbox_results
     
-    features = feature_extractor.extract_features(
-        parsed, 
-        config.api.virustotal_api_key,
-        config.api.virustotal_api_url
-    )
+    # 3. URL分析
+    urls = parsed.get('urls', [])
+    url_analysis = url_analyzer.analyze_urls(urls)
+    logger.info(f"URL分析完成: 共{url_analysis['total_urls']}个URL, 高风险{url_analysis['high_risk_count']}个")
     
-    # 更新特征中的沙箱检测结果
+    # 4. 特征提取
+    features = feature_extractor.extract_features(parsed)
+    
     if any(r.get('sandbox_detected') for r in sandbox_results):
         features['sandbox_detected'] = 1
     
-    # 先进行URL分析，然后传入检测器
-    url_analysis = url_analyzer.analyze_urls(parsed.get('urls', []))
-    url_risk_level = url_analysis.get('max_risk_level', 'UNKNOWN')
-    url_risk_score = url_analysis.get('max_risk_score', 0)
+    # 5. AI语义分析
+    ai_analysis = None
+    try:
+        from app.api.alerts import call_ai_service
+        import json
+        
+        # 读取AI配置
+        config_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'config', 'api_config.json')
+        if os.path.exists(config_file):
+            with open(config_file, 'r', encoding='utf-8') as f:
+                all_config = json.load(f)
+                ai_config = all_config.get('ai', {})
+                
+                if ai_config.get('enabled') and ai_config.get('api_key'):
+                    # 构建处理后的邮件内容（而非原始邮件）
+                    # 这样AI分析的是用户看到的实际内容
+                    email_content_for_ai = f"""发件人: {parsed.get('from_display_name', '')} <{parsed.get('from_email', '')}>
+收件人: {parsed.get('to', '')}
+主题: {parsed.get('subject', '')}
+
+邮件正文:
+{parsed.get('body', '') or parsed.get('html_body', '') or '[无正文内容]'}
+
+包含的URL:
+{chr(10).join('- ' + url for url in parsed.get('urls', [])[:10]) if parsed.get('urls') else '[无URL]'}
+
+附件信息:
+{chr(10).join('- ' + att.get('filename', '未知') for att in attachments[:5]) if attachments else '[无附件]'}
+"""
+                    ai_analysis = call_ai_service(ai_config, email_content_for_ai[:6000])
+                    logger.info(f"AI分析完成: is_phishing={ai_analysis.get('is_phishing')}")
+    except Exception as e:
+        logger.warning(f"AI语义分析失败: {e}")
     
-    label, confidence, reason = detector.analyze(
-        parsed, features, 
-        url_risk_level=url_risk_level,
-        url_risk_score=url_risk_score,
-        url_analysis=url_analysis
-    )
+    # 6. 钓鱼检测（融合轻量模型+规则引擎+AI分析+URL分析）
+    label, confidence, reason, model_scores = detector.analyze(parsed, features, ai_analysis, url_analysis)
     
-    traceback_report = traceback.generate_report(
-        parsed, 
-        config.api.virustotal_api_key,
-        config.api.ip_api_url
-    )
+    # 7. 溯源分析
+    traceback_report = traceback.generate_report(parsed)
     
+    # 8. 保存结果
     alert_id = db.save_alert(
         parsed, label, confidence, traceback_report, source, raw_email_stored, email_uid
     )
@@ -205,6 +241,7 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
         'confidence': round(confidence, 4),
         'reason': reason,
         'module_scores': module_scores,
+        'model_scores': model_scores,  # 添加各模型得分
         'parsed': {
             'from': parsed.get('from'),
             'from_display_name': parsed.get('from_display_name'),
@@ -224,9 +261,10 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
         'html_forms': parsed.get('html_forms', []),
         'headers': parsed.get('headers', {}),
         'traceback': traceback_report,
-        'url_analysis': url_analysis,
+        'ai_analysis': ai_analysis,  # AI语义分析结果
+        'url_analysis': url_analysis,  # URL分析结果
         'sandbox_analysis': {
-            'enabled': bool(config.api.virustotal_api_key),
+            'enabled': bool(config.api.threatbook_api_key),
             'has_sandbox_analysis': features.get('has_sandbox_analysis', 0) == 1,
             'sandbox_detected': features.get('sandbox_detected', 0) == 1,
             'max_detection_ratio': features.get('max_sandbox_detection_ratio', 0.0)

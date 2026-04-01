@@ -43,6 +43,62 @@
             --radius-xl: 22px;
         }
 
+        /* 暗色模式 */
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-card: #2d2d2d;
+            --bg-card-hover: #3a3a3a;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-glow: rgba(10, 132, 255, 0.4);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6a6a6a;
+            --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="dark"] body {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+        }
+
+        [data-theme="dark"] .navbar {
+            background: rgba(30, 30, 30, 0.85);
+            border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+        }
+
+        [data-theme="dark"] body::before {
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230a84ff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--text-primary);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-card-hover);
+            transform: scale(1.05);
+        }
+
+        .theme-toggle i {
+            font-size: 18px;
+        }
+
+        [data-theme="dark"] .theme-toggle .bi-sun-fill { display: none; }
+        [data-theme="dark"] .theme-toggle .bi-moon-fill { display: block; }
+        :root .theme-toggle .bi-moon-fill { display: none; }
+        :root .theme-toggle .bi-sun-fill { display: block; }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
@@ -736,7 +792,7 @@
                 <i class="bi bi-shield-check me-2"></i>
                 PHISHING DETECTOR
             </a>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 align-items-center">
                 <a href="/bigscreen" class="btn-nav">
                     <i class="bi bi-speedometer2 me-1"></i> 数据大屏
                 </a>
@@ -749,6 +805,10 @@
                 <a href="/settings" class="btn-nav">
                     <i class="bi bi-sliders me-1"></i> 系统配置
                 </a>
+                <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
+                    <i class="bi bi-sun-fill"></i>
+                    <i class="bi bi-moon-fill"></i>
+                </button>
                 <button class="btn-nav" onclick="shutdownSystem()">
                     <i class="bi bi-power me-1"></i> 关闭
                 </button>
@@ -799,6 +859,42 @@
                     <div class="stat-trend trend-up">
                         <i class="bi bi-arrow-up"></i>
                         <span>8% 较昨日</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-12">
+                <div class="stat-card" id="monitor-status-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon" id="monitor-icon">
+                                <i class="bi bi-pause-circle"></i>
+                            </div>
+                            <div>
+                                <div class="stat-label">邮件自动监控</div>
+                                <div class="stat-value" id="monitor-status-text">未运行</div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-end me-3">
+                                <div class="text-muted small">已检测邮件</div>
+                                <div class="fw-bold" id="monitor-checked-count">0</div>
+                            </div>
+                            <div class="text-end me-3">
+                                <div class="text-muted small">发现钓鱼邮件</div>
+                                <div class="fw-bold text-danger" id="monitor-phishing-count">0</div>
+                            </div>
+                            <div class="text-end me-3">
+                                <div class="text-muted small">监控间隔</div>
+                                <div class="fw-bold" id="monitor-interval">30秒</div>
+                            </div>
+                            <button class="btn btn-primary-custom" id="monitor-toggle-btn" onclick="toggleMonitor()">
+                                <i class="bi bi-play-circle me-1"></i>
+                                <span id="monitor-btn-text">启动监控</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1080,25 +1176,42 @@ https://example.com/account"></textarea>
         const emailsPerPage = 10;
         let selectedIds = new Set();
         let selectedFile = null;
-        let autoMonitorInterval = null;
         let isProcessingEmails = false;
-        const AUTO_MONITOR_INTERVAL = 30000;
         const processedEmailHashes = new Set();
+        let monitorPollingInterval = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
             loadEmailList(1);
+            loadMonitorStatus();
             
-            const autoMonitorEnabled = localStorage.getItem('autoMonitorEnabled') === 'true';
-            const autoMonitorToggle = document.getElementById('auto-monitor-toggle');
-            if (autoMonitorToggle) {
-                autoMonitorToggle.checked = autoMonitorEnabled;
-                if (autoMonitorEnabled) {
-                    startAutoMonitor();
-                    updateAutoMonitorStatus(true);
-                }
-            }
+            // 初始加载后，根据监控状态决定轮询频率
+            startMonitorPolling();
         });
+
+        function startMonitorPolling() {
+            // 清除现有轮询
+            if (monitorPollingInterval) {
+                clearInterval(monitorPollingInterval);
+            }
+            
+            // 先检查监控状态，然后决定轮询频率
+            fetch('/api/monitor/status')
+                .then(res => res.json())
+                .then(result => {
+                    if (result.status === 'success' && result.data && result.data.running) {
+                        // 监控运行中：每5秒轮询一次
+                        monitorPollingInterval = setInterval(loadMonitorStatus, 5000);
+                    } else {
+                        // 监控未运行：每30秒轮询一次（仅用于状态同步）
+                        monitorPollingInterval = setInterval(loadMonitorStatus, 30000);
+                    }
+                })
+                .catch(() => {
+                    // 出错时降低轮询频率
+                    monitorPollingInterval = setInterval(loadMonitorStatus, 30000);
+                });
+        }
 
         function animateNumber(elementId, targetValue, duration = 2000) {
             const element = document.getElementById(elementId);
@@ -1241,44 +1354,136 @@ https://example.com/account"></textarea>
         }
 
         function toggleAutoMonitor(enabled) {
-            if (enabled) {
-                startAutoMonitor();
-                localStorage.setItem('autoMonitorEnabled', 'true');
-                showAlert('success', '邮件自动监控已开启，每30秒检查一次新邮件');
-            } else {
-                stopAutoMonitor();
-                localStorage.setItem('autoMonitorEnabled', 'false');
-                showAlert('success', '邮件自动监控已关闭');
-            }
-            updateAutoMonitorStatus(enabled);
+            toggleMonitor();
         }
 
-        function updateAutoMonitorStatus(enabled) {
+        function updateAutoMonitorStatus(running) {
             const statusDot = document.getElementById('auto-monitor-status-dot');
             const statusBadge = document.getElementById('auto-monitor-status');
+            const toggleCheckbox = document.getElementById('auto-monitor-toggle');
             
-            if (enabled) {
-                statusDot.className = 'status-dot online';
-                statusBadge.className = 'badge-cyber badge-success';
-                statusBadge.textContent = '运行中';
+            if (toggleCheckbox) {
+                toggleCheckbox.checked = running;
+            }
+            
+            if (running) {
+                if (statusDot) statusDot.className = 'status-dot online';
+                if (statusBadge) {
+                    statusBadge.className = 'badge-cyber badge-success';
+                    statusBadge.textContent = '运行中';
+                }
             } else {
-                statusDot.className = 'status-dot warning';
-                statusBadge.className = 'badge-cyber badge-warning';
-                statusBadge.textContent = '未开启';
+                if (statusDot) statusDot.className = 'status-dot warning';
+                if (statusBadge) {
+                    statusBadge.className = 'badge-cyber badge-warning';
+                    statusBadge.textContent = '未开启';
+                }
             }
         }
 
-        function startAutoMonitor() {
-            if (autoMonitorInterval) clearInterval(autoMonitorInterval);
-            autoFetchEmails();
-            autoMonitorInterval = setInterval(autoFetchEmails, AUTO_MONITOR_INTERVAL);
+        async function loadMonitorStatus() {
+            try {
+                const response = await fetch('/api/monitor/status');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    const data = result.data;
+                    updateMonitorUI(data.running, data.stats);
+                    updateAutoMonitorStatus(data.running);
+                    
+                    // 根据运行状态动态调整轮询频率
+                    updatePollingInterval(data.running);
+                }
+            } catch (error) {
+                console.error('Failed to load monitor status:', error);
+            }
         }
 
-        function stopAutoMonitor() {
-            if (autoMonitorInterval) {
-                clearInterval(autoMonitorInterval);
-                autoMonitorInterval = null;
+        function updatePollingInterval(isRunning) {
+            // 获取当前设置的轮询频率
+            const currentInterval = isRunning ? 5000 : 30000;
+            
+            // 检查是否需要更新轮询频率
+            if (monitorPollingInterval) {
+                clearInterval(monitorPollingInterval);
+                monitorPollingInterval = setInterval(loadMonitorStatus, currentInterval);
             }
+        }
+
+        function updateMonitorUI(running, stats) {
+            const icon = document.getElementById('monitor-icon');
+            const statusText = document.getElementById('monitor-status-text');
+            const btn = document.getElementById('monitor-toggle-btn');
+            const btnText = document.getElementById('monitor-btn-text');
+            const checkedCount = document.getElementById('monitor-checked-count');
+            const phishingCount = document.getElementById('monitor-phishing-count');
+            const intervalText = document.getElementById('monitor-interval');
+            
+            if (running) {
+                if (icon) icon.innerHTML = '<i class="bi bi-play-circle text-success"></i>';
+                if (statusText) {
+                    statusText.textContent = '运行中';
+                    statusText.className = 'stat-value text-success';
+                }
+                if (btn) {
+                    btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i><span>停止监控</span>';
+                    btn.className = 'btn btn-danger';
+                }
+            } else {
+                if (icon) icon.innerHTML = '<i class="bi bi-pause-circle"></i>';
+                if (statusText) {
+                    statusText.textContent = '未运行';
+                    statusText.className = 'stat-value';
+                }
+                if (btn) {
+                    btn.innerHTML = '<i class="bi bi-play-circle me-1"></i><span>启动监控</span>';
+                    btn.className = 'btn btn-primary-custom';
+                }
+            }
+            
+            if (stats) {
+                if (checkedCount) checkedCount.textContent = stats.total_checked || 0;
+                if (phishingCount) phishingCount.textContent = stats.phishing_detected || 0;
+                if (intervalText) intervalText.textContent = (stats.interval || 30) + '秒';
+            }
+        }
+
+        async function toggleMonitor() {
+            const btn = document.getElementById('monitor-toggle-btn');
+            if (btn) btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/monitor/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    loadMonitorStatus();
+                    showToast(result.running ? '监控已启动' : '监控已停止');
+                } else {
+                    showToast(result.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                console.error('Toggle monitor failed:', error);
+                showToast('操作失败', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type === 'error' ? 'danger' : 'success'} position-fixed`;
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 200px;';
+            toast.innerHTML = `<i class="bi bi-${type === 'error' ? 'exclamation-circle' : 'check-circle'} me-2"></i>${message}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
         }
 
         async function autoFetchEmails() {
@@ -1822,6 +2027,24 @@ https://example.com/account"></textarea>
                 setTimeout(() => alertDiv.remove(), 300);
             }, 3000);
         }
+
+        // 暗色模式切换
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // 初始化主题
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
+        // 页面加载时初始化主题
+        initTheme();
 
         async function shutdownSystem() {
             if (!confirm('确定要关闭系统吗？关闭后需要重新启动服务才能再次访问。')) return;

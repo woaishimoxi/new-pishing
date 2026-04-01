@@ -1,10 +1,12 @@
 {
-  "virustotal": {
-    "api_key": "·",
-    "api_url": "https://www.virustotal.com/vtapi/v2/url/report"
+  "threatbook": {
+    "api_key": "4f8126c513f44f6bb83dbbdfbc9cbb289fd495b4866149b5af684ce47ea1f35a",
+    "api_url": "https://api.threatbook.cn/v3",
+    "sandbox_enabled": true,
+    "ioc_enabled": true
   },
   "ipapi": {
-    "api_url": "http://ip-api.com/json/"
+    "api_url": "https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8"
   },
   "email": {
     "email": "3437195366@qq.com",
@@ -12,6 +14,13 @@
     "server": "imap.qq.com",
     "protocol": "imap",
     "port": 993,
+    "enabled": true
+  },
+  "ai": {
+    "provider": "alibaba",
+    "api_key": "sk-899f6b5d9bc64336b9265efd514b9a43",
+    "api_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "model": "qwen-turbo",
     "enabled": true
   }
 }

@@ -223,7 +223,7 @@ virustotal_config_model = api.model('VirusTotalConfig', {
 })
 
 ipapi_config_model = api.model('IPApiConfig', {
-    'api_url': fields.String(description='IP查询API地址', example='http://ip-api.com/json/')
+    'api_url': fields.String(description='IP查询API地址', example='https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8')
 })
 
 email_config_model = api.model('EmailConfig', {

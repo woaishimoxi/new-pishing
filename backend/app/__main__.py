@@ -23,6 +23,7 @@ from app.api.domains import domains_bp
 from app.api.settings import settings_bp
 from app.api.attachment import attachment_bp
 from app.api.docs import api_docs
+from app.api.monitor import monitor_bp
 
 
 def create_app(config_name: str = 'development') -> Flask:
@@ -71,10 +72,16 @@ def create_app(config_name: str = 'development') -> Flask:
     app.register_blueprint(settings_bp)
     app.register_blueprint(attachment_bp)
     app.register_blueprint(api_docs)
+    app.register_blueprint(monitor_bp, url_prefix='/api/monitor')
     
     register_error_handlers(app)
     
     register_template_routes(app)
+    
+    if getattr(config.email, 'auto_monitor', False):
+        from app.services.email_monitor import email_monitor
+        email_monitor.start()
+        logger.info("Auto monitor started")
     
     logger.info("Application initialized successfully")
     

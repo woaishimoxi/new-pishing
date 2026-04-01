@@ -110,6 +110,277 @@ def _load_config():
     _CONFIG_LOADED = True
 
 
+class IOCQueryService:
+    """IOC查询服务：先查本地，再查云端"""
+    
+    def __init__(self):
+        self.logger = get_logger(__name__)
+        self.config = get_config()
+        self._load_local_ioc()
+    
+    def _load_local_ioc(self):
+        """加载本地IOC数据库"""
+        _load_config()
+    
+    def query_ip(self, ip: str) -> Dict:
+        """
+        查询IP的威胁情报
+        逻辑：先查本地IOC库，如果本地已标记则直接返回，否则调用云端API
+        """
+        result = {
+            'ip': ip,
+            'is_malicious': False,
+            'source': None,
+            'details': {}
+        }
+        
+        if ip in KNOWN_MALICIOUS_IOCS['ips']:
+            result['is_malicious'] = True
+            result['source'] = 'local'
+            result['details']['message'] = '本地IOC库已标记为恶意'
+            return result
+        
+        if ip in BLACKLISTED_IPS:
+            result['is_malicious'] = True
+            result['source'] = 'local_blacklist'
+            result['details']['message'] = '本地黑名单已标记'
+            return result
+        
+        if self.config.api.ioc_remote_enabled and self.config.api.threatbook_api_key:
+            cloud_result = self._query_threatbook_ip(ip)
+            if cloud_result:
+                result.update(cloud_result)
+                result['source'] = 'cloud'
+                if result['is_malicious']:
+                    self._update_local_ioc('ip', ip)
+        
+        return result
+    
+    def query_domain(self, domain: str) -> Dict:
+        """
+        查询域名的威胁情报
+        逻辑：先查本地IOC库，如果本地已标记则直接返回，否则调用云端API
+        """
+        result = {
+            'domain': domain,
+            'is_malicious': False,
+            'source': None,
+            'details': {}
+        }
+        
+        if domain in KNOWN_MALICIOUS_IOCS['domains']:
+            result['is_malicious'] = True
+            result['source'] = 'local'
+            result['details']['message'] = '本地IOC库已标记为恶意'
+            return result
+        
+        if domain in BLACKLISTED_DOMAINS:
+            result['is_malicious'] = True
+            result['source'] = 'local_blacklist'
+            result['details']['message'] = '本地黑名单已标记'
+            return result
+        
+        for pattern in KNOWN_MALICIOUS_IOCS.get('domain_patterns', []):
+            if pattern.lower() in domain.lower():
+                result['is_malicious'] = True
+                result['source'] = 'local_pattern'
+                result['details']['message'] = f'匹配恶意域名模式: {pattern}'
+                return result
+        
+        if self.config.api.ioc_remote_enabled and self.config.api.threatbook_api_key:
+            cloud_result = self._query_threatbook_domain(domain)
+            if cloud_result:
+                result.update(cloud_result)
+                result['source'] = 'cloud'
+                if result['is_malicious']:
+                    self._update_local_ioc('domain', domain)
+        
+        return result
+    
+    def query_url(self, url: str) -> Dict:
+        """
+        查询URL的威胁情报
+        逻辑：先查本地IOC库，如果本地已标记则直接返回，否则调用云端API
+        """
+        result = {
+            'url': url,
+            'is_malicious': False,
+            'source': None,
+            'details': {}
+        }
+        
+        if url in KNOWN_MALICIOUS_IOCS['urls']:
+            result['is_malicious'] = True
+            result['source'] = 'local'
+            result['details']['message'] = '本地IOC库已标记为恶意'
+            return result
+        
+        for pattern in KNOWN_MALICIOUS_IOCS.get('url_patterns', []):
+            if pattern.lower() in url.lower():
+                result['is_malicious'] = True
+                result['source'] = 'local_pattern'
+                result['details']['message'] = f'匹配恶意URL模式: {pattern}'
+                return result
+        
+        if self.config.api.ioc_remote_enabled and self.config.api.threatbook_api_key:
+            cloud_result = self._query_threatbook_url(url)
+            if cloud_result:
+                result.update(cloud_result)
+                result['source'] = 'cloud'
+                if result['is_malicious']:
+                    self._update_local_ioc('url', url)
+        
+        return result
+    
+    def _query_threatbook_ip(self, ip: str) -> Dict:
+        """查询微步在线IP威胁情报"""
+        try:
+            params = {
+                'apikey': self.config.api.threatbook_api_key,
+                'resource': ip
+            }
+            response = requests.get(
+                f'{self.config.api.threatbook_api_url}/ip/query',
+                params=params,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('response_code') == 0:
+                    ip_data = data.get('data', {}).get(ip, {})
+                    severity = ip_data.get('severity', '')
+                    
+                    is_malicious = severity in ['critical', 'high', 'medium']
+                    
+                    return {
+                        'is_malicious': is_malicious,
+                        'details': {
+                            'severity': severity,
+                            'judgments': ip_data.get('judgments', []),
+                            'tags': ip_data.get('tags', []),
+                            'confidence': ip_data.get('confidence', 0)
+                        }
+                    }
+        except Exception as e:
+            self.logger.warning(f"ThreatBook IP query failed: {e}")
+        
+        return None
+    
+    def _query_threatbook_domain(self, domain: str) -> Dict:
+        """查询微步在线域名威胁情报"""
+        try:
+            params = {
+                'apikey': self.config.api.threatbook_api_key,
+                'resource': domain
+            }
+            response = requests.get(
+                f'{self.config.api.threatbook_api_url}/domain/report',
+                params=params,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('response_code') == 0:
+                    domain_data = data.get('data', {}).get(domain, {})
+                    severity = domain_data.get('severity', '')
+                    
+                    is_malicious = severity in ['critical', 'high', 'medium']
+                    
+                    return {
+                        'is_malicious': is_malicious,
+                        'details': {
+                            'severity': severity,
+                            'judgments': domain_data.get('judgments', []),
+                            'tags': domain_data.get('tags', [])
+                        }
+                    }
+        except Exception as e:
+            self.logger.warning(f"ThreatBook domain query failed: {e}")
+        
+        return None
+    
+    def _query_threatbook_url(self, url: str) -> Dict:
+        """查询微步在线URL威胁情报"""
+        try:
+            params = {
+                'apikey': self.config.api.threatbook_api_key,
+                'url': url
+            }
+            response = requests.get(
+                f'{self.config.api.threatbook_api_url}/url/report',
+                params=params,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('response_code') == 0:
+                    url_data = data.get('data', {}).get(url, {})
+                    severity = url_data.get('severity', '')
+                    
+                    is_malicious = severity in ['critical', 'high', 'medium']
+                    
+                    return {
+                        'is_malicious': is_malicious,
+                        'details': {
+                            'severity': severity,
+                            'judgments': url_data.get('judgments', []),
+                            'threat_level': url_data.get('threat_level', 'unknown')
+                        }
+                    }
+        except Exception as e:
+            self.logger.warning(f"ThreatBook URL query failed: {e}")
+        
+        return None
+    
+    def _update_local_ioc(self, ioc_type: str, value: str):
+        """更新本地IOC数据库（缓存云端查询结果）"""
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            ioc_file = os.path.join(base_dir, 'config', 'ioc_database.json')
+            
+            if os.path.exists(ioc_file):
+                with open(ioc_file, 'r', encoding='utf-8') as f:
+                    ioc_data = json.load(f)
+            else:
+                ioc_data = {
+                    'malicious_ips': [],
+                    'malicious_domains': [],
+                    'malicious_urls': [],
+                    'malicious_hashes': []
+                }
+            
+            type_mapping = {
+                'ip': 'malicious_ips',
+                'domain': 'malicious_domains',
+                'url': 'malicious_urls'
+            }
+            
+            if ioc_type in type_mapping:
+                key = type_mapping[ioc_type]
+                if value not in ioc_data.get(key, []):
+                    ioc_data.setdefault(key, []).append(value)
+                    
+                    with open(ioc_file, 'w', encoding='utf-8') as f:
+                        json.dump(ioc_data, f, indent=2, ensure_ascii=False)
+                    
+                    if ioc_type == 'ip':
+                        KNOWN_MALICIOUS_IOCS['ips'].add(value)
+                    elif ioc_type == 'domain':
+                        KNOWN_MALICIOUS_IOCS['domains'].add(value)
+                    elif ioc_type == 'url':
+                        KNOWN_MALICIOUS_IOCS['urls'].add(value)
+                    
+                    self.logger.info(f"Updated local IOC: {ioc_type}={value}")
+        except Exception as e:
+            self.logger.error(f"Failed to update local IOC: {e}")
+
+
+ioc_query_service = IOCQueryService()
+
+
 def reload_config():
     """Reload configuration files"""
     global _CONFIG_LOADED
@@ -235,8 +506,7 @@ class TracebackService:
     def generate_report(
         self,
         parsed_email: Dict,
-        vt_api_key: str = "",
-        ip_api_url: str = 'http://ip-api.com/json/'
+        vt_api_key: str = ""
     ) -> Dict:
         """
         Generate complete traceback report with correlation analysis
@@ -273,7 +543,7 @@ class TracebackService:
                 
                 # IP地理位置查询
                 futures['geo'] = self.executor.submit(
-                    self._get_ip_geolocation, source_info['source_ip'], ip_api_url
+                    self._get_ip_geolocation, source_info['source_ip']
                 )
                 
                 # 黑名单检查
@@ -549,9 +819,8 @@ class TracebackService:
         
         return False
     
-    def _get_ip_geolocation(self, ip: str, ip_api_url: str) -> Dict:
+    def _get_ip_geolocation(self, ip: str, ip_api_url: str = None) -> Dict:
         """Get IP geolocation info with caching and timeout"""
-        # 检查缓存
         if ip in IP_GEO_CACHE:
             return IP_GEO_CACHE[ip]
         
@@ -564,20 +833,22 @@ class TracebackService:
         }
         
         try:
-            response = requests.get(f'{ip_api_url}{ip}', timeout=IP_API_TIMEOUT)
+            response = requests.get(
+                f'https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8',
+                timeout=IP_API_TIMEOUT
+            )
             if response.status_code == 200:
                 data = response.json()
-                if data.get('status') == 'success':
-                    locations['country'] = data.get('country', 'Unknown')
-                    locations['regionName'] = data.get('regionName', 'Unknown')
-                    locations['city'] = data.get('city', 'Unknown')
-                    locations['isp'] = data.get('isp', 'Unknown')
+                if data.get('status') == '0' and data.get('data'):
+                    location_info = data['data'][0]
+                    location_str = location_info.get('location', '')
+                    locations['country'] = location_str if location_str else 'Unknown'
+                    locations['city'] = location_info.get('city', 'Unknown')
         except requests.Timeout:
             self.logger.warning(f"IP geolocation timeout for {ip}")
         except Exception as e:
             self.logger.error(f"IP geolocation query failed: {e}")
         
-        # 缓存结果
         IP_GEO_CACHE[ip] = locations
         return locations
     
@@ -747,15 +1018,27 @@ class TracebackService:
         return result
     
     def _query_single_dnsbl(self, reversed_ip: str, server: str, name: str) -> Tuple[bool, str]:
-        """Query single DNSBL server with timeout"""
+        """
+        Query single DNSBL server with timeout
+        
+        修复：使用socket.create_connection超时而非全局设置
+        """
         query = f"{reversed_ip}.{server}"
         try:
-            socket.setdefaulttimeout(BLACKLIST_TIMEOUT)
-            socket.gethostbyname(query)
-            return True, name
-        except socket.gaierror:
+            # 使用线程超时而非全局socket超时
+            import concurrent.futures
+            
+            def dns_query():
+                return socket.gethostbyname(query)
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(dns_query)
+                try:
+                    future.result(timeout=BLACKLIST_TIMEOUT)
+                    return True, name
+                except concurrent.futures.TimeoutError:
+                    return False, name
+                except socket.gaierror:
+                    return False, name
+        except Exception:
             return False, name
-        except socket.timeout:
-            return False, name
-        finally:
-            socket.setdefaulttimeout(None)

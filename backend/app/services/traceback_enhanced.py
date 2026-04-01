@@ -73,12 +73,88 @@ class TracebackAnalyzer:
         self.logger = get_logger(__name__)
         self.config = get_config()
     
-    def analyze(self, parsed_email: Dict) -> Dict:
+    def _check_url_threatbook(self, url: str, api_key: str, api_url: str) -> Dict:
+        """
+        调用微步在线API检测URL
+        
+        微步在线API主要用于IP和域名查询
+        对于URL，提取域名进行查询
+        """
+        result = {
+            'checked': False,
+            'positives': 0,
+            'total': 0,
+            'detection_ratio': 0.0,
+            'threat_level': 'unknown',
+            'threat_types': []
+        }
+        
+        if not api_key:
+            return result
+        
+        try:
+            parsed = urlparse(url if url.startswith('http') else 'http://' + url)
+            domain = parsed.netloc.split(':')[0]
+            
+            if not domain:
+                return result
+            
+            tb_api_url = 'https://api.threatbook.cn/v3/domain/query'
+            
+            params = {
+                'apikey': api_key,
+                'resource': domain
+            }
+            
+            response = requests.get(
+                tb_api_url,
+                params=params,
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('response_code') == 0:
+                    detail = data.get('data', {}).get('detail', {})
+                    threat_info = detail.get('threat_tags', {})
+                    threat_types = threat_info.get('threat_types', [])
+                    
+                    result['checked'] = True
+                    result['threat_types'] = threat_types
+                    
+                    if threat_types:
+                        result['positives'] = len(threat_types)
+                        result['threat_level'] = 'malicious'
+                        result['detection_ratio'] = 1.0
+                    else:
+                        result['threat_level'] = 'clean'
+                        result['detection_ratio'] = 0.0
+                    
+                    tags = detail.get('tags', [])
+                    if tags:
+                        result['total'] = len(tags)
+                        
+                    severity = detail.get('severity', '')
+                    if severity in ['critical', 'high']:
+                        result['threat_level'] = 'malicious'
+                    elif severity == 'medium':
+                        result['threat_level'] = 'suspicious'
+                        
+        except requests.exceptions.Timeout:
+            self.logger.debug(f"ThreatBook API timeout for {url}")
+        except Exception as e:
+            self.logger.debug(f"ThreatBook API error: {e}")
+        
+        return result
+    
+    def analyze(self, parsed_email: Dict, saved_traceback: Dict = None) -> Dict:
         """
         执行完整的溯源分析
         
         Args:
             parsed_email: 解析后的邮件数据
+            saved_traceback: 数据库中已保存的溯源数据（优先使用）
             
         Returns:
             完整的溯源报告
@@ -92,8 +168,8 @@ class TracebackAnalyzer:
         # 维度1: 攻击目标
         report['dimensions']['targets'] = self._analyze_targets(parsed_email)
         
-        # 维度2: IP来源与传播链
-        report['dimensions']['source_chain'] = self._analyze_source_chain(parsed_email)
+        # 维度2: IP来源与传播链（优先使用已保存的数据）
+        report['dimensions']['source_chain'] = self._analyze_source_chain(parsed_email, saved_traceback)
         
         # 维度3: 攻击特性（社会工程学）
         report['dimensions']['social_engineering'] = self._analyze_social_engineering(parsed_email)
@@ -155,7 +231,7 @@ class TracebackAnalyzer:
         return targets
     
     # ==================== 维度2: IP来源与传播链 ====================
-    def _analyze_source_chain(self, parsed_email: Dict) -> Dict:
+    def _analyze_source_chain(self, parsed_email: Dict, saved_traceback: Dict = None) -> Dict:
         """分析IP来源与传播链"""
         chain = {
             'source_ip': 'Unknown',
@@ -166,11 +242,47 @@ class TracebackAnalyzer:
             'risk_level': 'low'
         }
         
-        # 提取Received链
+        # 优先使用数据库中已保存的溯源数据（包含正确提取的IP）
+        if saved_traceback:
+            email_source = saved_traceback.get('email_source', {})
+            
+            # 使用已保存的源IP
+            if email_source.get('source_ip') and email_source['source_ip'] != 'Unknown':
+                chain['source_ip'] = email_source['source_ip']
+                
+                # 使用已保存的地理位置信息
+                if email_source.get('geolocation'):
+                    chain['geolocation'] = email_source['geolocation']
+                
+                # 使用已保存的传播路径
+                if email_source.get('hops'):
+                    chain['hops'] = [
+                        {'ip': hop, 'server': None, 'time': None}
+                        for hop in email_source['hops']
+                    ]
+                
+                if email_source.get('full_path'):
+                    chain['full_path'] = email_source['full_path']
+                
+                # 使用已保存的黑名单检查结果
+                if email_source.get('blacklist_check', {}).get('is_blacklisted'):
+                    chain['risk_level'] = 'high'
+                    blacklists = email_source['blacklist_check'].get('blacklists', [])
+                    chain['analysis'] = f'源IP被以下黑名单标记：{", ".join(blacklists)}'
+                else:
+                    country = chain['geolocation'].get('country', '')
+                    if country and country not in ['China', 'United States', 'Japan', '']:
+                        chain['risk_level'] = 'medium'
+                        chain['analysis'] = f'源IP位于{country}，需注意跨境风险'
+                    else:
+                        chain['analysis'] = f'源IP: {chain["source_ip"]}，地理位置: {country or "未知"}'
+                
+                return chain
+        
+        # 如果没有已保存的数据，则从原始邮件中提取（兼容旧数据）
         received_chain = parsed_email.get('received_chain', [])
         
         if not received_chain:
-            # 尝试从原始邮件头提取
             headers = parsed_email.get('headers', {})
             received_header = headers.get('received', '')
             if received_header:
@@ -187,25 +299,22 @@ class TracebackAnalyzer:
         for i, received in enumerate(reversed(received_chain)):
             hop = {
                 'step': i + 1,
-                'raw': received[:200],  # 截取前200字符
+                'raw': received[:200],
                 'ip': None,
                 'server': None,
                 'time': None
             }
             
-            # 提取IP
             ip_match = re.search(ip_pattern, received)
             if ip_match:
                 ip = ip_match.group(1)
                 if not self._is_private_ip(ip):
                     hop['ip'] = ip
             
-            # 提取服务器名
             from_match = re.search(r'from\s+(\S+)', received, re.IGNORECASE)
             if from_match:
                 hop['server'] = from_match.group(1).rstrip(';')
             
-            # 提取时间
             time_match = re.search(r';\s*(.+)$', received)
             if time_match:
                 hop['time'] = time_match.group(1).strip()
@@ -214,23 +323,19 @@ class TracebackAnalyzer:
         
         chain['hops'] = hops
         
-        # 提取源IP（最早的非私有IP）
         for hop in hops:
             if hop['ip']:
                 chain['source_ip'] = hop['ip']
                 break
         
-        # 查询源IP地理位置
         if chain['source_ip'] != 'Unknown':
             chain['geolocation'] = self._get_ip_geolocation(chain['source_ip'])
             
-            # 分析风险
             country = chain['geolocation'].get('country', '')
             if country and country not in ['China', 'United States', 'Japan', '']:
                 chain['risk_level'] = 'medium'
                 chain['analysis'] = f'源IP位于{country}，需注意跨境风险'
         
-        # 构建传播链路径
         chain['full_path'] = ' → '.join([
             hop.get('server') or hop.get('ip') or '?'
             for hop in hops if hop.get('server') or hop.get('ip')
@@ -290,20 +395,25 @@ class TracebackAnalyzer:
             'qr_codes': 0,
             'info_theft_request': False,
             'risk_level': 'low',
-            'analysis': ''
+            'analysis': '',
+            'threatbook_results': []
         }
         
         body = parsed_email.get('body', '') + parsed_email.get('html_body', '')
         urls = parsed_email.get('urls', [])
         attachments = parsed_email.get('attachments', [])
         
-        # 分析链接
+        tb_api_key = self.config.api.threatbook_api_key
+        tb_api_url = self.config.api.threatbook_api_url
+        
         for url in urls:
             link_info = {
                 'url': url,
                 'is_short_url': False,
                 'is_ip_url': False,
-                'domain': ''
+                'domain': '',
+                'threatbook_checked': False,
+                'threatbook_malicious': False
             }
             
             try:
@@ -311,16 +421,29 @@ class TracebackAnalyzer:
                 domain = parsed.netloc.split(':')[0]
                 link_info['domain'] = domain
                 
-                # 检查短链接
                 if any(short in domain for short in SHORT_URL_DOMAINS):
                     link_info['is_short_url'] = True
                 
-                # 检查IP地址URL
                 if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', domain):
                     link_info['is_ip_url'] = True
                 
-                # 标记可疑链接
-                if link_info['is_short_url'] or link_info['is_ip_url']:
+                if tb_api_key and url.startswith(('http://', 'https://')):
+                    try:
+                        tb_result = self._check_url_threatbook(url, tb_api_key, tb_api_url)
+                        link_info['threatbook_checked'] = tb_result.get('checked', False)
+                        link_info['threatbook_malicious'] = tb_result.get('positives', 0) > 0
+                        link_info['threatbook_ratio'] = tb_result.get('detection_ratio', 0)
+                        if tb_result.get('checked'):
+                            vectors['threatbook_results'].append({
+                                'url': url,
+                                'positives': tb_result.get('positives', 0),
+                                'total': tb_result.get('total', 0),
+                                'threat_level': tb_result.get('threat_level', 'unknown')
+                            })
+                    except Exception as e:
+                        self.logger.debug(f"ThreatBook check failed for {url}: {e}")
+                
+                if link_info['is_short_url'] or link_info['is_ip_url'] or link_info['threatbook_malicious']:
                     vectors['malicious_links'].append(link_info)
                     
             except:
@@ -471,21 +594,27 @@ class TracebackAnalyzer:
         return False
     
     def _get_ip_geolocation(self, ip: str) -> Dict:
-        """查询IP地理位置"""
+        """查询IP地理位置（使用百度API）"""
         try:
-            response = requests.get(f'http://ip-api.com/json/{ip}', timeout=5)
+            response = requests.get(
+                f'https://opendata.baidu.com/api.php?query={ip}&co=&resource_id=6006&oe=utf8',
+                timeout=5
+            )
             if response.status_code == 200:
                 data = response.json()
-                return {
-                    'ip': ip,
-                    'country': data.get('country', 'Unknown'),
-                    'city': data.get('city', 'Unknown'),
-                    'isp': data.get('isp', 'Unknown'),
-                    'lat': data.get('lat'),
-                    'lon': data.get('lon')
-                }
+                if data.get('status') == '0' and data.get('data'):
+                    location_info = data['data'][0]
+                    location_str = location_info.get('location', '')
+                    return {
+                        'ip': ip,
+                        'country': location_str if location_str else 'Unknown',
+                        'city': location_info.get('city', 'Unknown'),
+                        'isp': location_info.get('isp', 'Unknown'),
+                        'lat': None,
+                        'lon': None
+                    }
         except Exception as e:
-            self.logger.warning(f"IP geolocation query failed: {e}")
+            self.logger.warning(f"IP地理位置查询失败: {e}")
         
         return {'ip': ip, 'country': 'Unknown'}
     

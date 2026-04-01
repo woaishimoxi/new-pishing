@@ -162,9 +162,6 @@ def ai_analyze(alert_id):
     if not alert:
         return jsonify({'error': '报告不存在'}), 404
     
-    # 读取AI配置
-    # alerts.py 在 backend/app/api/ 目录
-    # 配置文件在 项目根目录/config/ 目录
     config_file = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
         'config', 'api_config.json'
@@ -176,23 +173,21 @@ def ai_analyze(alert_id):
             with open(config_file, 'r', encoding='utf-8') as f:
                 all_config = json.load(f)
                 ai_config = all_config.get('ai', {})
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to load AI config: {e}")
     
-    # 检查AI配置是否完整
-    if not ai_config.get('enabled') or not ai_config.get('api_key'):
+    if not ai_config.get('api_key'):
         return jsonify({
-            'status': 'placeholder',
+            'status': 'error',
             'message': 'AI分析未配置',
-            'ai_suggestion': '请在系统配置中设置AI服务',
+            'ai_suggestion': '请在系统配置中设置AI服务的API Key',
             'integration_guide': {
-                'step1': '获取AI服务API Key',
+                'step1': '获取AI服务API Key（推荐智谱AI）',
                 'step2': '在系统配置中填写API配置',
-                'step3': '启用AI分析功能'
+                'step3': '保存配置后再次尝试AI分析'
             }
         })
     
-    # 解析溯源数据
     traceback_data = {}
     if alert.get('traceback_data'):
         try:
@@ -203,7 +198,6 @@ def ai_analyze(alert_id):
         except:
             pass
     
-    # 解析URL数据
     urls = []
     if alert.get('url_data'):
         try:
@@ -214,26 +208,35 @@ def ai_analyze(alert_id):
         except:
             pass
     
-    # 获取原始邮件内容
-    raw_email = alert.get('raw_email', '')
-    body = alert.get('body', '') or ''
+    attachments = []
+    if alert.get('attachment_data'):
+        try:
+            if isinstance(alert['attachment_data'], str):
+                attachments = json.loads(alert['attachment_data'])
+            else:
+                attachments = alert['attachment_data']
+        except:
+            pass
     
-    # 构建发送给AI的邮件内容（优先发送原始邮件）
-    if raw_email:
-        # 限制长度避免token过多
-        email_content = raw_email[:10000] if len(raw_email) > 10000 else raw_email
-    else:
-        # 如果没有原始邮件，使用解析后的内容
-        email_content = f"""
-邮件主题: {alert.get('subject', '无')}
-发件人: {alert.get('from_display_name', '')} <{alert.get('from_email', '')}>
+    body = alert.get('body', '') or ''
+    html_body = alert.get('html_body', '') or ''
+    
+    # 构建处理后的邮件内容（与detection.py保持一致）
+    # 这样AI分析的是用户看到的实际内容，而非原始编码数据
+    email_content = f"""发件人: {alert.get('from_display_name', '')} <{alert.get('from_email', '')}>
 收件人: {alert.get('to_addr', '')}
+主题: {alert.get('subject', '')}
 
 邮件正文:
-{body[:3000] if body else '无正文内容'}
+{body or html_body or '[无正文内容]'}
+
+包含的URL:
+{chr(10).join('- ' + url for url in urls[:10]) if urls else '[无URL]'}
+
+附件信息:
+{chr(10).join('- ' + att.get('filename', '未知') for att in attachments[:5]) if attachments else '[无附件]'}
 """
     
-    # 调用AI服务
     try:
         ai_result = call_ai_service(ai_config, email_content)
         return jsonify({
@@ -241,6 +244,7 @@ def ai_analyze(alert_id):
             'ai_result': ai_result
         })
     except Exception as e:
+        logger.error(f"AI analysis failed: {e}")
         return jsonify({
             'status': 'error',
             'message': f'AI分析失败: {str(e)}'
@@ -331,13 +335,21 @@ def get_enhanced_traceback(alert_id):
     
     from app.services.traceback_enhanced import traceback_analyzer
     
+    # 优先使用数据库中已保存的溯源数据（包含已提取的IP信息）
+    saved_traceback = None
+    if alert.get('traceback_data'):
+        try:
+            saved_traceback = json.loads(alert['traceback_data']) if isinstance(alert['traceback_data'], str) else alert['traceback_data']
+        except:
+            pass
+    
     # 构建解析后的邮件数据
     parsed = {
         'subject': alert.get('subject', '') or '',
         'from': alert.get('from_addr', '') or '',
         'from_email': alert.get('from_email', '') or '',
         'to': alert.get('to_addr', '') or '',
-        'cc': '',  # 数据库中可能没有CC字段
+        'cc': '',
         'body': alert.get('body', '') or '',
         'html_body': alert.get('html_body', '') or '',
         'urls': [],
@@ -367,14 +379,8 @@ def get_enhanced_traceback(alert_id):
         except:
             pass
     
-    # 从原始邮件提取Received链
-    raw_email = alert.get('raw_email', '')
-    if raw_email:
-        received_matches = re.findall(r'Received:.*?(?=\n\S|\n\n)', raw_email, re.DOTALL | re.IGNORECASE)
-        parsed['received_chain'] = [r.strip() for r in received_matches]
-    
-    # 执行增强版溯源分析
-    traceback_report = traceback_analyzer.analyze(parsed)
+    # 执行增强版溯源分析，传入已保存的溯源数据
+    traceback_report = traceback_analyzer.analyze(parsed, saved_traceback)
     
     return jsonify(traceback_report)
 
@@ -383,87 +389,84 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     """
     调用AI服务进行邮件深度分析
     
-    支持：OpenAI、文心一言、通义千问、智谱AI、月之暗面
-    """
-    provider = ai_config.get('provider', 'openai')
-    api_key = ai_config.get('api_key', '')
-    api_url = ai_config.get('api_url', '')
-    model = ai_config.get('model', 'gpt-4')
+    参考LLMphish项目的语义分析逻辑，提供多维度分析：
+    - 钓鱼意图识别
+    - 紧急程度分析
+    - 情感分析
+    - 可疑语言检测
     
-    # 构建系统提示（中文版，支持多种编码）
-    system_prompt = """你是一位邮件安全分析专家，任务是分析原始邮件并判断是否为钓鱼邮件。
+    支持：通义千问(阿里百炼)、智谱AI、DeepSeek、月之暗面
+    """
+    provider = ai_config.get('provider', 'alibaba')
+    api_key = ai_config.get('api_key', '').strip()
+    api_url = ai_config.get('api_url', '')
+    model = ai_config.get('model', '')
+    
+    logger.info(f"AI Service Call - Provider: {provider}, Model: {model}")
+    
+    if not api_key:
+        raise Exception("AI API Key未配置")
+    
+    system_prompt = """你是一个专业的钓鱼邮件检测专家，擅长分析邮件的语义特征、意图和可疑性。"""
+    
+    analysis_prompt = f"""请分析以下邮件的语义特征，返回JSON格式结果：
 
-一、邮件编码处理指南（必须先解码再分析）：
+邮件内容：
+{email_content[:3000]}
 
-1. Base64编码
-   - 识别：Content-Transfer-Encoding: base64 后的内容
-   - 解码：将base64字符串转为原始文本
-   - 示例：5L2g5b+r5omT = "你的密码"
+请从以下维度进行分析并返回JSON：
 
-2. Quoted-Printable编码  
-   - 识别：=XX 格式（如 =E4=BD=A0）
-   - 解码：将每个=XX转为对应UTF-8字符
-   - 示例：=E4=BD=A0=E5=A5=BD = "你好"
+1. 钓鱼意图分析 (phishing_intent_score: 0.0-1.0)
+   - 是否冒充知名品牌或机构
+   - 是否诱导点击链接或下载附件
+   - 是否要求提供敏感信息
 
-3. MIME主题编码
-   - 识别：=?UTF-8?B?...?=（B=base64）或 =?UTF-8?Q?...?=（Q=quoted）
-   - 解码：按编码类型解码中间内容
-   - 示例：=?UTF-8?B?56eY5a+G?= = "秘密"
+2. 紧急程度分析 (urgency_score: 0.0-1.0)
+   - 是否使用紧迫性词汇（立即、紧急、24小时内等）
+   - 是否制造恐慌或威胁
+   - 是否要求立即行动
 
-4. URL编码
-   - 识别：%XX 格式（如 %20 = 空格）
-   - 解码：将%XX转为对应字符
+3. 情感分析 (sentiment_score: -1.0到1.0)
+   - 邮件整体情感倾向
+   - 是否使用诱导性情感语言
 
-5. HTML实体
-   - 识别：&#XX; 或 &amp; &lt; &gt; 等
-   - 解码：转为对应字符
+4. 可疑语言检测 (suspicious_language_score: 0.0-1.0)
+   - 是否包含拼写错误或语法问题
+   - 是否使用模糊或不专业的表述
+   - 是否有异常的称呼方式
 
-二、分析要点：
+5. 综合判定
+   - is_phishing: true/false
+   - risk_score: 0-100
+   - attack_type: traditional(传统钓鱼)/llm_generated(AI生成)/hybrid(混合)/benign(正常)
+   - conclusion: 一句话结论
+   - key_indicators: 关键风险指标数组
+   - suggestions: 安全建议数组
 
-1. 发件人伪造
-   - 显示名与邮箱是否匹配
-   - SPF/DKIM/DMARC验证结果
-   - 是否冒充知名品牌
+返回JSON格式：
+{{
+    "phishing_intent_score": 0.0,
+    "urgency_score": 0.0,
+    "sentiment_score": 0.0,
+    "suspicious_language_score": 0.0,
+    "confidence_level": 0.0,
+    "is_phishing": true/false,
+    "risk_score": 0,
+    "attack_type": "类型",
+    "conclusion": "结论",
+    "analysis": "详细分析",
+    "key_indicators": ["指标1", "指标2"],
+    "suggestions": ["建议1", "建议2"]
+}}
 
-2. 社会工程学
-   - 紧迫感：立即、紧急、24小时内
-   - 威胁：账户冻结、数据泄露
-   - 利诱：中奖、退款、补贴
-   - 权威：管理员、IT部门、财务部
+只返回JSON，不要其他文字。"""
 
-3. 可疑链接
-   - 使用IP地址而非域名
-   - 短链接（bit.ly等）
-   - 域名仿冒（如paypa1.com）
-
-4. 危险附件
-   - 可执行文件：.exe, .bat, .ps1
-   - 带宏文档：.docm, .xlsm
-   - 双重扩展：invoice.pdf.exe
-
-三、返回格式（必须是有效JSON）：
-
-{"is_phishing":true或false,"risk_score":0到100的整数,"conclusion":"一句话结论","analysis":"详细分析","decoded_content":"解码后的邮件正文","key_indicators":["指标1","指标2"],"suggestions":["建议1","建议2"]}"""
-
-    # 构建用户消息
-    user_message = f"""请分析以下原始邮件，判断是否为钓鱼邮件。
-
-注意：
-1. 先解码邮件中的编码内容（base64、quoted-printable等）
-2. 然后分析解码后的内容
-3. 返回JSON格式结果
-
-原始邮件：
-{email_content}"""
-    # 根据不同提供商调用API
-    if provider == 'openai' or provider == 'moonshot' or provider == 'custom':
-        # OpenAI兼容格式
-        if not api_url:
-            api_url = 'https://api.openai.com/v1/chat/completions'
-        
+    def make_openai_compatible_request(url: str, api_key: str, model: str, 
+                                        system_prompt: str, user_message: str) -> Dict:
+        """通用的OpenAI兼容接口调用"""
         headers = {
             'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json; charset=utf-8'
         }
         
         data = {
@@ -472,128 +475,160 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_message}
             ],
-            'temperature': 0.3
+            'temperature': 0.3,
+            'max_tokens': 2000
         }
         
-        response = requests.post(api_url, headers=headers, json=data, timeout=60)
-        result = response.json()
-        
-        if 'choices' in result and len(result['choices']) > 0:
-            ai_text = result['choices'][0]['message']['content']
-        else:
-            raise Exception(f"AI返回异常: {result}")
+        try:
+            logger.debug(f"AI Request URL: {url}")
+            logger.debug(f"AI Request Model: {model}")
+            
+            response = requests.post(url, headers=headers, json=data, timeout=60)
+            
+            logger.info(f"AI API Response Status: {response.status_code}")
+            
+            if response.status_code == 400:
+                try:
+                    error_detail = response.json()
+                    error_msg = error_detail.get('error', {}).get('message', str(error_detail))
+                except:
+                    error_msg = response.text[:500]
+                logger.error(f"AI API 400 Error: {error_msg}")
+                raise Exception(f"API请求参数错误(400): {error_msg}")
+            
+            elif response.status_code == 401:
+                logger.error("AI API 401 Error: Invalid API Key")
+                raise Exception("API Key无效或已过期")
+            
+            elif response.status_code == 403:
+                logger.error("AI API 403 Error: Forbidden")
+                raise Exception("API访问被拒绝，请检查权限")
+            
+            elif response.status_code == 429:
+                logger.warning("AI API 429 Error: Rate Limited")
+                raise Exception("API调用频率超限，请稍后重试")
+            
+            elif response.status_code != 200:
+                logger.error(f"AI API Error: HTTP {response.status_code}")
+                raise Exception(f"API请求失败: HTTP {response.status_code}")
+            
+            result = response.json()
+            
+            if 'choices' in result and len(result['choices']) > 0:
+                message = result['choices'][0].get('message', {})
+                if 'content' in message:
+                    return message['content']
+                else:
+                    raise Exception("API响应格式异常: 缺少content字段")
+            elif 'error' in result:
+                error_msg = result['error'].get('message', str(result['error']))
+                logger.error(f"AI API Response Error: {error_msg}")
+                raise Exception(f"API返回错误: {error_msg}")
+            else:
+                logger.error(f"AI API Unexpected Response: {result}")
+                raise Exception(f"API返回格式异常")
+                
+        except requests.exceptions.Timeout:
+            logger.error("AI API Timeout")
+            raise Exception("API调用超时，请检查网络连接")
+        except requests.exceptions.ConnectionError:
+            logger.error("AI API Connection Error")
+            raise Exception("无法连接到API服务器")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"AI API Request Exception: {e}")
+            raise Exception(f"网络请求异常: {str(e)}")
+
+    ai_text = None
     
-    elif provider == 'baidu':
-        # 百度文心一言
-        url = f"{api_url}?access_token={api_key}"
+    if provider == 'alibaba':
+        if not api_url:
+            api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+        if not model:
+            model = 'qwen-turbo'
         
-        data = {
-            'messages': [
-                {'role': 'user', 'content': system_prompt + '\n\n' + user_message}
-            ]
-        }
-        
-        response = requests.post(url, json=data, timeout=60)
-        result = response.json()
-        
-        if 'result' in result:
-            ai_text = result['result']
-        else:
-            raise Exception(f"文心一言返回异常: {result}")
-    
-    elif provider == 'alibaba':
-        # 阿里通义千问
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-        
-        data = {
-            'model': model,
-            'input': {
-                'messages': [
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': user_message}
-                ]
-            },
-            'parameters': {
-                'temperature': 0.3
-            }
-        }
-        
-        response = requests.post(api_url, headers=headers, json=data, timeout=60)
-        result = response.json()
-        
-        if 'output' in result and 'text' in result['output']:
-            ai_text = result['output']['text']
-        else:
-            raise Exception(f"通义千问返回异常: {result}")
+        ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
     
     elif provider == 'zhipu':
-        # 智谱ChatGLM
-        import jwt
-        import time
+        if not api_url:
+            api_url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+        if not model:
+            model = 'glm-4-flash'
         
-        # 生成JWT token
-        api_key_parts = api_key.split('.')
-        if len(api_key_parts) != 2:
-            raise Exception("智谱API Key格式错误")
+        ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
+    
+    elif provider == 'deepseek':
+        if not api_url:
+            api_url = 'https://api.deepseek.com/v1/chat/completions'
+        if not model:
+            model = 'deepseek-chat'
         
-        id, secret = api_key_parts
-        payload = {
-            "api_key": id,
-            "exp": int(round(time.time() * 1000)) + 3600 * 1000,
-            "timestamp": int(round(time.time() * 1000))
-        }
-        token = jwt.encode(payload, secret, algorithm="HS256")
+        ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
+    
+    elif provider == 'moonshot':
+        if not api_url:
+            api_url = 'https://api.moonshot.cn/v1/chat/completions'
+        if not model:
+            model = 'moonshot-v1-8k'
         
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
+        ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
+    
+    elif provider == 'openai':
+        if not api_url:
+            api_url = 'https://api.openai.com/v1/chat/completions'
+        if not model:
+            model = 'gpt-3.5-turbo'
         
-        data = {
-            'model': model,
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_message}
-            ]
-        }
+        ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
+    
+    elif provider == 'custom':
+        if not api_url:
+            raise Exception("自定义API必须提供api_url")
         
-        response = requests.post(api_url, headers=headers, json=data, timeout=60)
-        result = response.json()
-        
-        if 'choices' in result and len(result['choices']) > 0:
-            ai_text = result['choices'][0]['message']['content']
-        else:
-            raise Exception(f"智谱AI返回异常: {result}")
+        ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
     
     else:
-        raise Exception(f"不支持的AI提供商: {provider}")
+        raise Exception(f"不支持的AI提供商: {provider}。支持的提供商: alibaba, zhipu, deepseek, moonshot, openai, custom")
     
-    # 解析AI返回的JSON
+    if not ai_text:
+        raise Exception("AI返回内容为空")
+    
     try:
-        # 尝试从返回文本中提取JSON
-        import re
         json_match = re.search(r'\{[\s\S]*\}', ai_text)
         if json_match:
             ai_result = json.loads(json_match.group())
+            logger.info("AI Response parsed as JSON successfully")
         else:
-            # 如果没有JSON，构建一个基本结果
+            logger.warning("AI Response is not JSON format, building fallback result")
             ai_result = {
                 'is_phishing': '钓鱼' in ai_text or 'phishing' in ai_text.lower(),
                 'risk_score': 50 if '风险' in ai_text else 20,
+                'phishing_intent_score': 0.5,
+                'urgency_score': 0.3,
+                'sentiment_score': 0.0,
+                'suspicious_language_score': 0.3,
                 'conclusion': ai_text[:200],
                 'analysis': ai_text,
+                'key_indicators': ['需要人工复核'],
                 'suggestions': ['请仔细核实发件人身份', '不要点击可疑链接']
             }
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.warning(f"JSON Decode Error: {e}")
         ai_result = {
             'is_phishing': False,
             'risk_score': 30,
+            'phishing_intent_score': 0.3,
+            'urgency_score': 0.2,
+            'sentiment_score': 0.0,
+            'suspicious_language_score': 0.2,
             'conclusion': 'AI分析完成',
             'analysis': ai_text,
+            'key_indicators': [],
             'suggestions': ['请人工复核']
         }
     
+    ai_result['llm_supported'] = True
+    ai_result['provider'] = provider
+    ai_result['model'] = model
+    
+    logger.info(f"AI Analysis Complete - is_phishing: {ai_result.get('is_phishing')}, score: {ai_result.get('risk_score')}")
     return ai_result

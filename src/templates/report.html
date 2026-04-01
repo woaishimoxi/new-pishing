@@ -646,21 +646,56 @@
                             <tr><th>处理建议:</th><td id="recommendation"></td></tr>
                         </table>
 
-                        <div class="confirm-section" id="userConfirmSection" style="display: none;">
-                            <h6><i class="bi bi-question-circle"></i> 请确认检测结果</h6>
-                            <p style="color: var(--text-secondary); margin: 0.75rem 0;">系统检测到以下可疑项，请您确认是否为异常：</p>
-                            <div id="suspiciousItems" class="suspicious-list"></div>
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button class="btn-cyber success" onclick="confirmResult('safe')">
-                                    <i class="bi bi-check-circle me-1"></i>确认安全
-                                </button>
-                                <button class="btn-cyber danger" onclick="confirmResult('phishing')">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>确认钓鱼
-                                </button>
-                                <button class="btn-cyber warning" onclick="confirmResult('uncertain')">
-                                    <i class="bi bi-robot me-1"></i>请求AI分析
-                                </button>
+                        <!-- AI语义分析结果模块 -->
+                        <div class="ai-analysis-section" id="aiAnalysisSection" style="display: none;">
+                            <h6 style="color: var(--blue); margin-bottom: 1rem;">
+                                <i class="bi bi-robot me-2"></i>AI语义分析结果
+                            </h6>
+                            <div class="ai-analysis-card" style="background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border);">
+                                <!-- AI分析结论 -->
+                                <div class="mb-3" id="aiConclusion">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                        <strong style="color: var(--text-primary);">分析结论</strong>
+                                        <span id="aiPhishingBadge" class="badge-cyber"></span>
+                                    </div>
+                                    <p id="aiConclusionText" style="color: var(--text-secondary); margin: 0; line-height: 1.6;"></p>
+                                </div>
+                                
+                                <!-- AI风险评分 -->
+                                <div class="mb-3">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                        <span style="color: var(--text-secondary);">AI风险评分</span>
+                                        <span id="aiRiskScore" style="font-weight: 600;"></span>
+                                    </div>
+                                    <div class="progress" style="height: 8px; background: rgba(255,255,255,0.1);">
+                                        <div id="aiRiskBar" class="progress-bar" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 详细分析 -->
+                                <div id="aiAnalysisDetail" class="mb-3">
+                                    <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">详细分析</strong>
+                                    <p id="aiAnalysisText" style="color: var(--text-secondary); margin: 0; line-height: 1.6; font-size: 0.9rem;"></p>
+                                </div>
+                                
+                                <!-- 关键指标 -->
+                                <div id="aiKeyIndicators" class="mb-3">
+                                    <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">关键指标</strong>
+                                    <div id="aiIndicatorsList"></div>
+                                </div>
+                                
+                                <!-- 建议 -->
+                                <div id="aiSuggestions">
+                                    <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">处置建议</strong>
+                                    <ul id="aiSuggestionsList" style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary);"></ul>
+                                </div>
                             </div>
+                        </div>
+
+                        <!-- AI分析不可用时的提示 -->
+                        <div class="alert-cyber info" id="aiAnalysisUnavailable" style="display: none;">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <span id="aiUnavailableReason">AI语义分析未启用，请在系统配置中启用AI分析功能</span>
                         </div>
 
                         <div class="alert-cyber info" id="userConfirmResult" style="display: none;"></div>
@@ -750,6 +785,22 @@
         <div class="card-cyber">
             <div class="card-header-cyber">
                 <h5 class="card-title-cyber">
+                    <i class="bi bi-cpu"></i>
+                    检测模型得分
+                    <span class="help-icon ms-2" title="显示各检测模型的置信度及综合结果来源">
+                        <i class="bi bi-question-circle"></i>
+                    </span>
+                </h5>
+            </div>
+            <div class="card-body-cyber">
+                <div id="modelScoresTable"></div>
+                <div id="fusionExplanation" class="mt-3"></div>
+            </div>
+        </div>
+
+        <div class="card-cyber">
+            <div class="card-header-cyber">
+                <h5 class="card-title-cyber">
                     <i class="bi bi-bar-chart"></i>
                     技术特征分析
                 </h5>
@@ -812,32 +863,30 @@
             document.getElementById('report-info').textContent = `报告编号：${reportId} | 生成时间：${timestamp}`;
             
             const isPhish = result.label === 'PHISHING';
-            updateSecurityScoreChart(result.confidence, isPhish, result.label);
+            
+            // 核心修复：直接使用后端计算的置信度，不再前端重新计算
+            // 后端已经完成了融合评分，前端只负责展示
+            const finalConfidence = result.confidence || 0;
+            const riskScoreValue = finalConfidence;
+            
+            updateSecurityScoreChart(finalConfidence, isPhish, result.label);
             
             document.getElementById('verdict').innerHTML = `<span class="badge-cyber ${getLabelBadgeClass(result.label)}">${result.label}</span>`;
-            document.getElementById('confidence').textContent = `${(result.confidence || 0).toFixed(2)}%`;
-            document.getElementById('riskScore').textContent = `${Math.round((result.confidence || 0) * 100)}`;
+            
+            // 显示后端计算的置信度
+            document.getElementById('confidence').textContent = `${(finalConfidence * 100).toFixed(2)}%`;
+            document.getElementById('riskScore').textContent = `${Math.round(finalConfidence * 100)}`;
             document.getElementById('keyReason').textContent = result.reason || '无';
+            
+            // 显示评分来源说明
+            const modelScores = result.model_scores || {};
+            displayScoreSourceExplanation(modelScores, finalConfidence, result.label);
             
             let recommendation;
             if (result.label === 'PHISHING') recommendation = '建议立即删除';
             else if (result.label === 'SUSPICIOUS') recommendation = '隔离审查';
             else recommendation = '可安全阅读';
             document.getElementById('recommendation').textContent = recommendation;
-            
-            const confirmSection = document.getElementById('userConfirmSection');
-            const suspiciousItems = document.getElementById('suspiciousItems');
-            
-            confirmSection.style.display = 'block';
-            
-            const reasons = (result.reason || '').split('；').filter(r => r.trim());
-            if (reasons.length > 0) {
-                suspiciousItems.innerHTML = '<ul style="list-style: none; margin: 0; padding: 0;">' + 
-                    reasons.map(r => `<li><i class="bi bi-exclamation-triangle"></i>${r.trim()}</li>`).join('') +
-                    '</ul>';
-            } else {
-                suspiciousItems.innerHTML = `<p style="color: var(--text-muted);">系统检测结果: ${result.label}，请确认是否准确</p>`;
-            }
             
             const parsed = result.parsed || {};
             document.getElementById('resultFromName').textContent = parsed.from_display_name || result.from_display_name || '-';
@@ -878,9 +927,152 @@
             
             displayFeatureAnalysis(result.features);
             displaySandboxAnalysis(result.sandbox_analysis);
+            displayModelScores(result);
             displayHighestRiskFactors(result.highest_risk_module, result.highest_risk_score, result.reason);
             displayModuleScores(result.module_scores);
+            displayAIAnalysis(result.ai_analysis);  // 显示AI语义分析结果
             displayJudgmentCriteria();
+        }
+        
+        // 显示AI语义分析结果
+        function displayAIAnalysis(aiAnalysis) {
+            const section = document.getElementById('aiAnalysisSection');
+            const unavailableSection = document.getElementById('aiAnalysisUnavailable');
+            
+            if (!section || !unavailableSection) return;
+            
+            // 如果没有AI分析结果
+            if (!aiAnalysis || Object.keys(aiAnalysis).length === 0) {
+                section.style.display = 'none';
+                unavailableSection.style.display = 'block';
+                document.getElementById('aiUnavailableReason').textContent = 'AI语义分析未执行，请在系统配置中启用AI分析功能';
+                return;
+            }
+            
+            // 如果AI分析有错误
+            if (aiAnalysis.error) {
+                section.style.display = 'none';
+                unavailableSection.style.display = 'block';
+                document.getElementById('aiUnavailableReason').textContent = `AI语义分析失败: ${aiAnalysis.error}`;
+                return;
+            }
+            
+            // 显示AI分析结果
+            section.style.display = 'block';
+            unavailableSection.style.display = 'none';
+            
+            // 设置是否钓鱼标记
+            const isPhishing = aiAnalysis.is_phishing;
+            const phishingBadge = document.getElementById('aiPhishingBadge');
+            if (isPhishing === true) {
+                phishingBadge.className = 'badge-cyber badge-danger';
+                phishingBadge.textContent = '判定为钓鱼';
+            } else if (isPhishing === false) {
+                phishingBadge.className = 'badge-cyber badge-success';
+                phishingBadge.textContent = '判定为安全';
+            } else {
+                phishingBadge.className = 'badge-cyber badge-warning';
+                phishingBadge.textContent = '未确定';
+            }
+            
+            // 设置结论文本
+            const conclusionText = aiAnalysis.conclusion || '无分析结论';
+            document.getElementById('aiConclusionText').textContent = conclusionText;
+            
+            // 设置风险评分
+            const riskScore = aiAnalysis.risk_score || 0;
+            document.getElementById('aiRiskScore').textContent = `${riskScore}/100`;
+            
+            const riskBar = document.getElementById('aiRiskBar');
+            riskBar.style.width = `${riskScore}%`;
+            if (riskScore >= 70) {
+                riskBar.className = 'progress-bar bg-danger';
+            } else if (riskScore >= 40) {
+                riskBar.className = 'progress-bar bg-warning';
+            } else {
+                riskBar.className = 'progress-bar bg-success';
+            }
+            
+            // 设置详细分析
+            const analysisText = aiAnalysis.analysis || '无详细分析';
+            document.getElementById('aiAnalysisText').textContent = analysisText;
+            
+            // 设置关键指标
+            const indicators = aiAnalysis.key_indicators || [];
+            const indicatorsList = document.getElementById('aiIndicatorsList');
+            if (indicators.length > 0) {
+                document.getElementById('aiKeyIndicators').style.display = 'block';
+                indicatorsList.innerHTML = indicators.map(ind => 
+                    `<div style="display: inline-block; margin: 0.25rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 0.85rem; color: var(--text-secondary);">
+                        <i class="bi bi-exclamation-circle me-1" style="color: var(--amber);"></i>${ind}
+                    </div>`
+                ).join('');
+            } else {
+                document.getElementById('aiKeyIndicators').style.display = 'none';
+            }
+            
+            // 设置建议
+            const suggestions = aiAnalysis.suggestions || [];
+            const suggestionsList = document.getElementById('aiSuggestionsList');
+            if (suggestions.length > 0) {
+                document.getElementById('aiSuggestions').style.display = 'block';
+                suggestionsList.innerHTML = suggestions.map(s => `<li>${s}</li>`).join('');
+            } else {
+                document.getElementById('aiSuggestions').style.display = 'none';
+            }
+        }
+        
+        function displayScoreSourceExplanation(modelScores, finalConfidence, label) {
+            // 在置信度旁边显示评分来源说明
+            const confidenceEl = document.getElementById('confidence');
+            if (!confidenceEl) return;
+            
+            // 创建说明区域
+            let explanationHtml = `
+            <div class="alert-cyber info" style="margin-top: 0.5rem; font-size: 0.85rem;">
+                <strong>评分来源：</strong>
+                <span style="color: var(--text-secondary);">
+            `;
+            
+            const sources = [];
+            if (modelScores.kill_switch) {
+                sources.push('<span class="badge-cyber badge-danger">一票否决</span>');
+            }
+            if (modelScores.rf !== null && modelScores.rf !== undefined) {
+                sources.push(`RF: ${(modelScores.rf * 100).toFixed(0)}%`);
+            }
+            if (modelScores.xgb !== null && modelScores.xgb !== undefined) {
+                sources.push(`XGB: ${(modelScores.xgb * 100).toFixed(0)}%`);
+            }
+            if (modelScores.anomaly !== null && modelScores.anomaly !== undefined) {
+                sources.push(`异常: ${(modelScores.anomaly * 100).toFixed(0)}%`);
+            }
+            if (modelScores.rule !== null && modelScores.rule !== undefined) {
+                sources.push(`规则: ${(modelScores.rule * 100).toFixed(0)}%`);
+            }
+            if (modelScores.ai !== null && modelScores.ai !== undefined) {
+                sources.push(`AI: ${(modelScores.ai * 100).toFixed(0)}%`);
+            }
+            if (modelScores.url !== null && modelScores.url !== undefined) {
+                sources.push(`URL: ${(modelScores.url * 100).toFixed(0)}%`);
+            }
+            
+            explanationHtml += sources.join(' | ');
+            explanationHtml += `
+                </span>
+                <br>
+                <span style="color: var(--blue);">最终评分 = ${(finalConfidence * 100).toFixed(2)}% → 判定: ${label}</span>
+            </div>
+            `;
+            
+            // 插入到置信度后面
+            const confidenceParent = confidenceEl.parentElement;
+            if (confidenceParent && !document.getElementById('scoreSourceExplanation')) {
+                const explanationDiv = document.createElement('div');
+                explanationDiv.id = 'scoreSourceExplanation';
+                explanationDiv.innerHTML = explanationHtml;
+                confidenceParent.appendChild(explanationDiv);
+            }
         }
 
         function getLabelBadgeClass(label) {
@@ -1007,6 +1199,152 @@
             </div>`;
             
             container.innerHTML = html;
+        }
+
+        // 显示检测模型得分表格
+        function displayModelScores(result) {
+            const container = document.getElementById('modelScoresTable');
+            const fusionContainer = document.getElementById('fusionExplanation');
+            
+            if (!container) return;
+            
+            // 使用后端返回的真实模型得分
+            const modelScores = result.model_scores || {
+                'rf': null,
+                'xgb': null,
+                'anomaly': null,
+                'rule': 0.5,
+                'ai': null,
+                'url': null
+            };
+            
+            const modelWeights = {
+                'rf': 1.0,
+                'xgb': 1.0,
+                'anomaly': 1.0,
+                'rule': 0.5,
+                'ai': 2.0,
+                'url': 3.0
+            };
+            
+            const modelNames = {
+                'rf': 'RF分类器',
+                'xgb': 'XGB分类器',
+                'anomaly': '异常检测器',
+                'rule': '规则引擎',
+                'ai': 'AI语义分析',
+                'url': 'URL分析'
+            };
+            
+            const modelIcons = {
+                'rf': '🌲',
+                'xgb': '⚡',
+                'anomaly': '🔍',
+                'rule': '📋',
+                'ai': '🤖',
+                'url': '🔗'
+            };
+            
+            // 计算加权得分
+            let totalWeight = 0;
+            let weightedSum = 0;
+            let activeModels = 0;
+            
+            for (const [key, score] of Object.entries(modelScores)) {
+                const weight = modelWeights[key] || 0;
+                if (score !== null && score !== undefined && weight > 0) {
+                    weightedSum += score * weight;
+                    totalWeight += weight;
+                    activeModels++;
+                }
+            }
+            
+            const finalScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+            
+            // 生成表格
+            let html = '<h6 style="color: var(--blue); margin-bottom: 1rem;">各模型检测得分</h6>';
+            html += '<div class="table-responsive">';
+            html += '<table class="detail-table" style="margin-bottom: 1rem;">';
+            html += '<tr><th>检测模块</th><th>置信度</th><th>权重</th><th>加权得分</th><th>状态</th></tr>';
+            
+            for (const [key, name] of Object.entries(modelNames)) {
+                const score = modelScores[key];
+                const weight = modelWeights[key];
+                const weightedScore = score !== null && score !== undefined ? (score * weight).toFixed(4) : '-';
+                const scorePercent = score !== null && score !== undefined ? (score * 100).toFixed(2) + '%' : 'N/A';
+                const isActive = score !== null && score !== undefined;
+                const statusBadge = isActive 
+                    ? '<span class="badge-cyber badge-success">激活</span>' 
+                    : '<span class="badge-cyber badge-warning">未激活</span>';
+                
+                html += `<tr>
+                    <td>${modelIcons[key]} ${name}</td>
+                    <td>${scorePercent}</td>
+                    <td>${weight.toFixed(1)}</td>
+                    <td>${weightedScore}</td>
+                    <td>${statusBadge}</td>
+                </tr>`;
+            }
+            
+            // 计算风险评分百分比
+            const riskPercent = (finalScore * 100).toFixed(2);
+            const riskLevel = finalScore >= 0.65 ? '钓鱼' : finalScore >= 0.4 ? '可疑' : '正常';
+            const riskClass = finalScore >= 0.65 ? 'badge-danger' : finalScore >= 0.4 ? 'badge-warning' : 'badge-success';
+            
+            html += `<tr style="background: rgba(59, 130, 246, 0.1); font-weight: bold;">
+                <td>📊 综合融合得分</td>
+                <td>${riskPercent}%</td>
+                <td colspan="2">权重总和: ${totalWeight.toFixed(1)}</td>
+                <td><span class="badge-cyber ${riskClass}">${riskLevel}</span></td>
+            </tr>`;
+            
+            html += '</table></div>';
+            
+            // 添加各模型得分占比图
+            html += '<div style="margin-top: 1rem;"><h6 style="color: var(--blue); margin-bottom: 0.75rem;">各模型得分占比</h6>';
+            
+            for (const [key, name] of Object.entries(modelNames)) {
+                const score = modelScores[key];
+                if (score !== null && score !== undefined) {
+                    const percent = (score * 100).toFixed(1);
+                    const barColor = score >= 0.7 ? 'bg-danger' : score >= 0.4 ? 'bg-warning' : 'bg-success';
+                    html += `<div style="margin-bottom: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                            <span>${modelIcons[key]} ${name}</span>
+                            <span>${percent}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar ${barColor}" style="width: ${percent}%"></div>
+                        </div>
+                    </div>`;
+                }
+            }
+            
+            html += '</div>';
+            
+            container.innerHTML = html;
+            
+            // 显示融合说明
+            if (fusionContainer) {
+                let fusionHtml = `
+                <div class="alert-cyber info" style="margin-top: 1rem;">
+                    <h6 style="margin-bottom: 0.75rem;"><i class="bi bi-info-circle me-2"></i>综合结果来源说明</h6>
+                    <p style="margin-bottom: 0.5rem;">最终检测结果由以下维度加权融合得出（当前激活: ${activeModels}个模型）：</p>
+                    <ul style="margin-bottom: 0.5rem; padding-left: 1.5rem;">
+                        <li><strong>URL分析 (权重3.0)</strong>：钓鱼检测核心杀招，域名仿冒、短链接、IP直连等高风险特征</li>
+                        <li><strong>AI语义分析 (权重2.0)</strong>：识别社会工程学话术，对抗AI生成钓鱼文案</li>
+                        <li><strong>RF分类器 (权重1.0)</strong>：基于35维语义特征的随机森林模型（辅助判断）</li>
+                        <li><strong>XGB分类器 (权重1.0)</strong>：基于35维语义特征的梯度提升模型（辅助判断）</li>
+                        <li><strong>异常检测器 (权重1.0)</strong>：基于26维统计特征的异常检测（辅助判断）</li>
+                        <li><strong>规则引擎 (权重0.5)</strong>：基于已知威胁库和关键词匹配（基础参考）</li>
+                    </ul>
+                    <p style="margin-bottom: 0;"><strong>融合公式：</strong>最终得分 = Σ(模型得分 × 权重) / Σ(权重)</p>
+                    <p style="margin-bottom: 0; margin-top: 0.5rem;"><strong>熔断机制：</strong>IP黑名单、域名仿冒、沙箱检测等高危特征直接触发一票否决</p>
+                </div>
+                `;
+                
+                fusionContainer.innerHTML = fusionHtml;
+            }
         }
 
         function displayModuleScores(moduleScores) {
@@ -1375,6 +1713,10 @@
             const parsed = currentResult.parsed || {};
             const moduleScores = currentResult.module_scores || {};
             
+            const bodyContent = parsed.body || currentResult.body || '';
+            const htmlBodyContent = parsed.html_body || currentResult.html_body || '';
+            const displayBody = bodyContent || htmlBodyContent || '无正文内容';
+            
             const weights = { 'header': 0.25, 'url': 0.30, 'text': 0.20, 'attachment': 0.15, 'html': 0.10 };
             let totalScore = 0;
             for (const [key, score] of Object.entries(moduleScores)) {
@@ -1393,11 +1735,11 @@
                             <div style="margin-bottom: 1.5rem;">
                                 <h6 style="color: var(--blue); margin-bottom: 1rem;"><i class="bi bi-info-circle me-2"></i>邮件基本信息</h6>
                                 <table class="detail-table">
-                                    <tr><th>发件人:</th><td>${parsed.from || '-'}</td></tr>
-                                    <tr><th>发件人显示名:</th><td>${parsed.from_display_name || '-'}</td></tr>
-                                    <tr><th>发件人邮箱:</th><td>${parsed.from_email || '-'}</td></tr>
-                                    <tr><th>收件人:</th><td>${parsed.to || '-'}</td></tr>
-                                    <tr><th>主题:</th><td>${parsed.subject || '-'}</td></tr>
+                                    <tr><th>发件人:</th><td>${parsed.from || currentResult.from_addr || '-'}</td></tr>
+                                    <tr><th>发件人显示名:</th><td>${parsed.from_display_name || currentResult.from_display_name || '-'}</td></tr>
+                                    <tr><th>发件人邮箱:</th><td>${parsed.from_email || currentResult.from_email || '-'}</td></tr>
+                                    <tr><th>收件人:</th><td>${parsed.to || currentResult.to_addr || '-'}</td></tr>
+                                    <tr><th>主题:</th><td>${parsed.subject || currentResult.subject || '-'}</td></tr>
                                     <tr><th>附件数量:</th><td>${parsed.attachment_count || 0}</td></tr>
                                 </table>
                             </div>
@@ -1409,16 +1751,16 @@
                                     <button class="btn-cyber" onclick="showBodyType('raw')">原始邮件</button>
                                 </div>
                                 <div id="bodyDecoded">
-                                    <pre>${parsed.body || '无正文内容'}</pre>
+                                    <pre style="white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto;">${displayBody}</pre>
                                 </div>
                                 <div id="bodyRaw" style="display: none;">
-                                    <pre style="font-size: 0.75rem;">${currentResult.raw_email || '无原始邮件'}</pre>
+                                    <pre style="font-size: 0.75rem; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">${currentResult.raw_email || '无原始邮件'}</pre>
                                 </div>
                             </div>
                             
                             <div style="margin-bottom: 1.5rem;">
                                 <h6 style="color: var(--blue); margin-bottom: 1rem;"><i class="bi bi-list me-2"></i>邮件头</h6>
-                                <pre>${JSON.stringify(currentResult.headers || {}, null, 2)}</pre>
+                                <pre style="max-height: 300px; overflow-y: auto;">${JSON.stringify(currentResult.headers || parsed.headers || {}, null, 2)}</pre>
                             </div>
                             
                             <div>
@@ -1463,7 +1805,7 @@
             }
 
             if (!sandboxAnalysis.enabled) {
-                container.innerHTML = '<div class="alert-cyber warning"><i class="bi bi-exclamation-circle me-2"></i>沙箱分析未启用，请在 API 配置中设置 VirusTotal API Key</div>';
+                container.innerHTML = '<div class="alert-cyber warning"><i class="bi bi-exclamation-circle me-2"></i>沙箱分析未启用，请在 API 配置中设置 微步在线(ThreatBook) API Key</div>';
                 return;
             }
 
@@ -1483,8 +1825,8 @@
                         <span class="badge-cyber ${detected ? 'badge-danger' : 'badge-success'}">${detected ? '恶意' : '安全'}</span>
                     </div>
                     <div class="feature-row"><span>检测率</span><span>${(detectionRatio * 100).toFixed(2)}%</span></div>
-                    <div class="feature-row"><span>分析服务</span><span>VirusTotal</span></div>
-                    <div class="feature-row"><span>分析类型</span><span>动态行为分析</span></div>
+                    <div class="feature-row"><span>分析服务</span><span>微步在线(ThreatBook)</span></div>
+                    <div class="feature-row"><span>分析类型</span><span>威胁情报+动态行为分析</span></div>
                 </div>
             </div>`;
 
@@ -1589,13 +1931,60 @@
             if (result.risk_score > 70) { riskColor = 'danger'; riskText = '高风险'; }
             else if (result.risk_score > 40) { riskColor = 'warning'; riskText = '中风险'; }
             
+            const phishingIntent = result.phishing_intent_score || 0;
+            const urgencyScore = result.urgency_score || 0;
+            const sentimentScore = result.sentiment_score || 0;
+            const suspiciousLang = result.suspicious_language_score || 0;
+            const confidence = result.confidence_level || 0.5;
+            
+            const semanticSection = `
+                <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.02); border-radius: var(--radius-md);">
+                    <h6 style="color: var(--blue); margin-bottom: 1rem;"><i class="bi bi-bar-chart me-2"></i>语义分析维度</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <small style="color: var(--text-secondary);">钓鱼意图</small>
+                            <div class="progress" style="height: 8px; background: var(--bg-secondary);">
+                                <div class="progress-bar bg-${phishingIntent > 0.6 ? 'danger' : phishingIntent > 0.3 ? 'warning' : 'success'}" 
+                                     style="width: ${phishingIntent * 100}%"></div>
+                            </div>
+                            <small style="color: var(--text-muted);">${(phishingIntent * 100).toFixed(0)}%</small>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small style="color: var(--text-secondary);">紧急程度</small>
+                            <div class="progress" style="height: 8px; background: var(--bg-secondary);">
+                                <div class="progress-bar bg-${urgencyScore > 0.6 ? 'danger' : urgencyScore > 0.3 ? 'warning' : 'success'}" 
+                                     style="width: ${urgencyScore * 100}%"></div>
+                            </div>
+                            <small style="color: var(--text-muted);">${(urgencyScore * 100).toFixed(0)}%</small>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small style="color: var(--text-secondary);">可疑语言</small>
+                            <div class="progress" style="height: 8px; background: var(--bg-secondary);">
+                                <div class="progress-bar bg-${suspiciousLang > 0.6 ? 'danger' : suspiciousLang > 0.3 ? 'warning' : 'success'}" 
+                                     style="width: ${suspiciousLang * 100}%"></div>
+                            </div>
+                            <small style="color: var(--text-muted);">${(suspiciousLang * 100).toFixed(0)}%</small>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small style="color: var(--text-secondary);">分析置信度</small>
+                            <div class="progress" style="height: 8px; background: var(--bg-secondary);">
+                                <div class="progress-bar bg-info" style="width: ${confidence * 100}%"></div>
+                            </div>
+                            <small style="color: var(--text-muted);">${(confidence * 100).toFixed(0)}%</small>
+                        </div>
+                    </div>
+                    ${result.attack_type ? `<div style="margin-top: 0.5rem;"><small style="color: var(--text-secondary);">攻击类型: </small><span class="badge-cyber badge-${result.attack_type === 'benign' ? 'success' : 'danger'}">${result.attack_type}</span></div>` : ''}
+                    ${result.provider ? `<small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">AI模型: ${result.provider} / ${result.model || 'default'}</small>` : ''}
+                </div>
+            `;
+            
             const modal = document.createElement('div');
             modal.innerHTML = `
                 <div class="modal fade" id="aiResultModal" tabindex="-1">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content modal-content-cyber">
                             <div class="modal-header modal-header-cyber">
-                                <h5 class="modal-title modal-title-cyber"><i class="bi bi-robot me-2"></i>AI深度分析报告</h5>
+                                <h5 class="modal-title modal-title-cyber"><i class="bi bi-robot me-2"></i>AI语义分析报告</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body modal-body-cyber">
@@ -1610,6 +1999,8 @@
                                 <div class="progress-cyber" style="margin-bottom: 1.5rem;">
                                     <div class="progress-bar-cyber ${riskColor}" style="width: ${result.risk_score}%"></div>
                                 </div>
+                                
+                                ${semanticSection}
                                 
                                 ${indicators.length > 0 ? `
                                 <div style="margin-bottom: 1.5rem;">
@@ -1685,34 +2076,6 @@
             bsModal.show();
             
             modalEl.addEventListener('hidden.bs.modal', () => { document.body.removeChild(modal); });
-        }
-
-        function confirmResult(action) {
-            const confirmSection = document.getElementById('userConfirmSection');
-            const confirmResult = document.getElementById('userConfirmResult');
-            
-            let message = '';
-            let alertClass = '';
-            
-            if (action === 'safe') {
-                message = '<i class="bi bi-check-circle me-2"></i>您已确认此邮件为<strong>安全邮件</strong>，系统将记录您的判断。';
-                alertClass = 'success';
-            } else if (action === 'phishing') {
-                message = '<i class="bi bi-exclamation-triangle me-2"></i>您已确认此邮件为<strong>钓鱼邮件</strong>，系统将记录您的判断并添加到黑名单。';
-                alertClass = 'danger';
-            } else if (action === 'uncertain') {
-                message = '<i class="bi bi-robot me-2"></i>正在调用AI进行深度分析...';
-                alertClass = 'info';
-                setTimeout(() => { aiAnalyze(); }, 500);
-            }
-            
-            confirmResult.className = `alert-cyber ${alertClass}`;
-            confirmResult.innerHTML = message;
-            confirmResult.style.display = 'block';
-            
-            if (action !== 'uncertain') {
-                confirmSection.style.display = 'none';
-            }
         }
 
         function copyAIResult() {

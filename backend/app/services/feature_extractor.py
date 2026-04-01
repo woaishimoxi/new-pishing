@@ -8,6 +8,7 @@ import json
 import os
 import whois
 import requests
+from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, List, Optional, Set
 import sys
@@ -54,17 +55,13 @@ class FeatureExtractionService:
     
     def extract_features(
         self,
-        parsed_email: Dict,
-        vt_api_key: str = "",
-        vt_api_url: str = "https://www.virustotal.com/vtapi/v2/url/report"
+        parsed_email: Dict
     ) -> Dict:
         """
         Extract all features from parsed email
         
         Args:
             parsed_email: Parsed email data
-            vt_api_key: VirusTotal API key
-            vt_api_url: VirusTotal API URL
             
         Returns:
             Feature vector dictionary
@@ -72,7 +69,7 @@ class FeatureExtractionService:
         header_features = self._extract_header_features(parsed_email)
         
         urls = parsed_email.get('urls', [])
-        url_features_list = [self._extract_url_features(url, vt_api_key, vt_api_url) for url in urls]
+        url_features_list = [self._extract_url_features(url) for url in urls]
         aggregated_url_features = self._aggregate_url_features(url_features_list)
         
         body = parsed_email.get('body', '')
@@ -80,7 +77,7 @@ class FeatureExtractionService:
         subject = parsed_email.get('subject', '')
         text_features = self._extract_text_features(body + html_body, subject)
         
-        attachment_features = self._extract_attachment_features(parsed_email, vt_api_key)
+        attachment_features = self._extract_attachment_features(parsed_email)
         
         html_features = self._extract_html_features(parsed_email)
         
@@ -164,18 +161,13 @@ class FeatureExtractionService:
         
         return features
     
-    def _extract_url_features(
-        self,
-        url: str,
-        vt_api_key: str = "",
-        vt_api_url: str = "https://www.virustotal.com/vtapi/v2/url/report"
-    ) -> Dict:
+    def _extract_url_features(self, url: str) -> Dict:
         """Extract features for a single URL"""
         features = {
-            'domain_age_days': 3650,
+            'domain_age_days': 0,  # 改为0表示未知，而非默认3650天
             'has_https': int(url.startswith('https')),
             'is_short_url': self._is_short_url(url),
-            'vt_detection_ratio': 0.0,
+            'threat_detection_ratio': 0.0,
             'is_ip_address': 0,
             'has_port': 0,
             'url_length': len(url),
@@ -237,8 +229,8 @@ class FeatureExtractionService:
             features['path_depth'] = path.count('/')
             features['query_length'] = len(query)
             
-            if vt_api_key:
-                features['vt_detection_ratio'] = self._query_virustotal(url, vt_api_key, vt_api_url)
+            if self.config.api.threatbook_api_key:
+                features['threat_detection_ratio'] = self._query_threatbook(url)
             
         except Exception:
             pass
@@ -253,12 +245,20 @@ class FeatureExtractionService:
         return False
     
     def _get_domain_age(self, domain: str) -> float:
-        """Get domain age in days"""
+        """
+        Get domain age in days
+        
+        修复：
+        1. 添加超时控制（5秒）
+        2. 添加国内API支持作为备选
+        3. 查询失败返回0而非默认值
+        """
         global DOMAIN_AGE_CACHE
         
         if domain in DOMAIN_AGE_CACHE:
             return DOMAIN_AGE_CACHE[domain]
         
+        # 可信域名直接返回老域名
         domain_parts = domain.split('.')
         if len(domain_parts) >= 2:
             registered_domain = '.'.join(domain_parts[-2:])
@@ -266,58 +266,131 @@ class FeatureExtractionService:
                 DOMAIN_AGE_CACHE[domain] = 3650.0
                 return 3650.0
         
-        try:
-            w = whois.get(domain)
-            if not w or not hasattr(w, 'creation_date'):
-                return 3650.0
-            
-            creation_date = w.creation_date
-            
-            if isinstance(creation_date, list):
-                creation_date = creation_date[0]
-            
-            if creation_date:
-                try:
-                    if hasattr(creation_date, 'timestamp'):
-                        age_seconds = time.time() - creation_date.timestamp()
-                    elif isinstance(creation_date, str):
-                        dt = time.strptime(creation_date[:19], '%Y-%m-%d %H:%M:%S')
-                        age_seconds = time.time() - time.mktime(dt)
-                    else:
-                        return 3650.0
-                    
-                    age_days = min(age_seconds / 86400, 3650)
-                    DOMAIN_AGE_CACHE[domain] = age_days
-                    return age_days
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        # 方法1: 尝试使用whois库查询（带超时控制）
+        creation_date = self._query_whois_with_timeout(domain)
         
-        return 3650.0
+        if creation_date:
+            try:
+                if hasattr(creation_date, 'timestamp'):
+                    age_seconds = time.time() - creation_date.timestamp()
+                elif isinstance(creation_date, str):
+                    # 尝试多种日期格式
+                    for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            dt = time.strptime(creation_date[:19], fmt)
+                            age_seconds = time.time() - time.mktime(dt)
+                            break
+                        except:
+                            continue
+                    else:
+                        DOMAIN_AGE_CACHE[domain] = 0.0
+                        return 0.0
+                else:
+                    DOMAIN_AGE_CACHE[domain] = 0.0
+                    return 0.0
+                
+                age_days = min(age_seconds / 86400, 3650)
+                DOMAIN_AGE_CACHE[domain] = age_days
+                return age_days
+            except Exception:
+                pass
+        
+        # 方法2: 尝试使用国内API查询
+        api_age = self._query_domain_age_from_api(domain)
+        if api_age > 0:
+            DOMAIN_AGE_CACHE[domain] = api_age
+            return api_age
+        
+        # 查询失败返回0
+        DOMAIN_AGE_CACHE[domain] = 0.0
+        return 0.0
     
-    def _query_virustotal(
-        self,
-        url: str,
-        vt_api_key: str,
-        vt_api_url: str
-    ) -> float:
-        """Query VirusTotal for URL detection ratio"""
-        if not vt_api_key or vt_api_key in ['test_key', 'test', 'your_api_key', '']:
+    def _query_whois_with_timeout(self, domain: str):
+        """Query WHOIS with timeout control"""
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("WHOIS query timeout")
+        
+        try:
+            # 设置5秒超时
+            if hasattr(signal, 'SIGALRM'):  # Unix系统
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(5)
+            
+            w = whois.get(domain)
+            
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)  # 取消超时
+            
+            if w and hasattr(w, 'creation_date'):
+                return w.creation_date
+        except (TimeoutError, Exception) as e:
+            self.logger.debug(f"WHOIS query failed for {domain}: {type(e).__name__}")
+        finally:
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+        
+        return None
+    
+    def _query_domain_age_from_api(self, domain: str) -> float:
+        """
+        从国内API查询域名年龄
+        
+        使用免费的WHOIS查询API获取域名注册时间
+        """
+        try:
+            # 使用免费的WHOIS API
+            api_url = f"https://v.api.aa1.cn/api/whois/index.php?domain={domain}"
+            
+            response = requests.get(api_url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # 解析注册日期
+                creation_date_str = data.get('creation_date') or data.get('Creation Date')
+                
+                if creation_date_str:
+                    # 尝试解析日期
+                    for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            creation_dt = datetime.strptime(creation_date_str[:19], fmt)
+                            age_days = (datetime.now() - creation_dt).days
+                            return min(age_days, 3650)
+                        except:
+                            continue
+        except Exception as e:
+            self.logger.debug(f"API domain age query failed for {domain}: {e}")
+        
+        return 0.0
+    
+    def _query_threatbook(self, url: str) -> float:
+        """Query ThreatBook for URL detection ratio"""
+        if not self.config.api.threatbook_api_key:
             return 0.0
         
         try:
-            params = {'apikey': vt_api_key, 'resource': url}
-            response = requests.get(vt_api_url, params=params, timeout=10)
+            params = {
+                'apikey': self.config.api.threatbook_api_key,
+                'url': url
+            }
+            response = requests.get(
+                f'{self.config.api.threatbook_api_url}/url/report',
+                params=params,
+                timeout=10
+            )
             
             if response.status_code == 200:
                 result = response.json()
-                if result.get('response_code') == 1:
-                    positives = result.get('positives', 0)
-                    total = result.get('total', 1)
-                    return positives / total if total > 0 else 0.0
+                if result.get('response_code') == 0:
+                    url_data = result.get('data', {}).get(url, {})
+                    scans = url_data.get('scans', {})
+                    detected = sum(1 for s in scans.values() if s.get('detected'))
+                    total = len(scans)
+                    return detected / total if total > 0 else 0.0
         except Exception as e:
-            self.logger.debug(f"VirusTotal query skipped for {url[:50]}: {type(e).__name__}")
+            self.logger.debug(f"ThreatBook query skipped for {url[:50]}: {type(e).__name__}")
         
         return 0.0
     
@@ -325,8 +398,9 @@ class FeatureExtractionService:
         """Aggregate URL features from multiple URLs"""
         if not url_features_list:
             return {
-                'avg_domain_age_days': 3650,
-                'max_vt_detection_ratio': 0,
+                'avg_domain_age_days': 0,  # 改为0表示未知
+                'max_vt_detection_ratio': 0,  # 修复特征名称
+                'max_threat_detection_ratio': 0,  # 保留兼容
                 'min_has_https': 1,
                 'short_url_count': 0,
                 'mixed_sld_count': 0,
@@ -342,9 +416,12 @@ class FeatureExtractionService:
             }
         
         count = len(url_features_list)
+        threat_ratios = [f.get('threat_detection_ratio', 0) for f in url_features_list]
+        
         return {
             'avg_domain_age_days': sum(f['domain_age_days'] for f in url_features_list) / count,
-            'max_vt_detection_ratio': max(f['vt_detection_ratio'] for f in url_features_list),
+            'max_vt_detection_ratio': max(threat_ratios),  # 修复特征名称
+            'max_threat_detection_ratio': max(threat_ratios),  # 保留兼容
             'min_has_https': min(f['has_https'] for f in url_features_list),
             'short_url_count': sum(f['is_short_url'] for f in url_features_list),
             'mixed_sld_count': sum(f.get('has_mixed_sld', 0) for f in url_features_list),
@@ -410,11 +487,7 @@ class FeatureExtractionService:
         
         return features
     
-    def _extract_attachment_features(
-        self,
-        parsed_email: Dict,
-        vt_api_key: str = ""
-    ) -> Dict:
+    def _extract_attachment_features(self, parsed_email: Dict) -> Dict:
         """Extract attachment features"""
         features = {
             'attachment_count': 0,

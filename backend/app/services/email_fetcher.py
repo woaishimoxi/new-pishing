@@ -21,7 +21,6 @@ from app.services.email_parser import EmailParserService
 from app.services.detector import DetectionService
 from app.services.traceback import TracebackService
 from app.services.feature_extractor import FeatureExtractionService
-from app.services.url_analyzer import URLAnalyzerService
 
 
 class EmailFetcherService:
@@ -169,21 +168,15 @@ class EmailFetcherService:
         
         return emails
     
-    def process_email(self, raw_email: str, vt_api_key: str = "") -> Dict:
+    def process_email(self, raw_email: str) -> Dict:
         """Process single email"""
         try:
             parsed = self.parser.parse(raw_email)
-            features = self.feature_extractor.extract_features(parsed, vt_api_key)
-            traceback_report = self.traceback.generate_report(parsed, vt_api_key)
+            features = self.feature_extractor.extract_features(parsed)
+            traceback_report = self.traceback.generate_report(parsed)
             
-            url_analyzer = URLAnalyzerService()
-            url_analysis = url_analyzer.analyze_urls(parsed.get('urls', []))
-            
-            label, confidence, reason = self.detector.analyze(
-                parsed, features, 
-                url_analysis['max_risk_level'],
-                url_analysis['max_risk_score']
-            )
+            # 使用新的检测接口（无需URL分析）
+            label, confidence, reason = self.detector.analyze(parsed, features)
             
             return {
                 'label': label,
@@ -203,8 +196,7 @@ class EmailFetcherService:
                     'has_html_body': 1 if parsed.get('html_body') else 0
                 },
                 'features': features,
-                'traceback': traceback_report,
-                'url_analysis': url_analysis
+                'traceback': traceback_report
             }
             
         except Exception as e:
@@ -219,7 +211,6 @@ class EmailFetcherService:
     def process_emails(
         self,
         emails: List[Dict],
-        vt_api_key: str = "",
         max_workers: int = 4
     ) -> List[Dict]:
         """Process multiple emails in parallel"""
@@ -227,7 +218,7 @@ class EmailFetcherService:
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_email = {
-                executor.submit(self.process_email, email['raw'], vt_api_key): email 
+                executor.submit(self.process_email, email['raw']): email 
                 for email in emails
             }
             
