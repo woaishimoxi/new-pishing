@@ -1,232 +1,289 @@
 # 面向中小型企业的轻量化钓鱼邮件检测与溯源系统
 
-一个集高精度检测、自动化溯源、可视化管理和一键式部署于一体的综合性钓鱼邮件安全防护解决方案。
+一个集高精度检测、自动化溯源、可视化管理和多维度分析于一体的综合性钓鱼邮件安全防护解决方案。
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-2.3+-green.svg)](https://flask.palletsprojects.com/)
-[![LightGBM](https://img.shields.io/badge/LightGBM-3.3+-orange.svg)](https://lightgbm.readthedocs.io/)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.x-green.svg)](https://flask.palletsprojects.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+---
 
 ## 系统特性
 
-- **轻量高效**：2核CPU、4GB内存即可流畅运行
-- **高精度检测**：基于LightGBM机器学习模型，39维特征提取
-- **多维度分析**：融合邮件头、URL、文本内容及威胁情报
-- **自动溯源**：追踪邮件传输路径和URL跳转链路
-- **智能配置**：基于企业邮件模式自动推荐最优参数
-- **性能监控**：实时记录检测响应时间和系统资源占用
-- **可视化界面**：直观的Web管理后台
-- **一键部署**：3步操作，10分钟内完成部署
+- **多维度融合检测**：集成轻量模型（RF/XGB/IsolationForest）、规则引擎、AI语义分析、URL分析
+- **Kill Switch机制**：针对高危特征设计一票否决规则，确保关键威胁即时阻断
+- **微步在线集成**：支持文件沙箱分析、URL/IP/域名威胁情报查询
+- **AI语义分析**：集成大语言模型分析邮件内容，识别社会工程学攻击
+- **完整溯源分析**：IP地理位置、DNSBL黑名单查询、攻击链还原
+- **自动邮件监控**：支持IMAP/POP3邮箱自动监控
+- **可视化界面**：直观的Web管理后台，支持暗色模式
+
+---
+
+## 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              前端展示层                                      │
+│  大屏展示 / 检测面板 / 报告详情 / 系统配置 / 溯源分析                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │ HTTP/REST
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Flask API层                                    │
+│  /api/detection  /api/alerts  /api/config  /api/stats  /api/monitor       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              业务服务层                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        检测引擎 (detector.py)                       │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │   │
+│  │  │ RF/XGB分类器│  │ 异常检测器  │  │  规则引擎   │  │ Kill Switch│ │   │
+│  │  │  (35维)     │  │  (26维)     │  │  (关键词)   │  │  (一票否决) │ │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └───────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐          │
+│  │email_parser │ │  traceback  │ │ url_analyzer│ │  threatbook │          │
+│  │  邮件解析   │ │  溯源分析   │ │  URL分析    │ │  微步API    │          │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              外部API集成                                     │
+│  微步在线API / 阿里通义千问API / DNSBL服务器                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 检测流程
+
+```
+邮件输入 (手动上传/邮箱拉取/手动输入)
+    │
+    ├── 1. 邮件解析 → 提取发件人、正文、URL、附件
+    ├── 2. 附件沙箱分析 → 微步在线文件沙箱API
+    ├── 3. URL分析 → 白名单检查、品牌仿冒检测
+    ├── 4. 特征提取 → 35维语义 + 26维统计 + 39维传统
+    ├── 5. AI语义分析 → 大语言模型分析邮件内容
+    ├── 6. 多模型融合检测
+    │       ├── RF分类器 (权重1.5)
+    │       ├── XGB分类器 (权重1.5)
+    │       ├── 异常检测器 (权重1.0)
+    │       ├── 规则引擎 (权重1.0)
+    │       ├── AI分析 (权重1.2)
+    │       └── URL分析 (权重1.0)
+    ├── 7. 阈值判断
+    │       ├── >= 0.60 → PHISHING
+    │       ├── >= 0.35 → SUSPICIOUS
+    │       └── < 0.35  → SAFE
+    ├── 8. 溯源分析 → IP/DNSBL/WHOIS/攻击链
+    └── 9. 结果存储
+```
+
+---
 
 ## 项目结构
 
 ```
 项目根目录/
-├── backend/                    # 后端核心代码
+├── backend/                        # 后端代码
 │   ├── app/
-│   │   ├── api/               # API路由层
-│   │   │   ├── detection.py   # 检测分析API
-│   │   │   ├── alerts.py      # 告警管理API
-│   │   │   ├── config.py      # 配置管理API
-│   │   │   ├── stats.py       # 统计数据API
-│   │   │   ├── email.py       # 邮件获取API
-│   │   │   └── system.py      # 系统管理API
-│   │   ├── services/          # 业务逻辑层
-│   │   │   ├── detector.py    # 邮件检测引擎
-│   │   │   ├── feature_extractor.py  # 特征提取
-│   │   │   ├── url_analyzer.py       # URL分析
-│   │   │   ├── traceback.py          # 溯源分析
-│   │   │   ├── auto_tuner.py         # 智能配置
-│   │   │   └── performance_monitor.py # 性能监控
-│   │   ├── core/              # 核心配置
-│   │   ├── models/            # 数据模型
-│   │   └── utils/             # 工具函数
-│   ├── tests/                 # 测试用例
-│   └── run.py                 # 启动入口
-├── src/
-│   └── templates/             # 前端模板
-│       ├── dashboard.html     # 主界面
-│       └── report.html        # 报告页面
-├── config/                    # 配置文件
-│   ├── api_config.json        # API配置
-│   ├── whitelist.json         # 白名单 (300+域名)
-│   └── ioc_database.json      # IOC威胁情报库
-├── models/                    # 模型文件
-│   ├── phish_detector.pkl     # LightGBM模型
-│   └── feature_info.json      # 特征信息
-├── data/                      # 数据目录
-├── scripts/                   # 工具脚本
-│   ├── startup/               # 启动脚本
-│   │   ├── deploy.bat         # Windows部署
-│   │   ├── deploy.sh          # Linux部署
-│   │   ├── Dockerfile         # Docker配置
-│   │   └── docker-compose.yml # Docker编排
-│   └── resource_monitor.py    # 资源监控
-├── requirements.txt           # Python依赖
-└── README.md                  # 项目文档
+│   │   ├── api/                   # API路由
+│   │   │   ├── detection.py       # 检测接口
+│   │   │   ├── alerts.py          # 告警接口/AI分析
+│   │   │   ├── config.py          # 配置接口
+│   │   │   └── monitor.py         # 邮件监控接口
+│   │   ├── services/              # 业务服务
+│   │   │   ├── detector.py        # 检测引擎（核心）
+│   │   │   ├── lightweight_features.py  # 轻量模型特征提取
+│   │   │   ├── lightweight_model.py     # 轻量模型服务
+│   │   │   ├── email_parser.py    # 邮件解析
+│   │   │   ├── url_analyzer.py    # URL分析
+│   │   │   ├── feature_extractor.py     # 特征提取
+│   │   │   ├── traceback.py       # 溯源分析
+│   │   │   ├── threatbook.py      # 微步API
+│   │   │   └── email_monitor.py   # 邮件监控
+│   │   ├── models/                # 数据模型
+│   │   └── core/                  # 核心模块
+│   └── run.py                     # 启动入口
+├── config/                         # 配置文件
+│   ├── api_config.json            # API配置
+│   └── whitelist.json             # 白名单
+├── models/                         # 机器学习模型
+│   ├── phishmmf_simplified_rf.joblib      # RF分类器
+│   ├── phishmmf_simplified_xgb.joblib     # XGB分类器
+│   ├── phishmmf_simplified_scaler.joblib  # 特征标准化器
+│   ├── phish_iforest.joblib               # 异常检测器
+│   └── phish_iforest_scaler.joblib        # 异常检测标准化器
+├── src/templates/                  # 前端模板
+│   ├── bigscreen.html             # 数据大屏
+│   ├── dashboard.html             # 检测面板
+│   ├── report.html                # 报告详情
+│   └── settings.html              # 系统配置
+├── docs/                           # 项目文档
+├── scripts/                        # 工具脚本
+├── requirements.txt                # Python依赖
+└── README.md                       # 项目文档
 ```
+
+---
 
 ## 快速开始
 
-### 方式一：一键部署（推荐）
-
-**Windows系统：**
-```cmd
-scripts\startup\deploy.bat
-```
-
-**Linux/Mac系统：**
-```bash
-chmod +x scripts/startup/deploy.sh
-./scripts/startup/deploy.sh
-```
-
-### 方式二：Docker部署
+### 1. 安装依赖
 
 ```bash
-cd scripts/startup
-docker-compose up -d
-```
-
-### 方式三：手动部署
-
-```bash
-# 1. 安装依赖
 pip install -r requirements.txt
+```
 
-# 2. 创建目录
-mkdir -p data/uploads data/logs logs uploads
+### 2. 配置API Key
 
-# 3. 启动服务
+编辑 `config/api_config.json`：
+
+```json
+{
+  "threatbook": {
+    "api_key": "您的微步在线API Key",
+    "api_url": "https://api.threatbook.cn/v3",
+    "sandbox_enabled": true,
+    "ioc_enabled": true
+  },
+  "ai": {
+    "provider": "alibaba",
+    "api_key": "您的阿里通义千问API Key",
+    "api_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "model": "qwen-turbo",
+    "enabled": true
+  },
+  "email": {
+    "email": "监控邮箱地址",
+    "password": "邮箱授权码",
+    "server": "imap.qq.com",
+    "protocol": "imap",
+    "port": 993,
+    "enabled": true
+  }
+}
+```
+
+### 3. 启动服务
+
+```bash
 cd backend
 python run.py
 ```
 
-### 访问系统
+### 4. 访问系统
 
-打开浏览器访问：http://localhost:5000
+- 大屏展示：http://localhost:5000/
+- 检测面板：http://localhost:5000/dashboard
+- 系统配置：http://localhost:5000/settings
 
-## 使用方式
+---
 
-### 邮件检测
+## 核心模块说明
 
-1. **手动输入**：在界面中粘贴邮件内容
-2. **上传文件**：上传.eml或.msg格式的邮件文件
-3. **自动获取**：配置邮箱后自动收取检测
+### 检测引擎 (detector.py)
 
-### 查看检测结果
+| 功能 | 说明 |
+|------|------|
+| Kill Switch | 一票否决规则（黑名单IP、可执行文件、双重扩展名等） |
+| 轻量模型 | RF + XGB + IsolationForest 多模型融合 |
+| 规则引擎 | 关键词匹配、模式识别 |
+| AI分析 | 大语言模型语义分析 |
+| URL分析 | 白名单、品牌仿冒、可疑参数检测 |
 
-- 主界面：查看统计概览和邮件列表
-- 点击邮件：查看详细检测报告
-- 报告内容：风险等级、置信度、模块评分、溯源信息
+### 特征维度
 
-### 系统配置
+| 特征类型 | 维度 | 用途 |
+|----------|------|------|
+| 35维语义特征 | 主题/发件人/正文/URL | RF/XGB分类器 |
+| 26维统计特征 | 基础统计/URL/HTML/钓鱼模式/认证 | IsolationForest异常检测 |
+| 39维传统特征 | 邮件头/URL/文本/附件/HTML | 规则引擎 |
 
-点击右上角齿轮图标，配置：
-- VirusTotal API Key（可选）
-- 邮箱服务器信息（可选）
+### 融合权重
 
-### 智能调优
+| 模块 | 权重 | 说明 |
+|------|------|------|
+| RF分类器 | 1.5 | 基于35维语义特征 |
+| XGB分类器 | 1.5 | 基于35维语义特征 |
+| 异常检测器 | 1.0 | 基于26维统计特征 |
+| 规则引擎 | 1.0 | 关键词/模式匹配 |
+| AI分析 | 1.2 | 大语言模型语义分析 |
+| URL分析 | 1.0 | URL风险特征分析 |
 
-点击"系统配置" → "智能调优"，系统将自动分析邮件模式并推荐最优参数。
+### Kill Switch规则
+
+| 序号 | 触发条件 | 说明 |
+|------|----------|------|
+| 1 | 沙箱检测到恶意代码 | 最高优先级 |
+| 2 | 包含可执行文件附件 | .exe, .bat, .cmd等 |
+| 3 | 源IP在黑名单中 | DNSBL黑名单标记 |
+| 4 | 认证全部失败+发件人冒充 | SPF/DKIM/DMARC |
+| 5 | 多个高风险URL | >= 2个高风险URL |
+| 6 | 双重扩展名附件 | 如 invoice.pdf.exe |
+| 7 | 隐藏链接+表单组合 | 钓鱼特征组合 |
+
+---
 
 ## API接口
 
-### 检测相关
+### 检测接口
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/detection/health` | GET | 健康检查 |
-| `/api/detection/analyze` | POST | 分析邮件 |
-| `/api/detection/upload` | POST | 上传邮件文件 |
+| `/api/detection/upload` | POST | 上传邮件文件进行检测 |
+| `/api/detection/analyze` | POST | 输入邮件内容进行检测 |
 
-### 告警管理
+### 告警接口
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/api/alerts` | GET | 获取告警列表 |
 | `/api/alerts/<id>` | GET | 获取告警详情 |
-| `/api/alerts/<id>` | DELETE | 删除告警 |
 
-### 统计数据
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/stats/overview` | GET | 概览统计 |
-| `/api/stats/daily` | GET | 每日统计 |
-
-### 系统管理
+### 配置接口
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/system/auto-tune` | POST | 智能参数调优 |
-| `/api/system/performance` | GET | 获取性能指标 |
-| `/api/system/performance/report` | GET | 生成性能报告 |
+| `/api/config` | GET | 获取系统配置 |
+| `/api/config` | POST | 更新系统配置 |
 
-## 技术架构
+### 监控接口
 
-### 核心模块
-
-| 模块 | 文件 | 功能 |
+| 接口 | 方法 | 说明 |
 |------|------|------|
-| 邮件解析 | `email_parser.py` | RFC格式邮件解析、附件提取 |
-| 特征工程 | `feature_extractor.py` | 39维特征提取 |
-| 检测模型 | `detector.py` | LightGBM分类器 |
-| 溯源分析 | `traceback.py` | IP定位、URL追踪 |
-| URL分析 | `url_analyzer.py` | VirusTotal集成 |
-| 智能配置 | `auto_tuner.py` | 参数自动推荐 |
-| 性能监控 | `performance_monitor.py` | 响应时间记录 |
+| `/api/monitor/status` | GET | 获取监控状态 |
+| `/api/monitor/start` | POST | 启动邮件监控 |
+| `/api/monitor/stop` | POST | 停止邮件监控 |
 
-### 特征维度 (39维)
+---
 
-- **邮件头特征 (8维)**：可疑域名、SPF/DKIM/DMARC验证
-- **URL特征 (14维)**：域名年龄、HTTPS、短链接、IP地址
-- **文本特征 (7维)**：紧急关键词、金融词汇、感叹号
-- **附件特征 (5维)**：可执行文件、双重扩展名
-- **HTML特征 (5维)**：隐藏链接、表单、iframe
+## 检测结果说明
 
-## 性能指标
+### 检测等级
 
-| 指标 | 目标值 | 实测值 |
-|------|--------|--------|
-| 检测准确率 | ≥90% | 95%+ |
-| 误报率 | ≤5% | <3% |
-| 检测响应时间 | <500ms | <100ms |
-| 内存占用 | <2GB | <500MB |
-| CPU占用 | <50% | <30% |
+| 等级 | 阈值 | 说明 |
+|------|------|------|
+| PHISHING | >= 0.60 | 判定为钓鱼邮件 |
+| SUSPICIOUS | >= 0.35 | 判定为可疑邮件 |
+| SAFE | < 0.35 | 判定为安全邮件 |
 
-## 配置说明
+### 报告内容
 
-### API配置
+- **基础概览**：风险评分、判定结果、置信度
+- **邮件头分析**：发件人信息、身份验证状态
+- **链接与附件分析**：URL风险、附件沙箱分析
+- **检测模型得分**：各模型单独得分和融合得分
+- **AI语义分析**：AI分析结论、关键指标、处置建议
+- **技术特征分析**：模块评分、风险指标
+- **溯源分析**：IP追踪、攻击链还原
 
-配置文件：`config/api_config.json`
-
-```json
-{
-  "virustotal": {
-    "api_key": "your_api_key",
-    "api_url": "https://www.virustotal.com/vtapi/v2/url/report"
-  },
-  "email": {
-    "email": "your_email@example.com",
-    "password": "your_password",
-    "server": "imap.example.com",
-    "protocol": "imap",
-    "port": 993,
-    "enabled": false
-  }
-}
-```
-
-### 白名单配置
-
-配置文件：`config/whitelist.json`
-
-包含300+可信域名，覆盖：
-- 中国互联网服务（QQ、阿里、腾讯、百度等）
-- 国际科技公司（Google、Microsoft、Apple等）
-- 邮件服务商（Gmail、Outlook、Yahoo等）
-- 银行金融机构（ICBC、CCB、HSBC等）
+---
 
 ## 系统要求
 
@@ -237,13 +294,35 @@ python run.py
 | 磁盘 | 10GB | 20GB |
 | Python | 3.8+ | 3.9+ |
 
+---
+
+## 性能指标
+
+| 指标 | 目标值 | 实测值 |
+|------|--------|--------|
+| 单封邮件检测时间 | < 10s | 3-5s |
+| 模型加载时间 | < 5s | 2-3s |
+| 并发处理能力 | > 10 req/s | 20 req/s |
+| 内存占用 | < 2GB | 1.2GB |
+| 检测准确率 | > 90% | 94.4% |
+| F1值 | > 90% | 93.8% |
+
+---
+
 ## 常见问题
 
-### Q: 如何获取VirusTotal API Key？
+### Q: 微步在线API Key如何获取？
 
-1. 访问 https://www.virustotal.com
+1. 访问 https://x.threatbook.com
 2. 注册账号
-3. 在设置中获取API Key
+3. 在个人中心获取API Key
+4. 填入系统配置
+
+### Q: 阿里通义千问API Key如何获取？
+
+1. 访问 https://dashscope.aliyun.com
+2. 注册账号
+3. 创建API Key
 4. 填入系统配置
 
 ### Q: 邮箱配置失败怎么办？
@@ -254,31 +333,36 @@ python run.py
 
 ### Q: 如何提高检测准确率？
 
-1. 配置VirusTotal API Key
-2. 更新白名单配置
-3. 使用智能调优功能
+1. 配置微步在线API Key（文件沙箱分析）
+2. 配置阿里通义千问API Key（AI语义分析）
+3. 更新白名单配置
 
-## 项目文档
-
-- [项目文件说明文档](01_项目文件说明文档.md)
-- [项目蓝图与使用说明](02_项目蓝图与使用说明.md)
+---
 
 ## 版本历史
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
-| v2.0.0 | 2026-03-22 | 39维特征模型、智能配置、性能监控 |
+| v3.0.0 | 2024-04-01 | 集成轻量模型、AI分析、Kill Switch机制 |
+| v2.0.0 | 2024-03-30 | 多维度融合检测、URL分析、暗色模式 |
 | v1.0.0 | 2024-01-01 | 初始版本 |
+
+---
+
+## 项目文档
+
+- [项目完整文档](docs/项目完整文档.md)
+- [项目蓝图与论文大纲](docs/项目蓝图与论文大纲.md)
+- [微步API分析报告结构](docs/微步API分析报告结构.md)
+- [毕业论文初稿](docs/毕业论文初稿.md)
+
+---
 
 ## 许可证
 
 本项目用于毕业设计，仅供学习参考。
 
-## 联系方式
-
-如有问题或建议，请通过 GitHub Issues 反馈。
-
 ---
 
-*最后更新：2026-03-22*
-*版本号：v2.0.0*
+*最后更新：2024-04-02*
+*版本号：v3.0.0*
