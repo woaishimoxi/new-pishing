@@ -2,6 +2,8 @@
 """
 微步在线沙箱检测服务
 用于附件深度分析
+
+支持等待分析结果返回后再完成报告
 """
 import os
 import json
@@ -20,6 +22,10 @@ class ThreatBookService:
     """
     微步在线威胁分析服务
     支持文件沙箱分析、URL检测、IP查询
+    
+    特性：
+    - 文件上传后轮询等待分析结果
+    - 支持配置最大等待时间和轮询间隔
     """
     
     # 微步在线API地址
@@ -35,6 +41,10 @@ class ThreatBookService:
     
     # IP查询接口
     IP_QUERY_URL = f"{BASE_URL}/ip/query"
+    
+    # 分析等待配置
+    MAX_WAIT_TIME = 120  # 最大等待时间（秒），微步API分析可能需要较长时间
+    POLL_INTERVAL = 5    # 轮询间隔（秒）
     
     # 威胁等级映射
     THREAT_LEVELS = {
@@ -65,13 +75,14 @@ class ThreatBookService:
                 pass
         return ''
     
-    def analyze_file(self, file_content: bytes, filename: str) -> Dict:
+    def analyze_file(self, file_content: bytes, filename: str, wait_for_result: bool = True) -> Dict:
         """
         分析文件（附件深度分析）
         
         Args:
             file_content: 文件内容
             filename: 文件名
+            wait_for_result: 是否等待分析结果（默认True）
             
         Returns:
             分析结果
@@ -108,20 +119,25 @@ class ThreatBookService:
             if report:
                 result.update(self._parse_report(report))
                 result['analyzed'] = True
+                self.logger.info(f"文件 {filename} 已有缓存分析结果")
             else:
                 # 上传文件进行分析
                 upload_result = self._upload_file(file_content, filename)
                 
                 if upload_result.get('response_code') == 0:
-                    # 等待分析完成
-                    time.sleep(3)
-                    report = self._query_file_report(md5)
+                    self.logger.info(f"文件 {filename} 上传成功，等待分析结果...")
                     
-                    if report:
-                        result.update(self._parse_report(report))
-                        result['analyzed'] = True
+                    if wait_for_result:
+                        # 轮询等待分析结果
+                        report = self._wait_for_report(md5, filename)
+                        
+                        if report:
+                            result.update(self._parse_report(report))
+                            result['analyzed'] = True
+                        else:
+                            result['error'] = f'分析超时（>{self.MAX_WAIT_TIME}秒），请稍后查询'
                     else:
-                        result['error'] = '分析中，请稍后查询'
+                        result['error'] = '分析已提交，请稍后查询'
                 else:
                     result['error'] = upload_result.get('verbose_msg', '上传失败')
         
@@ -130,6 +146,38 @@ class ThreatBookService:
             self.logger.error(f"微步文件分析失败: {e}")
         
         return result
+    
+    def _wait_for_report(self, md5: str, filename: str) -> Optional[Dict]:
+        """
+        轮询等待分析结果
+        
+        Args:
+            md5: 文件MD5
+            filename: 文件名
+            
+        Returns:
+            分析报告或None
+        """
+        start_time = time.time()
+        attempt = 0
+        
+        while time.time() - start_time < self.MAX_WAIT_TIME:
+            attempt += 1
+            elapsed = time.time() - start_time
+            
+            self.logger.debug(f"查询文件分析结果 [{filename}] (第{attempt}次, 已等待{elapsed:.1f}秒)")
+            
+            report = self._query_file_report(md5)
+            
+            if report:
+                self.logger.info(f"文件 {filename} 分析完成 (耗时{elapsed:.1f}秒)")
+                return report
+            
+            # 等待后再次查询
+            time.sleep(self.POLL_INTERVAL)
+        
+        self.logger.warning(f"文件 {filename} 分析超时 (>{self.MAX_WAIT_TIME}秒)")
+        return None
     
     def analyze_url(self, url: str) -> Dict:
         """
@@ -258,17 +306,40 @@ class ThreatBookService:
                 'resource': md5
             }
             
-            response = requests.get(self.FILE_REPORT_URL, params=params, timeout=10)
+            response = requests.get(self.FILE_REPORT_URL, params=params, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('response_code') == 0:
-                    return data.get('data', {}).get(md5, {})
+                response_code = data.get('response_code')
+                verbose_msg = data.get('verbose_msg', '')
+                
+                self.logger.debug(f"查询文件报告: response_code={response_code}, msg={verbose_msg}")
+                
+                if response_code == 0:
+                    # 分析完成，返回结果
+                    report_data = data.get('data', {})
+                    if md5 in report_data:
+                        self.logger.info(f"获取到文件分析报告: {md5}")
+                        return report_data[md5]
+                    elif report_data:
+                        # 有时返回的数据结构不同
+                        return report_data
+                    else:
+                        self.logger.debug(f"报告数据为空: {md5}")
+                        return None
+                elif response_code == 1:
+                    # 分析中
+                    self.logger.debug(f"文件分析中: {md5} ({verbose_msg})")
+                    return None
+                else:
+                    # 其他状态
+                    self.logger.debug(f"查询状态: {response_code} - {verbose_msg}")
+                    return None
             
             return None
         
         except Exception as e:
-            self.logger.error(f"查询文件报告失败: {e}")
+            self.logger.error(f"查询文件报告异常: {e}")
             return None
     
     def _parse_report(self, report: Dict) -> Dict:

@@ -502,6 +502,7 @@ class FeatureExtractionService:
         }
         
         attachments = parsed_email.get('attachments', [])
+        sandbox_results = parsed_email.get('sandbox_results', [])  # 读取沙箱分析结果
         
         if not attachments:
             return features
@@ -514,13 +515,26 @@ class FeatureExtractionService:
         sandbox_detected = False
         attachment_risk = 0.0
         
-        for att in attachments:
+        for i, att in enumerate(attachments):
             filename = att.get('filename', '').lower()
             content_type = att.get('content_type', '').lower()
             size = att.get('size', 0)
             is_suspicious = att.get('is_suspicious_type', False)
             
             total_size += size
+            
+            # 从沙箱结果中读取分析状态
+            if i < len(sandbox_results):
+                sandbox_result = sandbox_results[i]
+                if sandbox_result.get('sandbox_report'):
+                    sandbox_analyzed = True
+                    report = sandbox_result['sandbox_report']
+                    if report.get('threat_level') in ['malicious', 'suspicious']:
+                        sandbox_detected = True
+                    if report.get('threat_score'):
+                        max_detection_ratio = max(max_detection_ratio, report['threat_score'] / 100.0)
+                if sandbox_result.get('sandbox_detected'):
+                    sandbox_detected = True
             
             if is_suspicious:
                 features['has_suspicious_attachment'] = 1
