@@ -78,6 +78,8 @@ class DatabaseRepository:
                 cursor.execute('ALTER TABLE alerts ADD COLUMN body TEXT')
             if 'html_body' not in columns:
                 cursor.execute('ALTER TABLE alerts ADD COLUMN html_body TEXT')
+            if 'ai_analysis' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN ai_analysis TEXT')
         
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS processed_uids (
@@ -106,7 +108,8 @@ class DatabaseRepository:
         traceback_report: Dict,
         source: str = '手动输入',
         raw_email: str = '',
-        email_uid: str = ''
+        email_uid: str = '',
+        ai_analysis: Dict = None
     ) -> int:
         """Save detection result to database"""
         conn = sqlite3.connect(self.db_path)
@@ -124,12 +127,15 @@ class DatabaseRepository:
         if raw_email:
             email_hash = hashlib.md5(raw_email.encode('utf-8')).hexdigest()
         
+        # 序列化 AI 分析结果
+        ai_analysis_json = json.dumps(ai_analysis, ensure_ascii=False) if ai_analysis else None
+        
         cursor.execute('''
             INSERT INTO alerts (from_addr, from_display_name, from_email, to_addr, subject, detection_time,
                                label, confidence, source_ip, risk_indicators,
                                raw_email, traceback_data, attachment_data, url_data, header_data, source, email_hash,
-                               body, html_body)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               body, html_body, ai_analysis)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             parsed.get('from', ''),
             parsed.get('from_display_name', ''),
@@ -149,7 +155,8 @@ class DatabaseRepository:
             source,
             email_hash,
             parsed.get('body', ''),  # 添加body字段
-            parsed.get('html_body', '')  # 添加html_body字段
+            parsed.get('html_body', ''),  # 添加html_body字段
+            ai_analysis_json
         ))
         
         alert_id = cursor.lastrowid
@@ -167,6 +174,33 @@ class DatabaseRepository:
         conn.close()
         
         return alert_id
+    
+    def update_alert_ai_analysis(self, alert_id: int, ai_analysis: Dict) -> bool:
+        """更新告警的AI分析结果"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 检查记录是否存在
+            cursor.execute('SELECT id FROM alerts WHERE id = ?', (alert_id,))
+            if cursor.fetchone() is None:
+                conn.close()
+                self.logger.error(f"告警记录不存在: {alert_id}")
+                return False
+            
+            # 序列化 AI 分析结果
+            ai_json = json.dumps(ai_analysis, ensure_ascii=False)
+            
+            cursor.execute('UPDATE alerts SET ai_analysis = ? WHERE id = ?', (ai_json, alert_id))
+            conn.commit()
+            affected = cursor.rowcount
+            conn.close()
+            
+            self.logger.info(f"AI分析更新: alert_id={alert_id}, affected={affected}")
+            return affected > 0
+        except Exception as e:
+            self.logger.error(f"更新AI分析失败: {e}")
+            return False
     
     def get_alert(self, alert_id: int) -> Optional[Dict]:
         """Get single alert by ID"""
@@ -363,6 +397,13 @@ class DatabaseRepository:
                     alert['risk_indicators'] = json.loads(alert['risk_indicators'])
             except:
                 alert['risk_indicators'] = []
+        
+        if alert.get('ai_analysis'):
+            try:
+                if isinstance(alert['ai_analysis'], str):
+                    alert['ai_analysis'] = json.loads(alert['ai_analysis'])
+            except:
+                alert['ai_analysis'] = {}
         
         alert['parsed'] = {
             'from': alert.get('from_addr', ''),

@@ -12,11 +12,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from app.core import get_logger
 from app.models.database import DatabaseRepository
+from app.services.traceback import TracebackService
 from app.utils.helpers import normalize_ai_api_url, sanitize_ai_api_key, require_http_header_latin1
 
 alerts_bp = Blueprint('alerts', __name__)
 logger = get_logger(__name__)
 db = DatabaseRepository()
+traceback_service = TracebackService()
 
 
 @alerts_bp.route('', methods=['GET'])
@@ -52,6 +54,10 @@ def get_alert_detail(alert_id: int):
             alert['reason'] = '未检测到显著威胁'
         else:
             alert['reason'] = '检测完成'
+    
+    # 添加AI分析结果到返回对象
+    if alert.get('ai_analysis'):
+        alert['ai_analysis_result'] = alert['ai_analysis']
     
     return jsonify(alert)
 
@@ -240,9 +246,15 @@ def ai_analyze(alert_id):
     
     try:
         ai_result = call_ai_service(ai_config, email_content)
+        
+        # 保存AI分析结果到数据库
+        save_result = db.update_alert_ai_analysis(alert_id, ai_result)
+        logger.info(f"AI分析结果保存{'成功' if save_result else '失败'}: alert_id={alert_id}")
+        
         return jsonify({
             'status': 'success',
-            'ai_result': ai_result
+            'ai_result': ai_result,
+            'saved': save_result
         })
     except Exception as e:
         logger.error(f"AI analysis failed: {e}")
@@ -321,31 +333,13 @@ def get_analysis_detail(alert_id):
 def get_enhanced_traceback(alert_id):
     """
     获取增强版溯源分析报告
-    
-    GET /api/alerts/{alert_id}/traceback
-    返回5个维度的深度分析：
-    1. 攻击目标
-    2. IP来源与传播链
-    3. 攻击特性（社会工程学）
-    4. 攻击载体
-    5. 攻击动机
     """
     alert = db.get_alert(alert_id)
     if not alert:
         return jsonify({'error': '报告不存在'}), 404
     
-    # 从数据库读取已存储的溯源数据
-    traceback_data = {}
-    if alert.get('traceback_data'):
-        try:
-            if isinstance(alert['traceback_data'], str):
-                traceback_data = json.loads(alert['traceback_data'])
-            else:
-                traceback_data = alert['traceback_data']
-        except:
-            traceback_data = {}
+    from app.services.traceback_enhanced import traceback_analyzer
     
-    # 优先使用数据库中已保存的溯源数据（包含已提取的IP信息）
     saved_traceback = None
     if alert.get('traceback_data'):
         try:
@@ -353,7 +347,6 @@ def get_enhanced_traceback(alert_id):
         except:
             pass
     
-    # 构建解析后的邮件数据
     parsed = {
         'subject': alert.get('subject', '') or '',
         'from': alert.get('from_addr', '') or '',
@@ -368,140 +361,27 @@ def get_enhanced_traceback(alert_id):
         'received_chain': []
     }
     
-    # 解析URL
     if alert.get('url_data'):
         try:
-            urls = json.loads(alert['url_data']) if isinstance(alert['url_data'], str) else alert['url_data']
+            parsed['urls'] = json.loads(alert['url_data']) if isinstance(alert['url_data'], str) else alert['url_data']
         except:
             pass
     
-    # 解析附件数据
-    attachments = []
     if alert.get('attachment_data'):
         try:
-            attachments = json.loads(alert['attachment_data']) if isinstance(alert['attachment_data'], str) else alert['attachment_data']
+            parsed['attachments'] = json.loads(alert['attachment_data']) if isinstance(alert['attachment_data'], str) else alert['attachment_data']
         except:
             pass
     
-    # 解析邮件头数据
-    headers = {}
     if alert.get('header_data'):
         try:
-            headers = json.loads(alert['header_data']) if isinstance(alert['header_data'], str) else alert['header_data']
+            parsed['headers'] = json.loads(alert['header_data']) if isinstance(alert['header_data'], str) else alert['header_data']
         except:
             pass
     
-    # 执行增强版溯源分析，传入已保存的溯源数据
     traceback_report = traceback_analyzer.analyze(parsed, saved_traceback)
     
-    # 维度1: 攻击目标
-    targets = {
-        'recipients': [alert.get('to_addr', '')],
-        'total_count': 1,
-        'analysis': '单个目标定向攻击' if alert.get('to_addr') else '目标未知',
-        'risk_level': 'medium' if alert.get('to_addr') else 'low'
-    }
-    
-    # 维度2: IP来源与传播链（使用已存储的数据）
-    hops = email_source.get('hops', [])
-    chain = {
-        'source_ip': email_source.get('source_ip', 'Unknown'),
-        'geolocation': email_source.get('geolocation', {}),
-        'hops': [{'ip': hop, 'server': None, 'time': None} for hop in hops] if hops and isinstance(hops[0], str) else hops,
-        'full_path': email_source.get('full_path', ''),
-        'analysis': f'源IP: {email_source.get("source_ip", "未知")}' if email_source.get('source_ip') else '无法获取IP信息',
-        'risk_level': 'high' if any(ind.get('type') == 'BLACKLISTED_IP' for ind in risk_indicators) else 'medium'
-    }
-    
-    # 维度3: 攻击特性（社会工程学）- 从风险指标推断
-    se_keywords = []
-    se_categories = []
-    for ind in risk_indicators:
-        desc = ind.get('description', '')
-        if '紧急' in desc or 'urgent' in desc.lower():
-            se_keywords.append({'keyword': '紧急', 'category': 'urgency'})
-            se_categories.append('urgency')
-        if '域名' in desc or 'domain' in desc.lower():
-            se_keywords.append({'keyword': '可疑域名', 'category': 'fear'})
-            se_categories.append('fear')
-    
-    social_engineering = {
-        'detected_keywords': se_keywords,
-        'categories': list(set(se_categories)),
-        'risk_level': 'high' if len(se_categories) >= 2 else 'medium' if len(se_categories) >= 1 else 'low',
-        'analysis': f'检测到{len(se_categories)}类社会工程学特征' if se_categories else '未检测到明显社会工程学特征'
-    }
-    
-    # 维度4: 攻击载体
-    malicious_links = []
-    for ua in url_analysis:
-        if ua.get('risks'):
-            malicious_links.append({
-                'url': ua.get('url', ''),
-                'is_short_url': any('短链接' in str(r.get('description', '')) for r in ua.get('risks', [])),
-                'is_ip_url': any('IP' in str(r.get('description', '')) for r in ua.get('risks', [])),
-                'domain': ua.get('domain_info', {}).get('domain', '')
-            })
-    
-    suspicious_attachments = []
-    for att in attachments:
-        if att.get('is_suspicious_type'):
-            suspicious_attachments.append({
-                'filename': att.get('filename', ''),
-                'risk': 'high'
-            })
-    
-    attack_vectors = {
-        'malicious_links': malicious_links,
-        'suspicious_attachments': suspicious_attachments,
-        'qr_codes': 0,
-        'info_theft_request': any('密码' in ind.get('description', '') for ind in risk_indicators),
-        'risk_level': 'high' if malicious_links or suspicious_attachments else 'low',
-        'analysis': f'发现{len(malicious_links)}个可疑链接，{len(suspicious_attachments)}个可疑附件' if malicious_links or suspicious_attachments else '未发现明显攻击载体'
-    }
-    
-    # 维度5: 攻击动机
-    motivation_primary = 'unknown'
-    motivation_confidence = 0.3
-    motivation_analysis = '无法判断动机'
-    
-    if suspicious_attachments:
-        motivation_primary = 'malware_delivery'
-        motivation_confidence = 0.7
-        motivation_analysis = '包含可疑附件，动机为植入恶意软件'
-    elif malicious_links:
-        motivation_primary = 'credential_theft'
-        motivation_confidence = 0.6
-        motivation_analysis = '包含可疑链接，动机为窃取凭证'
-    
-    motivation_map = {
-        'credential_theft': '窃取凭证',
-        'malware_delivery': '植入恶意软件',
-        'financial_fraud': '财务诈骗',
-        'unknown': '未知'
-    }
-    
-    motivation = {
-        'primary': motivation_primary,
-        'primary_label': motivation_map.get(motivation_primary, '未知'),
-        'confidence': motivation_confidence,
-        'analysis': motivation_analysis
-    }
-    
-    # 组装最终报告
-    report = {
-        'dimensions': {
-            'targets': targets,
-            'source_chain': chain,
-            'social_engineering': social_engineering,
-            'attack_vectors': attack_vectors,
-            'motivation': motivation
-        },
-        'risk_score': risk_score,
-        'summary': f'来源IP: {chain["source_ip"]}；{attack_vectors["analysis"]}；攻击动机: {motivation["primary_label"]}'
-    }
-    
-    return jsonify(report)
+    return jsonify(traceback_report)
 
 
 def call_ai_service(ai_config: Dict, email_content: str) -> Dict:

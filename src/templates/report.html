@@ -837,6 +837,17 @@
                         return;
                     }
                     currentResult = await response.json();
+                    
+                    // 如果没有AI分析结果，尝试从localStorage补充
+                    const storedData = localStorage.getItem(`phishing_report_${alertId}`);
+                    if (storedData) {
+                        const stored = JSON.parse(storedData);
+                        if (stored.ai_analysis || stored.ai_analysis_result) {
+                            currentResult.ai_analysis = stored.ai_analysis || stored.ai_analysis_result;
+                            currentResult.ai_analysis_result = currentResult.ai_analysis;
+                        }
+                    }
+                    
                     displayReport(currentResult);
                 } catch (e) {
                     alert('加载报告失败: ' + e.message);
@@ -846,6 +857,25 @@
                 const storedData = localStorage.getItem(`phishing_report_${sessionId}`);
                 if (storedData) {
                     currentResult = JSON.parse(storedData);
+                    
+                    // 关键修复：如果有alertId，从API获取数据库中的AI分析结果
+                    const storedAlertId = currentResult.id;
+                    if (storedAlertId) {
+                        try {
+                            const response = await fetch(`/api/alerts/${storedAlertId}`);
+                            if (response.ok) {
+                                const apiData = await response.json();
+                                // 如果API返回的ai_analysis存在，使用API数据（包含数据库中的AI分析）
+                                if (apiData.ai_analysis || apiData.ai_analysis_result) {
+                                    currentResult.ai_analysis = apiData.ai_analysis || apiData.ai_analysis_result;
+                                    currentResult.ai_analysis_result = currentResult.ai_analysis;
+                                }
+                            }
+                        } catch (e) {
+                            console.log('无法获取AI分析数据:', e);
+                        }
+                    }
+                    
                     displayReport(currentResult);
                 } else {
                     alert('报告数据不存在');
@@ -915,6 +945,10 @@
             
             displayAuthStatus(result.headers);
             
+            // 显示AI分析结果（从数据库加载时使用ai_analysis_result字段）
+            const aiAnalysis = result.ai_analysis || result.ai_analysis_result || {};
+            displayAIAnalysis(aiAnalysis);
+            
             const riskIndicators = result.traceback?.risk_indicators || result.risk_indicators || [];
             displayRiskIndicators(riskIndicators, result.features);
             
@@ -930,7 +964,6 @@
             displayModelScores(result);
             displayHighestRiskFactors(result.highest_risk_module, result.highest_risk_score, result.reason);
             displayModuleScores(result.module_scores);
-            displayAIAnalysis(result.ai_analysis);  // 显示AI语义分析结果
             displayJudgmentCriteria();
         }
         
@@ -1907,6 +1940,15 @@
                 document.body.removeChild(loadingToast);
                 
                 if (data.status === 'success' && data.ai_result) {
+                    // 更新当前结果的AI分析
+                    if (!currentResult) currentResult = {};
+                    currentResult.ai_analysis = data.ai_result;
+                    currentResult.ai_analysis_result = data.ai_result;
+                    // 保存到localStorage以便刷新后仍能显示
+                    const sessionId = new URLSearchParams(window.location.search).get('session');
+                    if (sessionId) {
+                        localStorage.setItem(`phishing_report_${sessionId}`, JSON.stringify(currentResult));
+                    }
                     showAIResult(data.ai_result);
                 } else if (data.status === 'placeholder') {
                     showAIConfigGuide(data);

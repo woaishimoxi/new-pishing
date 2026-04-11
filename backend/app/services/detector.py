@@ -130,9 +130,9 @@ class DetectionService:
             if model_score is not None:
                 self.logger.debug(f"轻量模型得分: {model_score:.4f}, RF={rf_score}, XGB={xgb_score}, Anomaly={anomaly_score}")
                 
-                if rf_score > 0.7:
+                if rf_score is not None and rf_score > 0.7:
                     all_risk_indicators.append(f"RF模型高风险 ({rf_score:.2f})")
-                if xgb_score > 0.7:
+                if xgb_score is not None and xgb_score > 0.7:
                     all_risk_indicators.append(f"XGB模型高风险 ({xgb_score:.2f})")
         except Exception as e:
             self.logger.warning(f"轻量模型检测失败: {e}")

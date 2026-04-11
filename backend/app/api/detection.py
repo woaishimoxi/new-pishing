@@ -209,9 +209,9 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
     # 7. 溯源分析
     traceback_report = traceback.generate_report(parsed)
     
-    # 8. 保存结果
+    # 8. 保存结果（包含AI分析）
     alert_id = db.save_alert(
-        parsed, label, confidence, traceback_report, source, raw_email_stored, email_uid
+        parsed, label, confidence, traceback_report, source, raw_email_stored, email_uid, ai_analysis
     )
     
     # 处理附件信息（包含沙箱分析结果）

@@ -926,7 +926,17 @@ class TracebackService:
         # WHOIS查询（带超时）
         try:
             import whois
-            w = whois.whois(domain)
+            
+            # 使用正确的whois模块API
+            try:
+                # python-whois 库的正确用法
+                w = whois.query(domain)
+            except Exception:
+                # 备用：使用whois.whois()函数
+                try:
+                    w = whois.whois(domain)
+                except Exception:
+                    w = None
             
             if w and hasattr(w, 'creation_date') and w.creation_date:
                 info['is_valid'] = True
