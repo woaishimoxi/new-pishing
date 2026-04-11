@@ -159,6 +159,44 @@ def _sync_api_config(content: Dict):
                 config.email.port = email['port']
             if 'enabled' in email:
                 config.email.enabled = email['enabled']
+
+        if 'ipapi' in content and isinstance(content['ipapi'], dict):
+            ip = content['ipapi']
+            if 'api_url' in ip:
+                config.api.ip_api_url = ip['api_url']
+
+        if 'ai' in content and isinstance(content['ai'], dict):
+            ai = content['ai']
+            if 'provider' in ai:
+                config.api.ai_provider = ai['provider']
+            if 'api_key' in ai:
+                config.api.ai_api_key = ai['api_key']
+            if 'api_url' in ai:
+                config.api.ai_api_url = ai['api_url']
+            if 'model' in ai:
+                config.api.ai_model = ai['model']
+            if 'enabled' in ai:
+                config.api.ai_enabled = ai['enabled']
+
+        if 'detection' in content and isinstance(content['detection'], dict):
+            det = content['detection']
+            if 'phishing_threshold' in det:
+                config.detection.phishing_threshold = float(det['phishing_threshold'])
+            if 'suspicious_threshold' in det:
+                config.detection.suspicious_threshold = float(det['suspicious_threshold'])
+            if 'url_risk_weight' in det:
+                config.detection.url_risk_weight = float(det['url_risk_weight'])
+            if 'text_risk_weight' in det:
+                config.detection.text_risk_weight = float(det['text_risk_weight'])
+            if 'header_risk_weight' in det:
+                config.detection.header_risk_weight = float(det['header_risk_weight'])
+
+        if 'monitor' in content and isinstance(content['monitor'], dict):
+            mon = content['monitor']
+            if 'interval' in mon:
+                config.email.monitor_interval = int(mon['interval'])
+            if 'max_attachment_size' in mon:
+                config.detection.max_file_size = int(mon['max_attachment_size'])
         
         logger.info("API config synced to system")
     except Exception as e:

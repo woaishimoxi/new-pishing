@@ -75,6 +75,9 @@ class DetectionConfig:
     """Detection engine configuration"""
     phishing_threshold: float = 0.70
     suspicious_threshold: float = 0.40
+    url_risk_weight: float = 0.4
+    text_risk_weight: float = 0.3
+    header_risk_weight: float = 0.3
     feature_count: int = 39
     model_path: str = "models/phish_detector.txt"
     use_sandbox: bool = True
@@ -268,6 +271,26 @@ class Config:
                         self.api.ai_model = ai['model']
                     if 'enabled' in ai:
                         self.api.ai_enabled = ai['enabled']
+
+                if 'detection' in data:
+                    det = data['detection']
+                    if 'phishing_threshold' in det:
+                        self.detection.phishing_threshold = float(det['phishing_threshold'])
+                    if 'suspicious_threshold' in det:
+                        self.detection.suspicious_threshold = float(det['suspicious_threshold'])
+                    if 'url_risk_weight' in det:
+                        self.detection.url_risk_weight = float(det['url_risk_weight'])
+                    if 'text_risk_weight' in det:
+                        self.detection.text_risk_weight = float(det['text_risk_weight'])
+                    if 'header_risk_weight' in det:
+                        self.detection.header_risk_weight = float(det['header_risk_weight'])
+
+                if 'monitor' in data:
+                    mon = data['monitor']
+                    if 'interval' in mon:
+                        self.email.monitor_interval = int(mon['interval'])
+                    if 'max_attachment_size' in mon:
+                        self.detection.max_file_size = int(mon['max_attachment_size'])
                         
             except Exception as e:
                 print(f"Warning: Failed to load API config: {e}")
@@ -303,40 +326,50 @@ class Config:
         """Save API configuration to file"""
         config_file = self.config_dir / "api_config.json"
         try:
-            # 读取现有配置（保留其他配置项）
+            # 读取现有配置（保留 detection / monitor / last_tuned 等扩展段）
             existing_data = {}
             if config_file.exists():
                 with open(config_file, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
             
-            # 更新配置
-            data = {
-                'threatbook': {
-                    'api_key': self.api.threatbook_api_key,
-                    'api_url': self.api.threatbook_api_url,
-                    'sandbox_enabled': self.api.sandbox_enabled,
-                    'ioc_enabled': self.api.ioc_remote_enabled
-                },
-                'ipapi': {
-                    'api_url': self.api.ip_api_url
-                },
-                'email': {
-                    'email': self.email.address,
-                    'password': self.email.password,
-                    'server': self.email.server,
-                    'protocol': self.email.protocol,
-                    'port': self.email.port,
-                    'enabled': self.email.enabled
-                },
-                'ai': {
-                    'provider': self.api.ai_provider,
-                    'api_key': self.api.ai_api_key,
-                    'api_url': self.api.ai_api_url,
-                    'model': self.api.ai_model,
-                    'enabled': self.api.ai_enabled
-                }
+            data = {**existing_data}
+            data['threatbook'] = {
+                'api_key': self.api.threatbook_api_key,
+                'api_url': self.api.threatbook_api_url,
+                'sandbox_enabled': self.api.sandbox_enabled,
+                'ioc_enabled': self.api.ioc_remote_enabled
             }
-            
+            data['ipapi'] = {
+                'api_url': self.api.ip_api_url
+            }
+            data['email'] = {
+                'email': self.email.address,
+                'password': self.email.password,
+                'server': self.email.server,
+                'protocol': self.email.protocol,
+                'port': self.email.port,
+                'enabled': self.email.enabled
+            }
+            data['ai'] = {
+                'provider': self.api.ai_provider,
+                'api_key': self.api.ai_api_key,
+                'api_url': self.api.ai_api_url,
+                'model': self.api.ai_model,
+                'enabled': self.api.ai_enabled
+            }
+            data['detection'] = {
+                'phishing_threshold': self.detection.phishing_threshold,
+                'suspicious_threshold': self.detection.suspicious_threshold,
+                'url_risk_weight': self.detection.url_risk_weight,
+                'text_risk_weight': self.detection.text_risk_weight,
+                'header_risk_weight': self.detection.header_risk_weight,
+            }
+            data['monitor'] = {
+                'interval': self.email.monitor_interval,
+                'max_attachment_size': self.detection.max_file_size,
+                'enable_sandbox': self.api.sandbox_enabled,
+            }
+
             with open(config_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return True

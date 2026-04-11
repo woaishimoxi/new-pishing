@@ -103,19 +103,23 @@ def test_api_connection():
 def test_ai_connection():
     """Test AI API connection"""
     import requests
+    from app.utils.helpers import sanitize_ai_api_key, normalize_ai_api_url, require_http_header_latin1
     
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         provider = data.get('provider', 'zhipu')
-        api_key = data.get('api_key', '')
-        api_url = data.get('api_url', '')
+        api_key = sanitize_ai_api_key(data.get('api_key', ''))
+        api_url = (data.get('api_url') or '').strip()
         model = data.get('model', 'glm-4-flash')
         
         if not api_key:
             return jsonify({'status': 'error', 'message': '请填写API Key'}), 400
         
+        # 1st attempt: Alibaba DashScope style (text-generation API) usually expects 'prompt'
         if not api_url:
-            if provider == 'zhipu':
+            if provider == 'alibaba':
+                api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+            elif provider == 'zhipu':
                 api_url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
             elif provider == 'moonshot':
                 api_url = 'https://api.moonshot.cn/v1/chat/completions'
@@ -123,47 +127,51 @@ def test_ai_connection():
                 api_url = 'https://api.deepseek.com/v1/chat/completions'
             elif provider == 'openai':
                 api_url = 'https://api.openai.com/v1/chat/completions'
+            elif provider == 'baidu':
+                api_url = 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions'
             else:
                 api_url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+
+        api_url = normalize_ai_api_url(api_url)
+        try:
+            require_http_header_latin1(f'Bearer {api_key}', 'API Key')
+            require_http_header_latin1(api_url, 'API 地址')
+        except ValueError as ve:
+            return jsonify({'status': 'error', 'message': str(ve)}), 400
         
         test_message = "你好，这是一个测试消息，请回复'测试成功'。"
-        
         headers = {
             'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json; charset=utf-8'
         }
+        # Prefer chat-style if endpoint supports it, otherwise fall back to prompt
+        payloads = [
+            {
+                'model': model,
+                'messages': [ {'role': 'user', 'content': test_message} ],
+                'max_tokens': 50,
+                'temperature': 0.1
+            },
+            {
+                'model': model,
+                'prompt': test_message,
+                'max_tokens': 50,
+                'temperature': 0.1
+            }
+        ]
+        for idx, payload in enumerate(payloads):
+            response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result or 'result' in result:
+                    return jsonify({'status': 'success', 'message': 'AI连接测试成功'})
+            elif response.status_code == 401:
+                return jsonify({'status': 'error', 'message': 'API Key无效或已过期'}), 400
+            elif response.status_code == 429:
+                return jsonify({'status': 'error', 'message': 'API调用频率超限，请稍后重试'}), 400
+            # otherwise try next payload
+        return jsonify({'status': 'error', 'message': 'AI连接测试失败，返回多种格式均未成功'}), 400
         
-        payload = {
-            'model': model,
-            'messages': [
-                {'role': 'user', 'content': test_message}
-            ],
-            'max_tokens': 50,
-            'temperature': 0.1
-        }
-        
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            if 'choices' in result or 'result' in result:
-                return jsonify({'status': 'success', 'message': 'AI连接测试成功'})
-            else:
-                return jsonify({'status': 'error', 'message': f'AI返回格式异常: {result}'}), 400
-        elif response.status_code == 401:
-            return jsonify({'status': 'error', 'message': 'API Key无效或已过期'}), 400
-        elif response.status_code == 429:
-            return jsonify({'status': 'error', 'message': 'API调用频率超限，请稍后重试'}), 400
-        else:
-            error_msg = f'API返回错误 (状态码: {response.status_code})'
-            try:
-                error_data = response.json()
-                if 'error' in error_data:
-                    error_msg = error_data['error'].get('message', error_msg)
-            except:
-                pass
-            return jsonify({'status': 'error', 'message': error_msg}), 400
-            
     except requests.exceptions.Timeout:
         return jsonify({'status': 'error', 'message': 'AI连接超时，请检查网络'}), 500
     except requests.exceptions.ConnectionError:

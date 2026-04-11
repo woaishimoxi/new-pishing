@@ -59,6 +59,18 @@ class EmailMonitorService:
                     self.config.email.protocol = email_config.get('protocol', self.config.email.protocol)
                     self.config.email.port = email_config.get('port', self.config.email.port)
                     self.config.email.enabled = email_config.get('enabled', self.config.email.enabled)
+
+                mon = api_config.get('monitor') or {}
+                if 'interval' in mon:
+                    self.config.email.monitor_interval = int(mon['interval'])
+                if 'max_attachment_size' in mon:
+                    self.config.detection.max_file_size = int(mon['max_attachment_size'])
+
+                det = api_config.get('detection') or {}
+                if 'phishing_threshold' in det:
+                    self.config.detection.phishing_threshold = float(det['phishing_threshold'])
+                if 'suspicious_threshold' in det:
+                    self.config.detection.suspicious_threshold = float(det['suspicious_threshold'])
                     
                 logger.info(f"Email config reloaded: address={self.config.email.address[:10]}..., server={self.config.email.server}")
         except Exception as e:

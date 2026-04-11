@@ -122,3 +122,56 @@ def calculate_percentage(value: float, total: float) -> float:
         return 0.0
     
     return min(100.0, max(0.0, (value / total) * 100))
+
+
+def sanitize_ai_api_key(api_key: str) -> str:
+    """Strip whitespace and invisible Unicode that often breaks HTTP headers."""
+    if not api_key:
+        return ''
+    key = api_key.strip().replace('\ufeff', '')
+    for ch in ('\u200b', '\u200c', '\u200d', '\u00a0'):
+        key = key.replace(ch, '')
+    return key
+
+
+def normalize_ai_api_url(url: str) -> str:
+    """
+    Encode URL for HTTP clients: percent-escape non-ASCII in path/query, punycode IDN host.
+    Avoids urllib3/http.client 'latin-1' codec errors on outbound requests.
+    """
+    url = (url or '').strip()
+    if not url:
+        return url
+    try:
+        from requests.utils import requote_uri
+        url = requote_uri(url)
+    except Exception:
+        pass
+    from urllib.parse import urlparse, urlunparse, quote
+    parsed = urlparse(url)
+    path = parsed.path
+    if path and not path.isascii():
+        path = quote(path, safe='/:~%.-_+')
+    netloc = parsed.netloc
+    hn = parsed.hostname
+    if hn and not hn.isascii():
+        try:
+            ascii_h = hn.encode('idna').decode('ascii')
+            netloc = netloc.replace(hn, ascii_h, 1)
+        except Exception:
+            pass
+    query = parsed.query
+    if query and not query.isascii():
+        query = quote(query, safe='=&/:+,%?@~$!*\'()')
+    return urlunparse((parsed.scheme, netloc, path, parsed.params, query, parsed.fragment))
+
+
+def require_http_header_latin1(value: str, field_desc: str) -> None:
+    """Raise ValueError if value cannot be encoded as latin-1 (required for HTTP headers)."""
+    try:
+        value.encode('latin-1')
+    except UnicodeEncodeError as e:
+        raise ValueError(
+            f'{field_desc} 含有 HTTP 协议不允许的字符（如中文、部分 Emoji）。'
+            f'请使用纯 ASCII 的 API Key，并确认 API 地址为英文 URL。'
+        ) from e

@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from app.core import get_logger
 from app.models.database import DatabaseRepository
+from app.utils.helpers import normalize_ai_api_url, sanitize_ai_api_key, require_http_header_latin1
 
 alerts_bp = Blueprint('alerts', __name__)
 logger = get_logger(__name__)
@@ -516,7 +517,7 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     支持：通义千问(阿里百炼)、智谱AI、DeepSeek、月之暗面
     """
     provider = ai_config.get('provider', 'alibaba')
-    api_key = ai_config.get('api_key', '').strip()
+    api_key = sanitize_ai_api_key(ai_config.get('api_key', ''))
     api_url = ai_config.get('api_url', '')
     model = ai_config.get('model', '')
     
@@ -582,6 +583,14 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
     def make_openai_compatible_request(url: str, api_key: str, model: str, 
                                         system_prompt: str, user_message: str) -> Dict:
         """通用的OpenAI兼容接口调用"""
+        url = normalize_ai_api_url(url)
+        api_key = sanitize_ai_api_key(api_key)
+        try:
+            require_http_header_latin1(f'Bearer {api_key}', 'API Key')
+            require_http_header_latin1(url, 'API 地址')
+        except ValueError as e:
+            raise Exception(str(e)) from e
+
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json; charset=utf-8'
@@ -663,6 +672,14 @@ def call_ai_service(ai_config: Dict, email_content: str) -> Dict:
             api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
         if not model:
             model = 'qwen-turbo'
+        
+        # 检测是否为标准格式 URL，如果是则转换为 OpenAI 兼容格式
+        if 'dashscope.aliyuncs.com/api/v1/services/aigc' in api_url:
+            api_url = api_url.replace(
+                'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+                'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+            )
+            logger.info(f"自动转换为 OpenAI 兼容格式 URL: {api_url}")
         
         ai_text = make_openai_compatible_request(api_url, api_key, model, system_prompt, analysis_prompt)
     
