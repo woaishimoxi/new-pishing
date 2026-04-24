@@ -35,6 +35,10 @@ class EmailMonitorService:
             'phishing_detected': 0,
             'last_check_time': None,
             'last_error': None,
+            'last_fetched_count': 0,
+            'last_processed_count': 0,
+            'last_failed_count': 0,
+            'last_search_criteria': None,
             'start_time': None
         }
         
@@ -65,6 +69,9 @@ class EmailMonitorService:
                     self.config.email.monitor_interval = int(mon['interval'])
                 if 'max_attachment_size' in mon:
                     self.config.detection.max_file_size = int(mon['max_attachment_size'])
+                self.config.email.only_unseen = mon.get('only_unseen', getattr(self.config.email, 'only_unseen', True))
+                self.config.email.mark_seen_after_process = mon.get('mark_seen_after_process', getattr(self.config.email, 'mark_seen_after_process', False))
+                self.config.email.monitor_fetch_limit = mon.get('fetch_limit', mon.get('monitor_fetch_limit', getattr(self.config.email, 'monitor_fetch_limit', 10)))
 
                 det = api_config.get('detection') or {}
                 if 'phishing_threshold' in det:
@@ -141,7 +148,12 @@ class EmailMonitorService:
             'interval': getattr(self.config.email, 'monitor_interval', 30),
             'stats': stats_copy,
             'email_configured': config_check['valid'],
-            'config_details': config_check
+            'config_details': config_check,
+            'monitor_config': {
+                'only_unseen': getattr(self.config.email, 'only_unseen', True),
+                'mark_seen_after_process': getattr(self.config.email, 'mark_seen_after_process', False),
+                'fetch_limit': getattr(self.config.email, 'monitor_fetch_limit', 10)
+            }
         }
     
     def _check_email_config(self) -> Dict:
@@ -218,9 +230,19 @@ class EmailMonitorService:
                     self.stats['last_error'] = error_msg
                 return
             
-            emails = self.fetcher.fetch_emails(limit=10, only_unseen=True)
+            only_unseen = getattr(self.config.email, 'only_unseen', True)
+            mark_seen_after_process = getattr(self.config.email, 'mark_seen_after_process', False)
+            fetch_limit = getattr(self.config.email, 'monitor_fetch_limit', 10)
+            emails = self.fetcher.fetch_emails(
+                limit=fetch_limit,
+                only_unseen=only_unseen,
+                mark_seen_after_fetch=False
+            )
             
-            self.fetcher.disconnect()
+            with self._lock:
+                self.stats['last_fetched_count'] = len(emails)
+                self.stats['last_search_criteria'] = 'UNSEEN' if only_unseen else 'ALL'
+                self.stats['last_check_time'] = datetime.now().isoformat()
             
             if not emails:
                 logger.debug("No new emails found")
@@ -228,9 +250,19 @@ class EmailMonitorService:
             
             logger.info(f"Found {len(emails)} emails to process")
             
+            processed_count = 0
+            failed_count = 0
             for email_data in emails:
                 try:
-                    result = self.fetcher.process_email(email_data.get('raw', ''))
+                    result = self.fetcher.analyze_email(
+                        email_data.get('raw', ''),
+                        source='auto_monitor',
+                        metadata={
+                            'email_id': email_data.get('id'),
+                            'email_uid': email_data.get('uid'),
+                            'fingerprint': email_data.get('fingerprint')
+                        }
+                    )
                     
                     with self._lock:
                         self.stats['total_checked'] += 1
@@ -242,17 +274,30 @@ class EmailMonitorService:
                         
                         self._handle_phishing(email_data, result)
                     
+                    if mark_seen_after_process and self.config.email.protocol == 'imap' and result.get('label') != 'ERROR':
+                        self.fetcher.mark_as_seen(email_data.get('id', ''))
+                    
+                    processed_count += 1
+                    
                 except Exception as e:
+                    failed_count += 1
                     logger.error(f"Failed to process email: {e}")
+            
+            with self._lock:
+                self.stats['last_processed_count'] = processed_count
+                self.stats['last_failed_count'] = failed_count
                     
         except Exception as e:
             logger.error(f"Failed to fetch emails: {e}")
             raise
+        finally:
+            self.fetcher.disconnect()
     
     def _handle_phishing(self, email_data: Dict, result: Dict):
         """处理检测到的钓鱼邮件"""
-        subject = email_data.get('subject', 'Unknown')
-        from_addr = email_data.get('from', 'Unknown')
+        parsed_email = result.get('parsed') or {}
+        subject = parsed_email.get('subject') or email_data.get('subject', 'Unknown')
+        from_addr = parsed_email.get('from') or email_data.get('from', 'Unknown')
         confidence = result.get('confidence', 0)
         
         logger.warning(
@@ -260,16 +305,16 @@ class EmailMonitorService:
             f"Subject: {subject}, Confidence: {confidence:.2%}"
         )
         
-        self._save_alert(email_data, result)
+        self._save_alert(parsed_email or email_data, email_data, result)
     
-    def _save_alert(self, email_data: Dict, result: Dict):
+    def _save_alert(self, parsed_email: Dict, email_data: Dict, result: Dict):
         """保存告警到数据库"""
         try:
             self.db.save_alert(
-                parsed=email_data,
+                parsed=parsed_email,
                 label=result.get('label', 'PHISHING'),
                 confidence=result.get('confidence', 0),
-                traceback_data=result.get('traceback', {}),
+                traceback_report=result.get('traceback', {}),
                 source='auto_monitor',
                 raw_email=email_data.get('raw', ''),
                 email_uid=email_data.get('id')

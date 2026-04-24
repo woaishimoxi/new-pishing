@@ -8,6 +8,8 @@
     <link href="https://cdn.bootcdn.net/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
@@ -605,9 +607,19 @@
                 <button class="btn-nav" onclick="aiAnalyze()">
                     <i class="bi bi-robot me-1"></i> AI分析
                 </button>
-                <button class="btn-nav" onclick="exportReport()">
-                    <i class="bi bi-download me-1"></i> 导出报告
-                </button>
+                <div class="dropdown">
+                    <button class="btn-nav dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" onclick="event.stopPropagation()">
+                        <i class="bi bi-download me-1"></i> 导出报告
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('pdf'); return false;">
+                            <i class="bi bi-file-earmark-pdf text-danger me-2"></i>导出为 PDF
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportReport('json'); return false;">
+                            <i class="bi bi-file-earmark-code text-info me-2"></i>导出为 JSON
+                        </a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>
@@ -2148,8 +2160,13 @@ ${suggestions.length > 0 ? suggestions.map((s, i) => `${i+1}. ${s}`).join('\n') 
             navigator.clipboard.writeText(text).then(() => { alert('已复制到剪贴板'); });
         }
 
-        async function exportReport() {
+        async function exportReport(format) {
             if (!currentResult) return;
+
+            if (format === 'pdf') {
+                await exportReportPDF();
+                return;
+            }
 
             if (!currentResult.id) {
                 const reportId = generateReportId();
@@ -2212,6 +2229,132 @@ ${suggestions.length > 0 ? suggestions.map((s, i) => `${i+1}. ${s}`).join('\n') 
                 } catch (e) {
                     alert('导出失败: ' + e.message);
                 }
+            }
+        }
+
+        async function exportReportPDF() {
+            const { jsPDF } = window.jspdf;
+            const reportElement = document.querySelector('.main-container');
+            if (!reportElement) { alert('无法找到报告内容'); return; }
+
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'pdfLoadingOverlay';
+            loadingOverlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+            loadingOverlay.innerHTML = `<div style="background:white;border-radius:12px;padding:2rem;text-align:center;max-width:300px;">
+                <div style="width:40px;height:40px;border:3px solid #e8e8ed;border-top-color:#0071e3;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 1rem;"></div>
+                <div style="color:#1d1d1f;font-size:0.95rem;">正在加载字体...</div>
+                <div style="color:#6e6e73;font-size:0.85rem;margin-top:0.5rem;">请稍候</div>
+            </div>`;
+            document.body.appendChild(loadingOverlay);
+
+            const spinStyle = document.createElement('style');
+            spinStyle.id = 'pdfExportSpinStyle';
+            spinStyle.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+            document.head.appendChild(spinStyle);
+
+            try {
+                // --- 步骤 1: 等待字体就绪 ---
+                await document.fonts.ready;
+
+                // --- 步骤 2: 截图，字体声明仅注入克隆文档，不影响原页面 ---
+                document.getElementById('pdfLoadingOverlay').querySelector('div > div:last-child').textContent = '正在渲染页面...';
+
+                const fontFamily = '"Noto Sans SC", "Microsoft YaHei", "PingFang SC", "SimHei", sans-serif';
+                const canvas = await html2canvas(reportElement, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    onclone: (clonedDoc, clonedBody) => {
+                        const style = clonedDoc.createElement('style');
+                        style.id = '_pdfCloneFontStyle';
+                        style.textContent = `
+                            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+                            body, body * { font-family: ${fontFamily} !important; }
+                        `;
+                        clonedDoc.head.appendChild(style);
+                        // 强制重排让字体生效
+                        clonedBody.style.display = 'none';
+                        clonedBody.offsetHeight;
+                        clonedBody.style.display = '';
+                    }
+                });
+
+                // --- 步骤 6: 生成 PDF ---
+                document.getElementById('pdfLoadingOverlay').querySelector('div > div:last-child').textContent = '正在生成 PDF...';
+
+                const reportId = generateReportId();
+                const imgData = canvas.toDataURL('image/jpeg', 0.92);
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pageW = pdf.internal.pageSize.getWidth();
+                const pageH = pdf.internal.pageSize.getHeight();
+                const imgAspect = canvas.width / canvas.height;
+                const pageAspect = pageW / pageH;
+                let finalW, finalH;
+                if (imgAspect > pageAspect) {
+                    finalW = pageW;
+                    finalH = pageW / imgAspect;
+                } else {
+                    finalH = pageH;
+                    finalW = pageH * imgAspect;
+                }
+                const scaleFactor = canvas.width / finalW;
+                const totalPages = Math.ceil((canvas.height / scaleFactor) / pageH);
+
+                for (let p = 0; p < totalPages; p++) {
+                    if (p > 0) pdf.addPage();
+
+                    const srcY = p * pageH * scaleFactor;
+                    const srcH = Math.min(pageH * scaleFactor, canvas.height - srcY);
+
+                    const pageCanvas = document.createElement('canvas');
+                    pageCanvas.width = canvas.width;
+                    pageCanvas.height = srcH;
+                    const ctx = pageCanvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+                    ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+
+                    const drawnH = (srcH / canvas.width) * finalW;
+                    pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, finalW, drawnH);
+
+                    pdf.setFillColor(0, 113, 227);
+                    pdf.rect(0, pageH - 7, pageW, 7, 'F');
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(7.5);
+                    try { pdf.text(`钓鱼邮件检测报告  |  报告编号: ${reportId}  |  第 ${p + 1} / ${totalPages} 页`, pageW / 2, pageH - 2.5, { align: 'center' }); } catch (e) {}
+                }
+
+                const filename = currentResult.id ? `phishing_report_${currentResult.id}.pdf` : `phishing_report_${reportId}.pdf`;
+
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: filename,
+                            types: [{ description: 'PDF报告文件', accept: { 'application/pdf': ['.pdf'] } }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(pdf.output('blob'));
+                        await writable.close();
+                        return;
+                    } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+                }
+
+                pdf.save(filename);
+            } catch (e) {
+                alert('PDF 导出失败: ' + e.message);
+            } finally {
+                if (document.body.contains(loadingOverlay)) {
+                    document.body.removeChild(loadingOverlay);
+                }
+                const spin = document.getElementById('pdfExportSpinStyle');
+                if (spin) spin.remove();
             }
         }
     </script>

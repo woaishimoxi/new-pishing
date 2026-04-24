@@ -523,6 +523,31 @@
                             <input type="password" class="form-control form-control-custom" id="email-password" placeholder="密码/授权码">
                             <div class="form-text">QQ邮箱需使用授权码</div>
                         </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="bi bi-sliders me-1" style="color: var(--blue);"></i>邮件监控参数
+                            </label>
+                            <div class="row g-2 mb-2">
+                                <div class="col-4">
+                                    <input type="number" class="form-control form-control-custom" id="monitor-interval" min="10" step="1" placeholder="轮询间隔(秒)" value="30">
+                                </div>
+                                <div class="col-4">
+                                    <input type="number" class="form-control form-control-custom" id="monitor-fetch-limit" min="1" step="1" placeholder="单次抓取数量" value="10">
+                                </div>
+                                <div class="col-4">
+                                    <select class="form-select form-control-custom" id="monitor-only-unseen">
+                                        <option value="true" selected>仅未读</option>
+                                        <option value="false">全部邮件</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="mark-seen-after-process" checked>
+                                <label class="form-check-label" for="mark-seen-after-process">处理成功后标记已读</label>
+                            </div>
+                            <div class="form-text">建议生产环境保持“仅未读 + 处理后标记已读”，便于避免重复处理</div>
+                        </div>
                         
                         <button class="btn btn-primary-custom btn-custom w-100" onclick="saveApiConfig()">
                             <i class="bi bi-check-lg me-1"></i>保存配置
@@ -682,6 +707,47 @@
 
                 <div class="card-custom">
                     <div class="card-header-custom">
+                        <h5 class="card-title"><i class="bi bi-layout-text-window-reverse"></i>当前配置摘要</h5>
+                        <button class="btn btn-outline-custom btn-custom" onclick="refreshConfigSummary()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>刷新
+                        </button>
+                    </div>
+                    <div class="card-body-custom">
+                        <div class="row g-3" id="config-summary-grid">
+                            <div class="col-md-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">AI分析</div>
+                                    <div class="monitor-metric-value" id="summary-ai-status">未开启</div>
+                                    <div class="text-muted small mt-1" id="summary-ai-details">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">邮箱监控</div>
+                                    <div class="monitor-metric-value" id="summary-email-status">未配置</div>
+                                    <div class="text-muted small mt-1" id="summary-email-details">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">监控策略</div>
+                                    <div class="monitor-metric-value" id="summary-monitor-status">-</div>
+                                    <div class="text-muted small mt-1" id="summary-monitor-details">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">威胁情报</div>
+                                    <div class="monitor-metric-value" id="summary-threatbook-status">-</div>
+                                    <div class="text-muted small mt-1" id="summary-threatbook-details">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-custom">
+                    <div class="card-header-custom">
                         <h5 class="card-title"><i class="bi bi-code-slash"></i>JSON编辑器</h5>
                         <div class="d-flex gap-2">
                             <select class="form-select form-control-custom" id="file-selector" style="width: auto;" onchange="loadFileContent()">
@@ -744,6 +810,8 @@
                 if (apiData.content) {
                     currentData.api = apiData.content;
                     renderAPIPreview(apiData.content);
+                    renderMonitorPreview(apiData.content.monitor || {});
+                    refreshConfigSummary();
                 }
 
                 const whiteResp = await fetch('/api/settings/file/whitelist.json');
@@ -780,6 +848,10 @@
             document.getElementById('email-server').value = config.email?.server || '';
             document.getElementById('email-protocol').value = config.email?.protocol || 'imap';
             document.getElementById('email-port').value = config.email?.port || 993;
+            document.getElementById('monitor-interval').value = config.monitor?.interval || 30;
+            document.getElementById('monitor-fetch-limit').value = config.monitor?.fetch_limit || 10;
+            document.getElementById('monitor-only-unseen').value = String(config.monitor?.only_unseen !== false);
+            document.getElementById('mark-seen-after-process').checked = config.monitor?.mark_seen_after_process !== false;
             
             if (config.ai) {
                 document.getElementById('ai-provider').value = config.ai.provider || 'zhipu';
@@ -809,22 +881,22 @@
                     protocol: document.getElementById('email-protocol').value,
                     port: parseInt(document.getElementById('email-port').value) || 993,
                     enabled: !!document.getElementById('email-address').value
+                },
+                monitor: {
+                    interval: parseInt(document.getElementById('monitor-interval').value) || 30,
+                    fetch_limit: parseInt(document.getElementById('monitor-fetch-limit').value) || 10,
+                    only_unseen: document.getElementById('monitor-only-unseen').value === 'true',
+                    mark_seen_after_process: document.getElementById('mark-seen-after-process').checked
                 }
             };
             
             try {
-                const resp = await fetch('/api/settings/file/api_config.json', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: config })
-                });
-                
-                const data = await resp.json();
-                if (data.success) {
+                const mergedConfig = await mergeAndSaveApiConfig(config);
+                if (mergedConfig) {
                     showToast('配置已保存');
-                    currentData.api = config;
+                    currentData.api = mergedConfig;
                 } else {
-                    showToast(data.error || '保存失败', 'error');
+                    showToast('保存失败', 'error');
                 }
             } catch (e) {
                 showToast('保存失败: ' + e.message, 'error');
@@ -850,6 +922,12 @@
                         protocol: document.getElementById('email-protocol').value,
                         port: parseInt(document.getElementById('email-port').value) || 993,
                         enabled: !!document.getElementById('email-address').value
+                    },
+                    monitor: {
+                        interval: parseInt(document.getElementById('monitor-interval').value) || 30,
+                        fetch_limit: parseInt(document.getElementById('monitor-fetch-limit').value) || 10,
+                        only_unseen: document.getElementById('monitor-only-unseen').value === 'true',
+                        mark_seen_after_process: document.getElementById('mark-seen-after-process').checked
                     }
                 };
                 
@@ -858,11 +936,7 @@
                     return;
                 }
                 
-                await fetch('/api/settings/file/api_config.json', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: config })
-                });
+                await mergeAndSaveApiConfig(config);
                 
                 const resp = await fetch('/api/config/test');
                 const data = await resp.json();
@@ -895,6 +969,12 @@
                         protocol: document.getElementById('email-protocol').value,
                         port: parseInt(document.getElementById('email-port').value) || 993,
                         enabled: !!document.getElementById('email-address').value
+                    },
+                    monitor: {
+                        interval: parseInt(document.getElementById('monitor-interval').value) || 30,
+                        fetch_limit: parseInt(document.getElementById('monitor-fetch-limit').value) || 10,
+                        only_unseen: document.getElementById('monitor-only-unseen').value === 'true',
+                        mark_seen_after_process: document.getElementById('mark-seen-after-process').checked
                     }
                 };
                 
@@ -903,11 +983,7 @@
                     return;
                 }
                 
-                await fetch('/api/settings/file/api_config.json', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: config })
-                });
+                await mergeAndSaveApiConfig(config);
                 
                 const resp = await fetch('/api/config/test-email');
                 const data = await resp.json();
@@ -957,26 +1033,42 @@
             };
             
             try {
-                const resp = await fetch('/api/settings/file/api_config.json');
-                const data = await resp.json();
-                const existingConfig = data.content || {};
-                
-                existingConfig.ai = config.ai;
-                
-                const saveResp = await fetch('/api/settings/file/api_config.json', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: existingConfig })
-                });
-                
-                const saveData = await saveResp.json();
-                if (saveData.success) {
+                const mergedConfig = await mergeAndSaveApiConfig(config);
+                if (mergedConfig) {
                     showToast('AI配置已保存');
                 } else {
-                    showToast(saveData.error || '保存失败', 'error');
+                    showToast('保存失败', 'error');
                 }
             } catch (e) {
                 showToast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        async function mergeAndSaveApiConfig(partialConfig) {
+            try {
+                const resp = await fetch('/api/settings/file/api_config.json');
+                const data = await resp.json();
+                const existingConfig = data.content || {};
+                const mergedConfig = { ...existingConfig, ...partialConfig };
+                if (existingConfig.ai && !partialConfig.ai) mergedConfig.ai = existingConfig.ai;
+                if (existingConfig.threatbook && !partialConfig.threatbook) mergedConfig.threatbook = existingConfig.threatbook;
+                if (existingConfig.ipapi && !partialConfig.ipapi) mergedConfig.ipapi = existingConfig.ipapi;
+                if (existingConfig.email && !partialConfig.email) mergedConfig.email = existingConfig.email;
+                if (existingConfig.monitor && !partialConfig.monitor) mergedConfig.monitor = existingConfig.monitor;
+
+                const saveResp = await fetch('/api/settings/file/api_config.json', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: mergedConfig })
+                });
+                const saveData = await saveResp.json();
+                if (!saveData.success) {
+                    throw new Error(saveData.error || '保存失败');
+                }
+                return mergedConfig;
+            } catch (e) {
+                showToast('保存失败: ' + e.message, 'error');
+                return null;
             }
         }
 
@@ -1024,6 +1116,18 @@
             }
         }
 
+        function renderMonitorPreview(monitor) {
+            const intervalEl = document.getElementById('monitor-interval');
+            const fetchLimitEl = document.getElementById('monitor-fetch-limit');
+            const onlyUnseenEl = document.getElementById('monitor-only-unseen');
+            const markSeenEl = document.getElementById('mark-seen-after-process');
+
+            if (intervalEl) intervalEl.value = monitor.interval ?? 30;
+            if (fetchLimitEl) fetchLimitEl.value = monitor.fetch_limit ?? monitor.monitor_fetch_limit ?? 10;
+            if (onlyUnseenEl) onlyUnseenEl.value = String(monitor.only_unseen ?? true);
+            if (markSeenEl) markSeenEl.checked = monitor.mark_seen_after_process ?? false;
+        }
+
         function renderWhitelist(domains) {
             const container = document.getElementById('whitelist-tags');
             if (domains.length === 0) {
@@ -1033,7 +1137,7 @@
             container.innerHTML = domains.slice(0, 30).map(d => `
                 <span class="tag success">
                     ${d}
-                    <span class="tag-remove" onclick="removeWhitelist('${d}')">&times;</span>
+                    <span class="tag-remove" onclick="removeWhitelist('${d.replace(/'/g, "\\'")}')">&times;</span>
                 </span>
             `).join('') + (domains.length > 30 ? `<span class="text-muted">...还有${domains.length - 30}个</span>` : '');
         }
@@ -1088,6 +1192,33 @@
                     </span>
                 `).join('') + (domains.length > 10 ? `<span class="text-muted">+${domains.length - 10}</span>` : '')
                 : '<span class="text-muted">暂无</span>';
+        }
+
+        function refreshConfigSummary() {
+            const config = currentData.api || {};
+            const ai = config.ai || {};
+            const email = config.email || {};
+            const monitor = config.monitor || {};
+            const threatbook = config.threatbook || {};
+
+            const aiEnabled = ai.enabled ? '已开启' : '未开启';
+            const aiDetails = [ai.provider || '未设置', ai.model || '未设置'].join(' / ');
+            const emailEnabled = email.enabled ? '已配置' : '未配置';
+            const emailDetails = [email.server || '-', email.protocol ? email.protocol.toUpperCase() : '-'].join(' / ');
+            const monitorStatus = [monitor.only_unseen !== false ? '仅未读' : '全部邮件', monitor.mark_seen_after_process ? '已读标记开启' : '已读标记关闭'].join(' · ');
+            const monitorDetails = [`间隔 ${monitor.interval || 30} 秒`, `抓取 ${monitor.fetch_limit || 10} 封`].join('，');
+            const threatbookStatus = threatbook.api_key ? '已配置' : '未配置';
+            const threatbookDetails = [threatbook.sandbox_enabled === false ? '沙箱关闭' : '沙箱开启', threatbook.ioc_enabled === false ? 'IOC远程关闭' : 'IOC远程开启'].join(' · ');
+
+            const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+            setText('summary-ai-status', aiEnabled);
+            setText('summary-ai-details', aiDetails);
+            setText('summary-email-status', emailEnabled);
+            setText('summary-email-details', emailDetails);
+            setText('summary-monitor-status', monitorStatus);
+            setText('summary-monitor-details', monitorDetails);
+            setText('summary-threatbook-status', threatbookStatus);
+            setText('summary-threatbook-details', threatbookDetails);
         }
 
         async function loadFileContent() {

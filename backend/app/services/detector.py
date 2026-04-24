@@ -169,58 +169,72 @@ class DetectionService:
         model_scores['url'] = url_score
         
         # 6. 融合评分（核心逻辑：评分驱动决策）
-        # 
+        #
         # 权重设计原则（参考网络安全专家建议）：
         # - URL分析是钓鱼检测的核心杀招，权重最高
         # - AI语义分析识别社会工程学，权重次高
         # - RF/异常检测器作为辅助判断
         # - 规则引擎仅作基础参考（已知威胁应走熔断机制）
         #
+        # 修复：使用最大单项分作为核心参考，避免被低分项稀释
+        #
         scores = []
         weights = []
         score_details = []
-        
-        # RF/XGB模型（辅助判断）- 权重 1.0
+
+        # 获取各模块的最高单项分
+        max_individual_score = max(
+            model_scores.get('rf') or 0,
+            model_scores.get('xgb') or 0,
+            model_scores.get('anomaly') or 0
+        )
+
+        # RF/XGB模型集成分数（辅助判断）- 权重 1.0
         if model_score is not None:
             scores.append(model_score)
             weights.append(1.0)
-            score_details.append(f"模型={model_score:.2f}×1.0")
-        
-        # 规则引擎（基础参考）- 权重 0.5
+            score_details.append(f"模型集成={model_score:.2f}×1.0")
+
+        # 规则引擎（基础参考）- 权重 0.3（降低权重，避免拉低总分）
         scores.append(rule_score)
-        weights.append(0.5)
-        score_details.append(f"规则={rule_score:.2f}×0.5")
-        
+        weights.append(0.3)
+        score_details.append(f"规则={rule_score:.2f}×0.3")
+
         # AI语义分析（核心主力）- 权重 2.0
         if ai_score is not None:
             scores.append(ai_score)
             weights.append(2.0)
             score_details.append(f"AI={ai_score:.2f}×2.0")
-        
+
         # URL分析（最高优先级）- 权重 3.0
         if url_score is not None:
             scores.append(url_score)
             weights.append(3.0)
             score_details.append(f"URL={url_score:.2f}×3.0")
-        
+
         if scores:
             final_confidence = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
         else:
             final_confidence = rule_score
-        
+
         self.logger.info(f"融合评分: {' + '.join(score_details)} = {final_confidence:.4f}")
-        
+
         # 7. 高风险指标二次检查（确保不漏过）
+        # 当最高单项分远超融合分时，说明存在高风险信号被低估
         high_risk_score = max(
             model_scores.get('rf') or 0,
             model_scores.get('xgb') or 0,
+            model_scores.get('anomaly') or 0,
             model_scores.get('ai') or 0,
             model_scores.get('url') or 0
         )
-        
+
+        # 如果最高单项分 >= 0.85 且 融合分 < 0.6，使用最大单项分
+        # 这样可以确保高风险邮件不会被误判
         if high_risk_score >= 0.85 and final_confidence < 0.6:
-            self.logger.warning(f"高风险指标被低估: 最高单项={high_risk_score}, 融合={final_confidence}")
-            final_confidence = max(final_confidence, high_risk_score)
+            self.logger.warning(f"高风险指标被低估: 最高单项={high_risk_score:.4f}, 融合={final_confidence:.4f}")
+            # 使用最大单项分作为最终分数，确保不漏检
+            final_confidence = high_risk_score
             all_risk_indicators.append("高风险指标修正")
         
         # 8. 阈值判断（严格一致）

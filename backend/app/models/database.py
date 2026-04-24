@@ -26,6 +26,9 @@ class DatabaseRepository:
         self.logger = get_logger(__name__)
         self.config = get_config()
         self.db_path = db_path or self.config.database.path
+        if self.db_path and not os.path.isabs(self.db_path):
+            project_root = Path(__file__).resolve().parents[3]
+            self.db_path = str((project_root / self.db_path).resolve())
         self._ensure_database()
     
     def _ensure_database(self) -> None:
@@ -64,7 +67,8 @@ class DatabaseRepository:
                     source TEXT,
                     email_hash TEXT,
                     body TEXT,
-                    html_body TEXT
+                    html_body TEXT,
+                    ai_analysis TEXT
                 )
             ''')
         else:

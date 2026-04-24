@@ -226,7 +226,5 @@ def ensemble_score(features_35: List[float], features_26: List[float]) -> Tuple[
         'weights': weights,
         'final_score': final_score
     }
-    
-    return final_score, detail_scores
-    
+
     return final_score, detail_scores

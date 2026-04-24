@@ -192,6 +192,69 @@
         .trend-up { color: var(--green); }
         .trend-down { color: var(--red); }
 
+        .monitor-panel {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(6, 182, 212, 0.04) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.12);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+        }
+
+        .monitor-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .monitor-badge.running {
+            background: rgba(52, 199, 89, 0.12);
+            color: var(--green);
+        }
+
+        .monitor-badge.stopped {
+            background: rgba(255, 59, 48, 0.10);
+            color: var(--red);
+        }
+
+        .monitor-metric {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: var(--radius-md);
+            padding: 0.85rem 1rem;
+            min-height: 86px;
+        }
+
+        .monitor-metric-label {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+        }
+
+        .monitor-metric-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+
+        .monitor-progress {
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        .monitor-progress-bar {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--green) 0%, var(--cyan) 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
         .card-cyber {
             background: var(--bg-card);
             border: none;
@@ -806,34 +869,78 @@
 
         <div class="row g-4 mb-4">
             <div class="col-md-12">
-                <div class="stat-card" id="monitor-status-card">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <div class="stat-icon" id="monitor-icon">
-                                <i class="bi bi-pause-circle"></i>
-                            </div>
-                            <div>
-                                <div class="stat-label">邮件自动监控</div>
-                                <div class="stat-value" id="monitor-status-text">未运行</div>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="text-end me-3">
-                                <div class="text-muted small">已检测邮件</div>
-                                <div class="fw-bold" id="monitor-checked-count">0</div>
-                            </div>
-                            <div class="text-end me-3">
-                                <div class="text-muted small">发现钓鱼邮件</div>
-                                <div class="fw-bold text-danger" id="monitor-phishing-count">0</div>
-                            </div>
-                            <div class="text-end me-3">
-                                <div class="text-muted small">监控间隔</div>
-                                <div class="fw-bold" id="monitor-interval">30秒</div>
-                            </div>
+                <div class="card-cyber monitor-panel" id="monitor-status-card">
+                    <div class="card-header-cyber px-0 pt-0" style="border-bottom: 1px solid rgba(0,0,0,0.06);">
+                        <h5 class="card-title-cyber mb-0">
+                            <i class="bi bi-broadcast"></i>
+                            邮件自动监控
+                        </h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="monitor-badge stopped" id="monitor-state-badge">
+                                <span class="status-dot offline" id="monitor-state-dot"></span>
+                                <span id="monitor-status-text">未运行</span>
+                            </span>
                             <button class="btn btn-primary-custom" id="monitor-toggle-btn" onclick="toggleMonitor()">
                                 <i class="bi bi-play-circle me-1"></i>
                                 <span id="monitor-btn-text">启动监控</span>
                             </button>
+                        </div>
+                    </div>
+                    <div class="card-body-cyber px-0 pb-0">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3 col-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">已检测邮件</div>
+                                    <div class="monitor-metric-value" id="monitor-checked-count">0</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">发现钓鱼邮件</div>
+                                    <div class="monitor-metric-value text-danger" id="monitor-phishing-count">0</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">监控间隔</div>
+                                    <div class="monitor-metric-value" id="monitor-interval">30秒</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">处理进度</div>
+                                    <div class="monitor-metric-value" style="font-size: 1rem; margin-bottom: 0.45rem;" id="monitor-progress-text">0%</div>
+                                    <div class="monitor-progress">
+                                        <div class="monitor-progress-bar" id="monitor-progress-bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-lg-4 col-md-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">本轮抓取</div>
+                                    <div class="monitor-metric-value" id="monitor-fetched-count">0</div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4 col-md-6">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">本轮处理成功</div>
+                                    <div class="monitor-metric-value" id="monitor-processed-count">0</div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4 col-md-12">
+                                <div class="monitor-metric">
+                                    <div class="monitor-metric-label">本轮失败</div>
+                                    <div class="monitor-metric-value text-warning" id="monitor-failed-count">0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 small text-muted d-flex flex-wrap gap-3">
+                            <span>监控模式：<strong id="monitor-mode-text">仅未读 · 未自动已读</strong></span>
+                            <span>搜索条件：<strong id="monitor-search-criteria">UNSEEN</strong></span>
+                            <span>最近检查：<strong id="monitor-last-check-time">-</strong></span>
+                            <span>最近错误：<strong id="monitor-last-error">无</strong></span>
                         </div>
                     </div>
                 </div>
@@ -1351,30 +1458,35 @@ https://example.com/account"></textarea>
         }
 
         function updateMonitorUI(running, stats) {
-            const icon = document.getElementById('monitor-icon');
+            const badge = document.getElementById('monitor-state-badge');
+            const dot = document.getElementById('monitor-state-dot');
             const statusText = document.getElementById('monitor-status-text');
             const btn = document.getElementById('monitor-toggle-btn');
-            const btnText = document.getElementById('monitor-btn-text');
             const checkedCount = document.getElementById('monitor-checked-count');
             const phishingCount = document.getElementById('monitor-phishing-count');
             const intervalText = document.getElementById('monitor-interval');
+            const fetchedCount = document.getElementById('monitor-fetched-count');
+            const processedCount = document.getElementById('monitor-processed-count');
+            const failedCount = document.getElementById('monitor-failed-count');
+            const progressText = document.getElementById('monitor-progress-text');
+            const progressBar = document.getElementById('monitor-progress-bar');
+            const searchCriteria = document.getElementById('monitor-search-criteria');
+            const lastCheckTime = document.getElementById('monitor-last-check-time');
+            const lastError = document.getElementById('monitor-last-error');
+            const monitorMode = document.getElementById('monitor-mode-text');
             
             if (running) {
-                if (icon) icon.innerHTML = '<i class="bi bi-play-circle text-success"></i>';
-                if (statusText) {
-                    statusText.textContent = '运行中';
-                    statusText.className = 'stat-value text-success';
-                }
+                if (badge) badge.className = 'monitor-badge running';
+                if (dot) dot.className = 'status-dot online';
+                if (statusText) statusText.textContent = '运行中';
                 if (btn) {
                     btn.innerHTML = '<i class="bi bi-stop-circle me-1"></i><span>停止监控</span>';
                     btn.className = 'btn btn-danger';
                 }
             } else {
-                if (icon) icon.innerHTML = '<i class="bi bi-pause-circle"></i>';
-                if (statusText) {
-                    statusText.textContent = '未运行';
-                    statusText.className = 'stat-value';
-                }
+                if (badge) badge.className = 'monitor-badge stopped';
+                if (dot) dot.className = 'status-dot offline';
+                if (statusText) statusText.textContent = '未运行';
                 if (btn) {
                     btn.innerHTML = '<i class="bi bi-play-circle me-1"></i><span>启动监控</span>';
                     btn.className = 'btn btn-primary-custom';
@@ -1382,9 +1494,29 @@ https://example.com/account"></textarea>
             }
             
             if (stats) {
-                if (checkedCount) checkedCount.textContent = stats.total_checked || 0;
-                if (phishingCount) phishingCount.textContent = stats.phishing_detected || 0;
+                const totalChecked = stats.total_checked || 0;
+                const phishingDetected = stats.phishing_detected || 0;
+                const fetched = stats.last_fetched_count || 0;
+                const processed = stats.last_processed_count || 0;
+                const failed = stats.last_failed_count || 0;
+                const progress = fetched > 0 ? Math.min(100, Math.round((processed / fetched) * 100)) : 0;
+
+                if (checkedCount) checkedCount.textContent = totalChecked;
+                if (phishingCount) phishingCount.textContent = phishingDetected;
                 if (intervalText) intervalText.textContent = (stats.interval || 30) + '秒';
+                if (fetchedCount) fetchedCount.textContent = fetched;
+                if (processedCount) processedCount.textContent = processed;
+                if (failedCount) failedCount.textContent = failed;
+                if (progressText) progressText.textContent = progress + '%';
+                if (progressBar) progressBar.style.width = progress + '%';
+                if (searchCriteria) searchCriteria.textContent = stats.last_search_criteria || 'UNSEEN';
+                if (lastCheckTime) lastCheckTime.textContent = stats.last_check_time || '-';
+                if (lastError) lastError.textContent = stats.last_error || '无';
+                if (monitorMode) {
+                    const monitorConfig = stats.monitor_config || {};
+                    const modeText = [monitorConfig.only_unseen === false ? '全部邮件' : '仅未读', monitorConfig.mark_seen_after_process ? '处理后已读' : '未自动已读'].join(' · ');
+                    monitorMode.textContent = modeText;
+                }
             }
         }
 
@@ -1468,7 +1600,7 @@ https://example.com/account"></textarea>
                         }
                     }
                     
-                    loadEmailList();
+                    loadEmailList(currentPage);
                     loadStats();
                     showAlert('success', `自动监控：发现并分析了 ${uniqueEmails.length} 封新邮件`);
                 }
@@ -1677,7 +1809,7 @@ https://example.com/account"></textarea>
                     }
                     
                     hideLoading();
-                    loadEmailList();
+                    loadEmailList(currentPage);
                     loadStats();
                     showAlert('success', `成功获取并分析 ${result.emails.length} 封邮件`);
                 } else {

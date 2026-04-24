@@ -68,6 +68,9 @@ class EmailConfig:
     fetch_limit: int = 10
     auto_monitor: bool = False
     monitor_interval: int = 30
+    only_unseen: bool = True
+    mark_seen_after_process: bool = False
+    monitor_fetch_limit: int = 10
 
 
 @dataclass
