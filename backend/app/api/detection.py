@@ -110,7 +110,11 @@ def process_email(raw_email: str, source: str = '手动输入', email_uid: str =
         source,
         raw_email,
         email_uid,
-        result.get('ai_analysis')
+        ai_analysis=result.get('ai_analysis'),
+        module_scores=result.get('module_scores'),
+        model_scores=result.get('model_scores'),
+        features=result.get('features'),
+        url_analysis=result.get('url_analysis')
     )
     result['id'] = alert_id
     result['saved'] = True

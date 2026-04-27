@@ -47,11 +47,12 @@ This is a normal email content.
             'attachment_count': 0
         }
         
-        label, confidence, reason = detector.analyze(parsed, features)
+        label, confidence, reason, model_scores = detector.analyze(parsed, features)
         
         assert label in ['SAFE', 'SUSPICIOUS', 'PHISHING']
         assert 0 <= confidence <= 1
         assert isinstance(reason, str)
+        assert isinstance(model_scores, dict)
 
 
 class TestEmailParserService:

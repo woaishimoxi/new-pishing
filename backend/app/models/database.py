@@ -84,6 +84,14 @@ class DatabaseRepository:
                 cursor.execute('ALTER TABLE alerts ADD COLUMN html_body TEXT')
             if 'ai_analysis' not in columns:
                 cursor.execute('ALTER TABLE alerts ADD COLUMN ai_analysis TEXT')
+            if 'module_scores' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN module_scores TEXT')
+            if 'model_scores' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN model_scores TEXT')
+            if 'features' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN features TEXT')
+            if 'url_analysis' not in columns:
+                cursor.execute('ALTER TABLE alerts ADD COLUMN url_analysis TEXT')
         
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS processed_uids (
@@ -113,7 +121,11 @@ class DatabaseRepository:
         source: str = '手动输入',
         raw_email: str = '',
         email_uid: str = '',
-        ai_analysis: Dict = None
+        ai_analysis: Dict = None,
+        module_scores: Dict = None,
+        model_scores: Dict = None,
+        features: Dict = None,
+        url_analysis: Dict = None
     ) -> int:
         """Save detection result to database"""
         conn = sqlite3.connect(self.db_path)
@@ -133,13 +145,17 @@ class DatabaseRepository:
         
         # 序列化 AI 分析结果
         ai_analysis_json = json.dumps(ai_analysis, ensure_ascii=False) if ai_analysis else None
+        module_scores_json = json.dumps(module_scores, ensure_ascii=False) if module_scores else None
+        model_scores_json = json.dumps(model_scores, ensure_ascii=False) if model_scores else None
+        features_json = json.dumps(features, ensure_ascii=False) if features else None
+        url_analysis_json = json.dumps(url_analysis, ensure_ascii=False) if url_analysis else None
         
         cursor.execute('''
             INSERT INTO alerts (from_addr, from_display_name, from_email, to_addr, subject, detection_time,
                                label, confidence, source_ip, risk_indicators,
                                raw_email, traceback_data, attachment_data, url_data, header_data, source, email_hash,
-                               body, html_body, ai_analysis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               body, html_body, ai_analysis, module_scores, model_scores, features, url_analysis)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             parsed.get('from', ''),
             parsed.get('from_display_name', ''),
@@ -158,9 +174,13 @@ class DatabaseRepository:
             json.dumps(parsed.get('headers', {})),
             source,
             email_hash,
-            parsed.get('body', ''),  # 添加body字段
-            parsed.get('html_body', ''),  # 添加html_body字段
-            ai_analysis_json
+            parsed.get('body', ''),
+            parsed.get('html_body', ''),
+            ai_analysis_json,
+            module_scores_json,
+            model_scores_json,
+            features_json,
+            url_analysis_json
         ))
         
         alert_id = cursor.lastrowid

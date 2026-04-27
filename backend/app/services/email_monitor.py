@@ -54,7 +54,30 @@ class EmailMonitorService:
             if os.path.exists(config_file):
                 with open(config_file, 'r', encoding='utf-8') as f:
                     api_config = json.load(f)
-                    
+                
+                # 加载 AI 配置
+                ai_config = api_config.get('ai', {})
+                if ai_config:
+                    if 'provider' in ai_config:
+                        self.config.api.ai_provider = ai_config['provider']
+                    if 'api_key' in ai_config:
+                        self.config.api.ai_api_key = ai_config['api_key']
+                    if 'api_url' in ai_config:
+                        self.config.api.ai_api_url = ai_config['api_url']
+                    if 'model' in ai_config:
+                        self.config.api.ai_model = ai_config['model']
+                    if 'enabled' in ai_config:
+                        self.config.api.ai_enabled = ai_config['enabled']
+                    logger.info(f"AI config reloaded: enabled={self.config.api.ai_enabled}, api_key={'已配置' if self.config.api.ai_api_key else '未配置'}")
+                
+                # 加载 threatbook 配置
+                tb_config = api_config.get('threatbook', {})
+                if tb_config:
+                    if 'api_key' in tb_config:
+                        self.config.api.threatbook_api_key = tb_config['api_key']
+                    if 'api_url' in tb_config:
+                        self.config.api.threatbook_api_url = tb_config['api_url']
+                
                 email_config = api_config.get('email', {})
                 if email_config:
                     self.config.email.address = email_config.get('email', self.config.email.address)
@@ -158,6 +181,9 @@ class EmailMonitorService:
     
     def _check_email_config(self) -> Dict:
         """检查邮箱配置是否完整，返回详细信息"""
+        # 每次都重新获取最新配置
+        self.config = get_config()
+        
         address = self.config.email.address
         password = self.config.email.password
         server = self.config.email.server
@@ -308,16 +334,36 @@ class EmailMonitorService:
         self._save_alert(parsed_email or email_data, email_data, result)
     
     def _save_alert(self, parsed_email: Dict, email_data: Dict, result: Dict):
-        """保存告警到数据库"""
+        """保存告警到数据库 - 与手动输入保持一致的分析流程"""
         try:
+            # 获取完整的 parsed 数据（包含 body、html_body 等）
+            full_parsed = result.get('parsed') or {}
+            # 确保 body 和 html_body 被包含
+            if not full_parsed.get('body') and result.get('features', {}).get('body'):
+                full_parsed['body'] = result['features'].get('body', '')
+            if not full_parsed.get('html_body') and result.get('features', {}).get('html_body'):
+                full_parsed['html_body'] = result['features'].get('html_body', '')
+            
+            # 构建完整的 traceback 报告，包含所有分析模块的结果
+            traceback_report = result.get('traceback') or {}
+            traceback_report['module_scores'] = result.get('module_scores')  # 模块评分
+            traceback_report['model_scores'] = result.get('model_scores')   # 模型评分
+            traceback_report['features'] = result.get('features')           # 特征数据
+            traceback_report['url_analysis'] = result.get('url_analysis')   # URL分析
+            
             self.db.save_alert(
-                parsed=parsed_email,
+                parsed=full_parsed,
                 label=result.get('label', 'PHISHING'),
                 confidence=result.get('confidence', 0),
-                traceback_report=result.get('traceback', {}),
+                traceback_report=traceback_report,
                 source='auto_monitor',
                 raw_email=email_data.get('raw', ''),
-                email_uid=email_data.get('id')
+                email_uid=email_data.get('id'),
+                ai_analysis=result.get('ai_analysis'),
+                module_scores=result.get('module_scores'),
+                model_scores=result.get('model_scores'),
+                features=result.get('features'),
+                url_analysis=result.get('url_analysis')
             )
         except Exception as e:
             logger.error(f"Failed to save alert: {e}")

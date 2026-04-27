@@ -15,7 +15,6 @@ from app.services.url_analyzer import URLAnalyzerService
 from app.services.sandbox_analyzer import SandboxAnalyzerService
 
 logger = get_logger(__name__)
-config = get_config()
 
 
 class AnalysisPipeline:
@@ -27,7 +26,17 @@ class AnalysisPipeline:
         self.url_analyzer = URLAnalyzerService()
         self.sandbox_analyzer = SandboxAnalyzerService()
 
+    def _get_config(self):
+        """每次获取最新的配置实例，避免缓存旧配置"""
+        return get_config()
+
     def analyze(self, raw_email: str, source: str = 'manual', email_uid: str = '', include_sandbox: bool = True) -> Dict:
+        logger.info(f"[Pipeline] 开始分析 - source={source}, email_uid={email_uid}, include_sandbox={include_sandbox}")
+        
+        # 每次分析都获取最新配置
+        config = self._get_config()
+        logger.info(f"[Pipeline] AI配置: ai_enabled={getattr(config.api, 'ai_enabled', None)}, api_key={'已配置' if getattr(config.api, 'ai_api_key', '') else '未配置'}")
+
         parsed = self.parser.parse(raw_email)
         parsed['analysis_source'] = source
         if email_uid:
@@ -67,14 +76,9 @@ class AnalysisPipeline:
 
         ai_analysis = None
         try:
-            config_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'config', 'api_config.json')
-            if os.path.exists(config_file):
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    all_config = json.load(f)
-                    ai_config = all_config.get('ai', {})
-                    if ai_config.get('enabled') and ai_config.get('api_key'):
-                        body_text = parsed.get('body', '') or parsed.get('html_body', '') or '[无正文内容]'
-                        email_content_for_ai = f"""发件人: {parsed.get('from_display_name', '')} <{parsed.get('from_email', '')}>
+            if getattr(config.api, 'ai_enabled', False) and getattr(config.api, 'ai_api_key', ''):
+                body_text = parsed.get('body', '') or parsed.get('html_body', '') or '[无正文内容]'
+                email_content_for_ai = f"""发件人: {parsed.get('from_display_name', '')} <{parsed.get('from_email', '')}>
 收件人: {parsed.get('to', '')}
 主题: {parsed.get('subject', '')}
 
@@ -87,11 +91,16 @@ class AnalysisPipeline:
 附件信息:
 {chr(10).join('- ' + att.get('filename', '未知') for att in (parsed.get('attachments', []) or [])[:5]) if parsed.get('attachments') else '[无附件]'}
 """
-                        try:
-                            from app.api.alerts import call_ai_service
-                            ai_analysis = call_ai_service(ai_config, email_content_for_ai[:6000])
-                        except Exception as e:
-                            logger.warning(f"AI service unavailable, skip AI analysis: {e}")
+                try:
+                    from app.api.alerts import call_ai_service
+                    ai_analysis = call_ai_service({
+                        'provider': getattr(config.api, 'ai_provider', 'alibaba'),
+                        'api_key': getattr(config.api, 'ai_api_key', ''),
+                        'api_url': getattr(config.api, 'ai_api_url', ''),
+                        'model': getattr(config.api, 'ai_model', 'qwen-turbo'),
+                    }, email_content_for_ai[:6000])
+                except Exception as e:
+                    logger.warning(f"AI service unavailable, skip AI analysis: {e}")
         except Exception as e:
             logger.warning(f"AI analysis config load failed: {e}")
 

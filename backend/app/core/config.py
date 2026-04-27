@@ -328,13 +328,13 @@ class Config:
     def save_api_config(self) -> bool:
         """Save API configuration to file"""
         config_file = self.config_dir / "api_config.json"
+        backup_file = self.config_dir / "api_config.json.bak"
         try:
-            # 读取现有配置（保留 detection / monitor / last_tuned 等扩展段）
             existing_data = {}
             if config_file.exists():
                 with open(config_file, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
-            
+
             data = {**existing_data}
             data['threatbook'] = {
                 'api_key': self.api.threatbook_api_key,
@@ -372,6 +372,12 @@ class Config:
                 'max_attachment_size': self.detection.max_file_size,
                 'enable_sandbox': self.api.sandbox_enabled,
             }
+
+            if config_file.exists():
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    original = f.read()
+                with open(backup_file, 'w', encoding='utf-8') as bf:
+                    bf.write(original)
 
             with open(config_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)

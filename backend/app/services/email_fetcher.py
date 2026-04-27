@@ -17,11 +17,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.core import get_logger, get_config
-from app.services.email_parser import EmailParserService
-from app.services.detector import DetectionService
-from app.services.traceback import TracebackService
-from app.services.feature_extractor import FeatureExtractionService
-from app.services.url_analyzer import URLAnalyzerService
+from app.services.analysis_pipeline import AnalysisPipeline
 
 
 class EmailFetcherService:
@@ -32,13 +28,21 @@ class EmailFetcherService:
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        self.config = get_config()
-        self.parser = EmailParserService()
-        self.detector = DetectionService()
-        self.traceback = TracebackService()
-        self.feature_extractor = FeatureExtractionService()
-        self.url_analyzer = URLAnalyzerService()
+        self._config = None
+        self.pipeline = AnalysisPipeline()
         self.connection = None
+    
+    @property
+    def config(self):
+        """每次获取最新配置"""
+        if self._config is None:
+            self._config = get_config()
+        return self._config
+    
+    def refresh_config(self):
+        """手动刷新配置"""
+        self._config = get_config()
+        self.logger.info("Config refreshed")
     
     def connect(
         self,
@@ -190,74 +194,10 @@ class EmailFetcherService:
         
         return emails
     
-    def _analyze_parsed_email(self, parsed: Dict, raw_email: str = '') -> Dict:
-        """统一分析入口：解析结果 -> 特征 -> URL/AI -> 融合检测"""
-        features = self.feature_extractor.extract_features(parsed)
-        traceback_report = self.traceback.generate_report(parsed)
-        urls = parsed.get('urls', []) or []
-
-        url_analysis = None
-        if urls:
-            try:
-                url_analysis = self.url_analyzer.analyze_urls(urls)
-            except Exception as e:
-                self.logger.warning(f"URL analysis failed: {e}")
-                url_analysis = None
-
-        ai_analysis = parsed.get('ai_analysis') or {}
-
-        try:
-            label, confidence, reason, model_scores = self.detector.analyze(
-                parsed,
-                features,
-                ai_analysis=ai_analysis,
-                url_analysis=url_analysis
-            )
-        except ValueError as ve:
-            self.logger.error(f"Unpack error in detector.analyze: {ve}")
-            self.logger.error(f"parsed type: {type(parsed)}, keys: {list(parsed.keys()) if isinstance(parsed, dict) else 'N/A'}")
-            self.logger.error(f"features type: {type(features)}, keys: {list(features.keys()) if isinstance(features, dict) else 'N/A'}")
-            import traceback
-            self.logger.error(f"Full traceback: {traceback.format_exc()}")
-            return {
-                'label': 'ERROR',
-                'confidence': 0.0,
-                'reason': f'检测失败: {str(ve)}',
-                'parsed': {},
-                'model_scores': {}
-            }
-
-        return {
-            'label': label,
-            'confidence': round(confidence, 4),
-            'reason': reason,
-            'model_scores': model_scores,
-            'parsed': {
-                'from': parsed.get('from'),
-                'from_display_name': parsed.get('from_display_name'),
-                'from_email': parsed.get('from_email'),
-                'to': parsed.get('to'),
-                'subject': parsed.get('subject'),
-                'body': parsed.get('body', ''),
-                'html_body': parsed.get('html_body', ''),
-                'urls': urls,
-                'url_count': len(urls),
-                'attachment_count': len(parsed.get('attachments', [])),
-                'has_html_body': 1 if parsed.get('html_body') else 0
-            },
-            'features': features,
-            'traceback': traceback_report,
-            'url_analysis': url_analysis,
-            'ai_analysis': ai_analysis,
-            'raw_email': raw_email
-        }
-
     def process_email(self, raw_email: str) -> Dict:
-        """Process single email"""
+        """Process single email - 统一走 AnalysisPipeline"""
         try:
-            parsed = self.parser.parse(raw_email)
-            return self._analyze_parsed_email(parsed, raw_email)
-            
+            return self.pipeline.analyze(raw_email, source='IMAP自动拉取')
         except Exception as e:
             self.logger.error(f"Failed to process email: {e}")
             return {
@@ -267,14 +207,10 @@ class EmailFetcherService:
                 'parsed': {},
                 'model_scores': {}
             }
-    
+
     def analyze_email(self, raw_email: str, source: str = 'manual', metadata: Optional[Dict] = None) -> Dict:
         """统一分析入口：所有来源邮件都调用这里"""
-        result = self.process_email(raw_email)
-        result['source'] = source
-        if metadata:
-            result['metadata'] = metadata
-        return result
+        return self.pipeline.analyze(raw_email, source=source)
 
     def process_emails(
         self,
@@ -282,15 +218,15 @@ class EmailFetcherService:
         max_workers: int = 4,
         mark_seen_after_process: bool = False
     ) -> List[Dict]:
-        """Process multiple emails in parallel"""
+        """Process multiple emails in parallel - 统一走 AnalysisPipeline"""
         results = []
-        
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_email = {
-                executor.submit(self._analyze_parsed_email, self.parser.parse(email['raw']), email['raw']): email 
+                executor.submit(self.pipeline.analyze, email['raw'], source='IMAP自动拉取'): email
                 for email in emails
             }
-            
+
             for future in future_to_email:
                 try:
                     result = future.result()
@@ -301,5 +237,5 @@ class EmailFetcherService:
                     results.append(result)
                 except Exception as e:
                     self.logger.error(f"Exception processing email: {e}")
-        
+
         return results

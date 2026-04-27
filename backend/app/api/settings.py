@@ -129,12 +129,12 @@ def update_config_file(filename):
 
 
 def _sync_api_config(content: Dict):
-    """同步API配置到系统配置"""
+    """同步API配置到系统配置并统一落盘"""
     try:
         from app.core.config import get_config
         config = get_config()
-        
-        if 'threatbook' in content:
+
+        if 'threatbook' in content and isinstance(content['threatbook'], dict):
             tb = content['threatbook']
             if 'api_key' in tb:
                 config.api.threatbook_api_key = tb['api_key']
@@ -144,8 +144,8 @@ def _sync_api_config(content: Dict):
                 config.api.sandbox_enabled = tb['sandbox_enabled']
             if 'ioc_enabled' in tb:
                 config.api.ioc_remote_enabled = tb['ioc_enabled']
-        
-        if 'email' in content:
+
+        if 'email' in content and isinstance(content['email'], dict):
             email = content['email']
             if 'email' in email:
                 config.email.address = email['email']
@@ -197,8 +197,11 @@ def _sync_api_config(content: Dict):
                 config.email.monitor_interval = int(mon['interval'])
             if 'max_attachment_size' in mon:
                 config.detection.max_file_size = int(mon['max_attachment_size'])
-        
-        logger.info("API config synced to system")
+
+        if not config.save_api_config():
+            raise RuntimeError('保存API配置失败')
+
+        logger.info("API config synced to system and persisted")
     except Exception as e:
         logger.error(f"Failed to sync API config: {e}")
 

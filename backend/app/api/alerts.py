@@ -11,6 +11,7 @@ from typing import Dict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.core import get_logger
+from app.core.config import get_config
 from app.models.database import DatabaseRepository
 from app.services.traceback import TracebackService
 from app.utils.helpers import normalize_ai_api_url, sanitize_ai_api_key, require_http_header_latin1
@@ -169,21 +170,15 @@ def ai_analyze(alert_id):
     if not alert:
         return jsonify({'error': '报告不存在'}), 404
     
-    config_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-        'config', 'api_config.json'
-    )
+    config = get_config()
+    ai_config = {
+        'provider': getattr(config.api, 'ai_provider', 'alibaba'),
+        'api_key': getattr(config.api, 'ai_api_key', ''),
+        'api_url': getattr(config.api, 'ai_api_url', ''),
+        'model': getattr(config.api, 'ai_model', 'qwen-turbo'),
+    }
     
-    ai_config = {}
-    if os.path.exists(config_file):
-        try:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                all_config = json.load(f)
-                ai_config = all_config.get('ai', {})
-        except Exception as e:
-            logger.error(f"Failed to load AI config: {e}")
-    
-    if not ai_config.get('api_key'):
+    if not ai_config.get('api_key') or not getattr(config.api, 'ai_enabled', False):
         return jsonify({
             'status': 'error',
             'message': 'AI分析未配置',
