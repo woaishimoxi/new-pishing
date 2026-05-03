@@ -94,7 +94,7 @@ class DetectionService:
             'rule': 0.0,
             'ai': None,
             'url': None,
-            'kill_switch': None
+            'kill_switch': 0.0
         }
         
         all_risk_indicators = []
@@ -125,7 +125,9 @@ class DetectionService:
             model_scores['xgb'] = xgb_score
             model_scores['anomaly'] = anomaly_score
             
+            # 获取融合后的模型集成分数
             model_score, model_details = ensemble_score(features_35d, features_26d)
+            model_scores['ensemble'] = model_score  # 添加融合分数到model_scores
             
             if model_score is not None:
                 self.logger.debug(f"轻量模型得分: {model_score:.4f}, RF={rf_score}, XGB={xgb_score}, Anomaly={anomaly_score}")
@@ -156,8 +158,8 @@ class DetectionService:
         # 5. URL分析评分
         url_score = None
         if url_analysis:
-            if url_analysis.get('max_risk_score'):
-                url_score = url_analysis['max_risk_score'] / 100.0
+            max_risk_score = url_analysis.get('max_risk_score', 0)
+            url_score = (max_risk_score or 0) / 100.0
             
             if url_analysis.get('high_risk_count', 0) > 0:
                 all_risk_indicators.append(f"发现{url_analysis['high_risk_count']}个高风险URL")

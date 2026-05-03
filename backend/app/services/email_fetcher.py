@@ -28,21 +28,9 @@ class EmailFetcherService:
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        self._config = None
+        self.config = get_config()
         self.pipeline = AnalysisPipeline()
         self.connection = None
-    
-    @property
-    def config(self):
-        """每次获取最新配置"""
-        if self._config is None:
-            self._config = get_config()
-        return self._config
-    
-    def refresh_config(self):
-        """手动刷新配置"""
-        self._config = get_config()
-        self.logger.info("Config refreshed")
     
     def connect(
         self,
@@ -210,7 +198,10 @@ class EmailFetcherService:
 
     def analyze_email(self, raw_email: str, source: str = 'manual', metadata: Optional[Dict] = None) -> Dict:
         """统一分析入口：所有来源邮件都调用这里"""
-        return self.pipeline.analyze(raw_email, source=source)
+        email_uid = ''
+        if metadata:
+            email_uid = metadata.get('email_uid', '') or metadata.get('email_id', '')
+        return self.pipeline.analyze(raw_email, source=source, email_uid=email_uid)
 
     def process_emails(
         self,

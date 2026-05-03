@@ -531,13 +531,36 @@ class TracebackService:
         
         # 分析邮件来源
         received_chain = parsed_email.get('received_chain', [])
+        headers = parsed_email.get('headers', {})
+        
+        # 尝试从多个来源获取源IP
+        source_ip = 'Unknown'
+        
+        # 方法1: 从Received链提取
         if received_chain:
             source_info = self._extract_source_ip_and_path(received_chain)
-            report['email_source']['source_ip'] = source_info['source_ip']
+            source_ip = source_info['source_ip']
+            report['email_source']['source_ip'] = source_ip
             report['email_source']['full_path'] = source_info['full_path']
             report['email_source']['hops'] = source_info['hops']
-            
-            if source_info['source_ip'] != 'Unknown':
+        
+        # 方法2: 从headers中提取的源IP（如果Received链没有）
+        if source_ip == 'Unknown' and headers.get('extracted_source_ip'):
+            source_ip = headers['extracted_source_ip']
+            report['email_source']['source_ip'] = source_ip
+            report['email_source']['full_path'] = source_ip
+            report['email_source']['hops'] = [source_ip]
+        
+        # 方法3: 从X-Originating-IP提取
+        if source_ip == 'Unknown' and headers.get('x_originating_ip'):
+            ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', headers['x_originating_ip'])
+            if ip_match:
+                source_ip = ip_match.group(1)
+                report['email_source']['source_ip'] = source_ip
+                report['email_source']['full_path'] = source_ip
+                report['email_source']['hops'] = [source_ip]
+        
+        if source_ip != 'Unknown':
                 # 并行查询IP信息和黑名单
                 futures = {}
                 

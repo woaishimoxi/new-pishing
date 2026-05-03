@@ -107,7 +107,7 @@ def is_models_available() -> Dict[str, bool]:
 def score_with_rf(features_35: List[float]) -> Optional[float]:
     """
     使用RF分类器评分 (35维特征)
-    返回钓鱼概率 (0-1)
+    返回钓鱼概率 (0-1)，值越大表示越可能是钓鱼邮件
     """
     load_models()
     
@@ -120,8 +120,9 @@ def score_with_rf(features_35: List[float]) -> Optional[float]:
         if _models['phishmmf_scaler'] is not None:
             X = _models['phishmmf_scaler'].transform(X)
         
+        # predict_proba返回 [正常概率, 钓鱼概率]，取索引1即为钓鱼概率
         proba = float(_models['phishmmf_rf'].predict_proba(X)[0, 1])
-        return 1.0 - proba
+        return proba  # 直接返回钓鱼概率，无需反转
     except Exception as e:
         logger.error(f"RF评分错误: {e}")
         return None
@@ -130,7 +131,7 @@ def score_with_rf(features_35: List[float]) -> Optional[float]:
 def score_with_xgb(features_35: List[float]) -> Optional[float]:
     """
     使用XGB分类器评分 (35维特征)
-    返回钓鱼概率 (0-1)
+    返回钓鱼概率 (0-1)，值越大表示越可能是钓鱼邮件
     """
     load_models()
     
@@ -143,8 +144,9 @@ def score_with_xgb(features_35: List[float]) -> Optional[float]:
         if _models['phishmmf_scaler'] is not None:
             X = _models['phishmmf_scaler'].transform(X)
         
+        # predict_proba返回 [正常概率, 钓鱼概率]，取索引1即为钓鱼概率
         proba = float(_models['phishmmf_xgb'].predict_proba(X)[0, 1])
-        return 1.0 - proba
+        return proba  # 直接返回钓鱼概率，无需反转
     except Exception as e:
         logger.error(f"XGB评分错误: {e}")
         return None

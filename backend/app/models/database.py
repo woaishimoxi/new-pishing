@@ -155,7 +155,7 @@ class DatabaseRepository:
                                label, confidence, source_ip, risk_indicators,
                                raw_email, traceback_data, attachment_data, url_data, header_data, source, email_hash,
                                body, html_body, ai_analysis, module_scores, model_scores, features, url_analysis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             parsed.get('from', ''),
             parsed.get('from_display_name', ''),
@@ -428,6 +428,34 @@ class DatabaseRepository:
                     alert['ai_analysis'] = json.loads(alert['ai_analysis'])
             except:
                 alert['ai_analysis'] = {}
+        
+        if alert.get('model_scores'):
+            try:
+                if isinstance(alert['model_scores'], str):
+                    alert['model_scores'] = json.loads(alert['model_scores'])
+            except:
+                alert['model_scores'] = {}
+        
+        if alert.get('module_scores'):
+            try:
+                if isinstance(alert['module_scores'], str):
+                    alert['module_scores'] = json.loads(alert['module_scores'])
+            except:
+                alert['module_scores'] = {}
+        
+        if alert.get('features'):
+            try:
+                if isinstance(alert['features'], str):
+                    alert['features'] = json.loads(alert['features'])
+            except:
+                alert['features'] = {}
+        
+        if alert.get('url_analysis'):
+            try:
+                if isinstance(alert['url_analysis'], str):
+                    alert['url_analysis'] = json.loads(alert['url_analysis'])
+            except:
+                alert['url_analysis'] = {}
         
         alert['parsed'] = {
             'from': alert.get('from_addr', ''),

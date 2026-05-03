@@ -402,7 +402,7 @@ class EmailParserService:
         return processed_urls
     
     def _extract_headers(self, msg: Message) -> Dict[str, str]:
-        """Extract email headers"""
+        """Extract email headers - 增强版，支持QQ邮箱等国内邮箱"""
         headers = {
             'return_path': msg.get("Return-Path", ""),
             'x_mailer': msg.get("X-Mailer", ""),
@@ -412,7 +412,52 @@ class EmailParserService:
             'dkim_signature': msg.get("DKIM-Signature", ""),
             'x_spam_status': msg.get("X-Spam-Status", ""),
             'x_spam_score': msg.get("X-Spam-Score", ""),
+            # QQ邮箱特有头部
+            'x_qq_mime': msg.get("X-QQ-MIME", ""),
+            'x_qq_mailer': msg.get("X-QQ-Mailer", ""),
+            'x_qq_mid': msg.get("X-QQ-mid", ""),
+            'x_qq_xmrinfo': msg.get("X-QQ-XMRINFO", ""),
+            'x_qq_xmailinfo': msg.get("X-QQ-XMAILINFO", ""),
+            # 其他常见邮箱头部
+            'x_priority': msg.get("X-Priority", ""),
+            'x_ms_exchange_organization_authsource': msg.get("X-MS-Exchange-Organization-AuthSource", ""),
+            'x_forefront_antispam_report': msg.get("X-Forefront-Antispam-Report", ""),
+            'x_microsoft_antispam': msg.get("X-Microsoft-Antispam", ""),
         }
+        
+        # 尝试从多个来源提取源IP
+        source_ip = ""
+        
+        # 方法1: 从X-Originating-IP提取
+        if headers.get('x_originating_ip'):
+            ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', headers['x_originating_ip'])
+            if ip_match:
+                source_ip = ip_match.group(1)
+        
+        # 方法2: 从X-QQ-XMAILINFO提取（QQ邮箱特有）
+        if not source_ip and headers.get('x_qq_xmailinfo'):
+            ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', headers['x_qq_xmailinfo'])
+            if ip_match:
+                source_ip = ip_match.group(1)
+        
+        # 方法3: 从Received头部提取（如果存在）
+        received_list = msg.get_all("Received", [])
+        if not source_ip and received_list:
+            for received in received_list:
+                ip_match = re.search(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]', received)
+                if ip_match:
+                    potential_ip = ip_match.group(1)
+                    # 检查是否是私有IP
+                    parts = potential_ip.split('.')
+                    if len(parts) == 4:
+                        first = int(parts[0])
+                        second = int(parts[1])
+                        if not (first == 10 or (first == 172 and 16 <= second <= 31) or 
+                                (first == 192 and second == 168) or first == 127):
+                            source_ip = potential_ip
+                            break
+        
+        headers['extracted_source_ip'] = source_ip
         
         auth_results = headers.get('authentication_results', '')
         headers['spf_result'] = self._parse_auth_result(auth_results, 'spf')

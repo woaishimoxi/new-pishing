@@ -93,7 +93,7 @@ class FeatureExtractionService:
         return feature_vector
     
     def _extract_header_features(self, parsed_email: Dict) -> Dict:
-        """Extract email header features"""
+        """Extract email header features - 增强版，处理头部信息缺失的情况"""
         features = {
             'is_suspicious_from_domain': 0,
             'received_hops_count': 0,
@@ -103,6 +103,8 @@ class FeatureExtractionService:
             'dmarc_fail': 0,
             'from_display_name_mismatch': 0,
             'from_domain_in_subject': 0,
+            'has_source_ip': 0,  # 新增：是否有源IP
+            'has_authentication_results': 0,  # 新增：是否有认证结果
         }
         
         from_email = parsed_email.get('from_email', '')
@@ -140,12 +142,43 @@ class FeatureExtractionService:
         features['received_hops_count'] = len(received_chain)
         
         headers = parsed_email.get('headers', {})
+        
+        # 检查是否有源IP（从多个来源）
+        has_source_ip = False
+        if headers.get('extracted_source_ip'):
+            has_source_ip = True
+        elif headers.get('x_originating_ip'):
+            has_source_ip = True
+        elif received_chain:
+            # 如果有received链，尝试从中提取IP
+            for received in received_chain:
+                ip_match = re.search(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]', received)
+                if ip_match:
+                    has_source_ip = True
+                    break
+        
+        features['has_source_ip'] = 1 if has_source_ip else 0
+        
+        # 检查是否有认证结果
+        has_auth_results = bool(headers.get('authentication_results'))
+        features['has_authentication_results'] = 1 if has_auth_results else 0
+        
+        # SPF/DKIM/DMARC 检查
         if headers.get('spf_result') == 'fail':
             features['spf_fail'] = 1
+        elif headers.get('spf_result') == 'none':
+            # 如果没有SPF记录，可能是一个风险信号
+            features['spf_fail'] = 0  # 不标记为失败，但记录为缺失
+        
         if headers.get('dkim_result') == 'fail':
             features['dkim_fail'] = 1
+        elif headers.get('dkim_result') == 'none':
+            features['dkim_fail'] = 0
+        
         if headers.get('dmarc_result') == 'fail':
             features['dmarc_fail'] = 1
+        elif headers.get('dmarc_result') == 'none':
+            features['dmarc_fail'] = 0
         
         from_display_name = parsed_email.get('from_display_name', '')
         if from_display_name:

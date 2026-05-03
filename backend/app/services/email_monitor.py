@@ -257,7 +257,7 @@ class EmailMonitorService:
                 return
             
             only_unseen = getattr(self.config.email, 'only_unseen', True)
-            mark_seen_after_process = getattr(self.config.email, 'mark_seen_after_process', False)
+            mark_seen_after_process = getattr(self.config.email, 'mark_seen_after_process', True)
             fetch_limit = getattr(self.config.email, 'monitor_fetch_limit', 10)
             emails = self.fetcher.fetch_emails(
                 limit=fetch_limit,
@@ -274,19 +274,44 @@ class EmailMonitorService:
                 logger.debug("No new emails found")
                 return
             
-            logger.info(f"Found {len(emails)} emails to process")
+            # 获取已处理的邮件指纹和UID，用于去重
+            processed_hashes = self.db.get_processed_hashes()
+            processed_uids = self.db.get_processed_uids()
+            
+            logger.info(f"Found {len(emails)} emails to process, already processed: {len(processed_hashes)} hashes, {len(processed_uids)} UIDs")
             
             processed_count = 0
             failed_count = 0
+            skipped_count = 0
+            
             for email_data in emails:
                 try:
+                    email_uid = email_data.get('uid', '')
+                    fingerprint = email_data.get('fingerprint', '')
+                    
+                    # 去重：检查是否已处理过
+                    if fingerprint and fingerprint in processed_hashes:
+                        logger.debug(f"Skipping already processed email (fingerprint): {fingerprint[:16]}...")
+                        skipped_count += 1
+                        # 仍然标记为已读，避免下次再拉取
+                        if mark_seen_after_process and self.config.email.protocol == 'imap':
+                            self.fetcher.mark_as_seen(email_data.get('id', ''))
+                        continue
+                    
+                    if email_uid and email_uid in processed_uids:
+                        logger.debug(f"Skipping already processed email (uid): {email_uid}")
+                        skipped_count += 1
+                        if mark_seen_after_process and self.config.email.protocol == 'imap':
+                            self.fetcher.mark_as_seen(email_data.get('id', ''))
+                        continue
+                    
                     result = self.fetcher.analyze_email(
                         email_data.get('raw', ''),
                         source='auto_monitor',
                         metadata={
                             'email_id': email_data.get('id'),
-                            'email_uid': email_data.get('uid'),
-                            'fingerprint': email_data.get('fingerprint')
+                            'email_uid': email_uid,
+                            'fingerprint': fingerprint
                         }
                     )
                     
@@ -294,12 +319,18 @@ class EmailMonitorService:
                         self.stats['total_checked'] += 1
                         self.stats['last_check_time'] = datetime.now().isoformat()
                     
+                    # 保存所有分析结果
+                    self._save_alert(
+                        result.get('parsed') or {},
+                        email_data,
+                        result
+                    )
+                    
                     if result.get('label') == 'PHISHING':
                         with self._lock:
                             self.stats['phishing_detected'] += 1
-                        
-                        self._handle_phishing(email_data, result)
                     
+                    # 处理完成后标记为已读
                     if mark_seen_after_process and self.config.email.protocol == 'imap' and result.get('label') != 'ERROR':
                         self.fetcher.mark_as_seen(email_data.get('id', ''))
                     
@@ -312,6 +343,10 @@ class EmailMonitorService:
             with self._lock:
                 self.stats['last_processed_count'] = processed_count
                 self.stats['last_failed_count'] = failed_count
+            
+            if skipped_count > 0:
+                logger.info(f"Skipped {skipped_count} already processed emails")
+            logger.info(f"Processed {processed_count} new emails, {failed_count} failed")
                     
         except Exception as e:
             logger.error(f"Failed to fetch emails: {e}")
@@ -319,46 +354,24 @@ class EmailMonitorService:
         finally:
             self.fetcher.disconnect()
     
-    def _handle_phishing(self, email_data: Dict, result: Dict):
-        """处理检测到的钓鱼邮件"""
-        parsed_email = result.get('parsed') or {}
-        subject = parsed_email.get('subject') or email_data.get('subject', 'Unknown')
-        from_addr = parsed_email.get('from') or email_data.get('from', 'Unknown')
-        confidence = result.get('confidence', 0)
-        
-        logger.warning(
-            f"Phishing detected! From: {from_addr}, "
-            f"Subject: {subject}, Confidence: {confidence:.2%}"
-        )
-        
-        self._save_alert(parsed_email or email_data, email_data, result)
-    
     def _save_alert(self, parsed_email: Dict, email_data: Dict, result: Dict):
-        """保存告警到数据库 - 与手动输入保持一致的分析流程"""
+        """保存告警到数据库 - 与手动输入完全一致的流程"""
         try:
-            # 获取完整的 parsed 数据（包含 body、html_body 等）
+            # 使用 pipeline 返回的完整 parsed 数据
             full_parsed = result.get('parsed') or {}
-            # 确保 body 和 html_body 被包含
-            if not full_parsed.get('body') and result.get('features', {}).get('body'):
-                full_parsed['body'] = result['features'].get('body', '')
-            if not full_parsed.get('html_body') and result.get('features', {}).get('html_body'):
-                full_parsed['html_body'] = result['features'].get('html_body', '')
             
-            # 构建完整的 traceback 报告，包含所有分析模块的结果
+            # 使用 pipeline 返回的完整 traceback 报告
             traceback_report = result.get('traceback') or {}
-            traceback_report['module_scores'] = result.get('module_scores')  # 模块评分
-            traceback_report['model_scores'] = result.get('model_scores')   # 模型评分
-            traceback_report['features'] = result.get('features')           # 特征数据
-            traceback_report['url_analysis'] = result.get('url_analysis')   # URL分析
             
+            # 调用与 API 完全相同的 save_alert 参数
             self.db.save_alert(
                 parsed=full_parsed,
                 label=result.get('label', 'PHISHING'),
                 confidence=result.get('confidence', 0),
                 traceback_report=traceback_report,
-                source='auto_monitor',
+                source='IMAP自动拉取',
                 raw_email=email_data.get('raw', ''),
-                email_uid=email_data.get('id'),
+                email_uid=email_data.get('uid', email_data.get('id')),
                 ai_analysis=result.get('ai_analysis'),
                 module_scores=result.get('module_scores'),
                 model_scores=result.get('model_scores'),
